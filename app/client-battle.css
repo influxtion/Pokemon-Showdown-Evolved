@@ -3,8 +3,9 @@
 
    Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. Do not
    give .leftmenu, .mainmenu, .menugroup, .battleform or their <p> rows a position or
-   lasting transform: the client's team picker expects the select's offsetParent to be
-   .mainmenuwrapper. The entrance animation below only moves them while it plays. */
+   transform, not even in an animation: the client's team picker expects the select's
+   offsetParent to be .mainmenuwrapper, and an animation stays on its first frame while the
+   client view is hidden (on Home, for example). The card containing the form only fades. */
 html.sd-launcher-shell:not(.sd-menu-community) {
   .mainmenuwrapper {
     background: radial-gradient(ellipse 900px 420px at 50% -80px,
@@ -422,9 +423,10 @@ html.sd-launcher-shell:not(.sd-menu-community) {
       width: 100% !important;
     }
   }
-  /* Motion: the page rises in each time the tab opens, and controls answer the pointer. */
+  /* Motion: the page appears each time the tab opens, and controls answer the pointer.
+     The card holding the pickers fades without moving (see the note at the top). */
   .mainmenu > .menugroup:has(.battleform) {
-    animation: sd-rise 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) backwards !important;
+    animation: sd-fade 0.32s ease-out backwards !important;
   }
   .mainmenu button[value="ladder"],
   .mainmenu button[value="/smogtours"],
