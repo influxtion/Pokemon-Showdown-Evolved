@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, WebContentsView, Menu, ipcMain, nativeTheme, shell, dialog,
-  protocol, session: electronSession, screen } = require('electron');
+  protocol, session: electronSession, screen, Notification } = require('electron');
 require('./profile').configureProfile(app);
 const { Settings } = require('./settings');
 const { ShowdownBridge } = require('./showdown');
@@ -17,6 +17,7 @@ const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
 const { Logger } = require('./logging');
 const { WindowState } = require('./window-state');
+const { MessageAlerts } = require('./message-alerts');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
 
 if (!app.isReady()) registerShowdexScheme(protocol);
@@ -26,7 +27,7 @@ let showdexApplied = false;
 let showdexLoadFailed = false;
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
-const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-rooms.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
+const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-messages.css', 'client-rooms.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
 const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
@@ -57,6 +58,12 @@ let maintenance = false;
 let logger = null;
 let windowState = null;
 const bridge = new ShowdownBridge(() => (client ? client.webContents : null));
+const messageAlerts = new MessageAlerts();
+// Held so click handlers survive garbage collection until the notification closes.
+const shownAlerts = new Set();
+
+// Windows matches toasts to the installer's Start menu shortcut by this ID.
+if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId('com.influxtion.showdowndesktop');
 
 function background() {
   return nativeTheme.shouldUseDarkColors ? BACKGROUND.dark : BACKGROUND.light;
@@ -124,6 +131,10 @@ function ensureClient() {
   client.setBackgroundColor(background());
 
   const contents = client.webContents;
+  // The launcher sends challenge and message notifications itself (see announce), so the
+  // client's own would only duplicate them, and clicking those cannot raise the window.
+  contents.session.setPermissionRequestHandler((_contents, permission, respond) => respond(permission !== 'notifications'));
+  contents.session.setPermissionCheckHandler((_contents, permission) => permission !== 'notifications');
   contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
     if (isMainFrame) logger.write('client-load-failed', code);
   });
@@ -189,10 +200,13 @@ function createWindow() {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      // Pages poll the client for challenges and messages; keep that timely when minimized.
+      backgroundThrottling: false,
     },
   });
 
   const currentWindow = win;
+  win.on('focus', () => { if (!currentWindow.isDestroyed()) currentWindow.flashFrame(false); });
   if (process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1') win.setIgnoreMouseEvents(true);
   replayReview = new ReplayReview({ window: win, css: REPLAY_CSS, background: background() });
   let practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
@@ -403,10 +417,40 @@ ipcMain.handle('showdown:snapshot', (event) => {
   return bridge.snapshot();
 });
 
-ipcMain.handle('showdown:session', (event) => {
+ipcMain.handle('showdown:session', async (event) => {
   if (!isLauncherFrame(event)) return { ready: false, rooms: [] };
-  return bridge.session();
+  const state = await bridge.session();
+  announce(messageAlerts.observe(state));
+  return state;
 });
+
+// Challenges and messages that arrive while the app is in the background. In the foreground
+// the rail and the challenge bar already show them.
+function announce(alerts) {
+  if (!alerts.length || !win || win.isDestroyed() || win.isFocused() || !settings.get('notifyMessages')) return;
+  win.flashFrame(true);
+  if (!Notification.isSupported()) return;
+  for (const alert of alerts.slice(0, 3)) {
+    // The client plays its own challenge sound.
+    const notification = new Notification({ title: alert.title, body: alert.body, silent: alert.kind === 'challenge' });
+    shownAlerts.add(notification);
+    notification.on('click', () => openAlert(alert).catch(() => {}));
+    notification.on('close', () => shownAlerts.delete(notification));
+    notification.show();
+  }
+}
+
+async function openAlert(alert) {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  // A challenge is answered from the bar on any page; a message opens its conversation,
+  // unless leaving the current page would drop an unsaved replay note.
+  if (alert.kind !== 'pm' || replayDirty || maintenance) return;
+  if (await bridge.act('open-pm', { user: alert.user }) !== true || !win) return;
+  if (!parseUrl(win.webContents.getURL())?.pathname.endsWith('/play.html')) win.loadFile(path.join(RENDERER_DIR, 'play.html'));
+}
 
 ipcMain.handle('showdown:action', (event, action, args) => {
   if (!isLauncherFrame(event) || typeof action !== 'string') return false;

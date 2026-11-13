@@ -80,19 +80,23 @@ app.whenReady().then(async () => {
   await load('settings.html');
   await until(() => run("document.getElementById('start-page').value === 'replays'"), 'Settings loaded');
   assert.equal(await run("document.getElementById('confirm-on-close').checked"), true);
-  for (const id of ['theme', 'start-page', 'confirm-on-close', 'reload-client', 'open-logs', 'sign-out', 'reset-launcher', 'showdex-enabled', 'showdex-status', 'showdex-reload-banner', 'showdex-reload']) {
+  assert.equal(await run("document.getElementById('notify-messages').checked"), true);
+  for (const id of ['theme', 'start-page', 'confirm-on-close', 'notify-messages', 'reload-client', 'open-logs', 'sign-out', 'reset-launcher', 'showdex-enabled', 'showdex-status', 'showdex-reload-banner', 'showdex-reload']) {
     assert.equal(await run(`Boolean(document.getElementById(${JSON.stringify(id)}))`), true, `${id} control`);
   }
   await run("document.getElementById('start-page').value = 'home'; document.getElementById('start-page').dispatchEvent(new Event('change', {bubbles:true}))");
   await until(() => readSettings().startPage === 'home', 'start page saved');
   await run("document.getElementById('confirm-on-close').click()");
   await until(() => readSettings().confirmOnClose === false, 'close setting saved');
+  await run("document.getElementById('notify-messages').click()");
+  await until(() => readSettings().notifyMessages === false, 'notification setting saved');
   await run("document.getElementById('theme').value = 'dark'; document.getElementById('theme').dispatchEvent(new Event('change', {bubbles:true}))");
   await until(() => readSettings().theme === 'dark', 'appearance saved');
   renderer.reload();
   await until(() => !renderer.isLoading() && renderer.getURL().endsWith('settings.html'), 'settings reload');
   await until(() => run("document.getElementById('theme').value === 'dark'"), 'settings restored');
   assert.equal(await run("document.getElementById('confirm-on-close').checked"), false);
+  assert.equal(await run("document.getElementById('notify-messages').checked"), false);
   assert.equal(await run("document.getElementById('start-page').value"), 'home');
   assert.deepEqual((await result('getSettings()')).settings, readSettings());
   assert.equal((await result("setSetting('unknown', true)")).ok, false);
@@ -159,7 +163,7 @@ app.whenReady().then(async () => {
   assert.equal((await result('resetLauncher()')).ok, true);
   assert.equal(await noteCount(), 0);
   assert.equal(fs.existsSync(replayFile), false);
-  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false });
+  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
   assert.equal(await run("localStorage.getItem('launcher-marker')"), null);
   assert.equal(await client().executeJavaScript("localStorage.getItem('session-marker')"), 'keep-after-reset');
 

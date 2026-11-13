@@ -33,7 +33,11 @@ function renderRoom(session) {
   let title = 'Showdown';
   let format = '';
   let status = '';
-  if (session.ready && current === '') {
+  const pm = session.menuTab === 'pm' && (session.messages || []).find((m) => m.userid === session.pmOpen);
+  if (session.ready && current === '' && pm) {
+    title = pm.name;
+    status = 'Private message';
+  } else if (session.ready && current === '') {
     title = session.menuTab === 'community' ? 'Community' : 'Battle';
   } else if (current === 'rooms') {
     title = 'Rooms';

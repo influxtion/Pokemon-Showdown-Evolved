@@ -19,6 +19,9 @@
     ladder: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
     battles: svg('<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>', round),
     plus: svg('<path d="M8 3v10M3 8h10"/>', ' stroke-linecap="round"'),
+    message: svg('<path d="M2 4h12v8H2zM2 4l6 5 6-5"/>', round),
+    // Two crossed swords: blades, crossguards and grips.
+    swords: svg('<path d="M2.5 2.5h2.5l6 6M11 11l2.5 2.5M9.5 12.5l3-3M13.5 2.5H11l-6 6M5 11l-2.5 2.5M3.5 9.5l3 3"/>', ' stroke-linecap="round" stroke-linejoin="round"'),
     other: svg('<rect x="3" y="3" width="10" height="10" rx="1.5"/>'),
     x: svg('<path d="M4 4l8 8M12 4l-8 8"/>', ' stroke-linecap="round"'),
   };
@@ -91,6 +94,27 @@
   const BATTLE_ROOMS = new Set(['ladder', 'battles', 'tournaments', 'smogtours']);
   const inBattle = (room) => room.battle || BATTLE_ROOMS.has(room.id);
 
+  async function openConversation(user) {
+    await act('open-pm', { user });
+    if (onPlay) pollNow();
+    else go('play.html');
+  }
+
+  // Closing goes through the client, which also declines a challenge still waiting there.
+  async function closeConversation(user) {
+    await act('close-pm', { user });
+    pollNow();
+  }
+
+  function messageSub(m) {
+    const c = m.challenge;
+    if (!c) return '';
+    // The rail is narrow; the challenge bar and the row's tooltip carry the format.
+    if (c.dir === 'in') return 'Challenge';
+    if (c.dir === 'out') return 'Waiting for reply';
+    return 'Challenge cancelled';
+  }
+
   async function joinRooms() {
     await act('join', { room: 'rooms' });
     if (onPlay) pollNow();
@@ -103,9 +127,9 @@
     else go('play.html');
   }
 
-  function row({ title, sub, kind, live, unread, current, id, closable, tab }) {
-    const node = make('div', `nav-item ${tab ? 'nav-tab' : 'nav-room'}${live ? ' nav-item--live' : ''}`);
-    node.title = sub ? `${title} · ${sub}` : title;
+  function row({ title, sub, tip, kind, live, unread, current, id, closable, tab, pm, challenge }) {
+    const node = make('div', `nav-item ${tab ? 'nav-tab' : 'nav-room'}${live ? ' nav-item--live' : ''}${challenge ? ' nav-item--challenge' : ''}`);
+    node.title = tip || (sub ? `${title} · ${sub}` : title);
     if (current) node.setAttribute('aria-current', 'page');
     const main = make('button', 'nav-room-main');
     main.type = 'button';
@@ -119,7 +143,7 @@
       dot.title = 'New activity';
       main.append(dot);
     }
-    main.addEventListener('click', () => (tab ? openTab(tab) : focusRoom(id)));
+    main.addEventListener('click', () => (pm ? openConversation(pm) : tab ? openTab(tab) : focusRoom(id)));
     node.append(main);
     if (closable) {
       const close = make('button', 'rail-icon-btn nav-close');
@@ -129,7 +153,8 @@
       close.append(icon(ICONS.x));
       close.addEventListener('click', (event) => {
         event.stopPropagation();
-        closeRoom(id);
+        if (pm) closeConversation(pm);
+        else closeRoom(id);
       });
       node.append(close);
     }
@@ -147,6 +172,115 @@
 
   let lastKey = null;
 
+  // Challenge bars sit under the top bar on every page, so a challenge can be answered
+  // without leaving the current screen. Answers go through the client's own buttons.
+  let barsKey = null;
+  let barsBox = null;
+  const chosenTeams = new Map();
+
+  // The team Home last used for this format, if any.
+  function savedTeam(format) {
+    try {
+      const raw = localStorage.getItem(`hub.team.${format.split('@@@')[0]}`);
+      const n = raw === null || raw === '' ? NaN : Number(raw);
+      return Number.isInteger(n) && n >= 0 ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function answer(user, reply, team) {
+    const result = await act('answer-challenge', team === null ? { user, answer: reply } : { user, answer: reply, team });
+    // The client needs the user, for example to build a team first: show its conversation.
+    if (result === 'needs-client') await openConversation(user);
+    barsKey = null;
+    pollNow();
+  }
+
+  function challengeBar(m) {
+    const c = m.challenge;
+    const bar = make('section', `banner banner--bar banner--challenge banner--challenge-${c.dir}`);
+    bar.setAttribute('aria-label', c.dir === 'out' ? `Your challenge to ${m.name}` : `Challenge from ${m.name}`);
+    bar.append(icon(ICONS.swords, 'challenge-icon'));
+    const text = make('div', 'challenge-text');
+    const format = c.formatName || 'a battle';
+    if (c.dir === 'in') {
+      text.append(make('strong', '', `${m.name} challenges you to ${format}`));
+      if (c.message && c.message !== `${m.name} wants to battle!`) text.append(make('span', 'challenge-note', c.message));
+    } else if (c.dir === 'out') {
+      text.append(make('strong', '', `Waiting for ${m.name} to accept`), make('span', 'challenge-note', format));
+    } else {
+      text.append(make('strong', '', `${m.name} cancelled the challenge`));
+    }
+    bar.append(text, make('span', 'spacer'));
+
+    const button = (label, className, handler, lock = true) => {
+      const node = make('button', `btn${className}`, label);
+      node.type = 'button';
+      node.addEventListener('click', () => {
+        if (lock) for (const control of bar.querySelectorAll('button, select')) control.disabled = true;
+        handler();
+      });
+      return node;
+    };
+    const chat = () => button('Open chat', ' btn-quiet', () => openConversation(m.userid), false);
+
+    if (c.dir === 'in' && c.pending) {
+      bar.append(make('span', 'challenge-note', 'Starting the battle…'));
+    } else if (c.dir === 'in') {
+      let select = null;
+      if (c.needsTeam && c.teams.length) {
+        const id = `challenge-team-${m.userid}`;
+        const label = make('label', 'challenge-label', 'Team');
+        label.htmlFor = id;
+        select = make('select', 'select challenge-team');
+        select.id = id;
+        for (const t of c.teams) {
+          const option = make('option', '', t.name);
+          option.value = String(t.index);
+          select.append(option);
+        }
+        const pick = [chosenTeams.get(m.userid), savedTeam(c.format), c.team]
+          .find((v) => Number.isInteger(v) && c.teams.some((t) => t.index === v));
+        if (pick !== undefined) select.value = String(pick);
+        select.addEventListener('change', () => chosenTeams.set(m.userid, Number(select.value)));
+        bar.append(label, select);
+      } else if (c.needsTeam) {
+        bar.append(make('span', 'challenge-note', 'No team for this format'));
+      }
+      bar.append(chat(),
+        button('Decline', '', () => answer(m.userid, 'reject', null)),
+        button('Accept', ' btn-primary', () => answer(m.userid, 'accept', select ? Number(select.value) : null)));
+    } else if (c.dir === 'out') {
+      bar.append(chat(), button('Cancel challenge', '', () => answer(m.userid, 'cancel', null)));
+    } else {
+      bar.append(button('OK', '', () => answer(m.userid, 'dismiss', null)));
+    }
+    return bar;
+  }
+
+  function renderChallenges(session) {
+    const topbar = document.querySelector('.main > .topbar');
+    if (!topbar) return;
+    // The conversation open on the Showdown screen already shows its challenge form.
+    const shown = onPlay && session.current === '' && session.menuTab === 'pm' ? session.pmOpen : '';
+    const items = (session.ready && Array.isArray(session.messages) ? session.messages : [])
+      .filter((m) => m.challenge && m.userid !== shown)
+      .slice(0, 3);
+    const key = JSON.stringify(items.map((m) => [m.userid, m.name, m.challenge]));
+    if (key === barsKey) return;
+    barsKey = key;
+    if (!barsBox) {
+      barsBox = make('div', 'challenge-bars');
+      topbar.after(barsBox);
+    }
+    for (const user of chosenTeams.keys()) {
+      if (!items.some((m) => m.userid === user)) chosenTeams.delete(user);
+    }
+    barsBox.replaceChildren(...items.map(challengeBar));
+    barsBox.hidden = !items.length;
+  }
+
   function render(session) {
     const rooms = session.rooms;
     const current = typeof session.current === 'string' ? session.current : '';
@@ -162,17 +296,32 @@
     });
     // The Teambuilder tab stands in for its room, so it never gets a row of its own.
     const rows = [
-      tabRow('battle', current === '' && !community, !!session.menuUnread),
+      tabRow('battle', current === '' && !community && session.menuTab !== 'pm', !!session.menuUnread),
       ...rooms.filter(inBattle).map(roomRow),
       tabRow('teambuilder', current === 'teambuilder', rooms.some((r) => r.id === 'teambuilder' && r.unread)),
       tabRow('community', (current === '' && community) || current === 'rooms', false),
       ...rooms.filter((r) => !inBattle(r) && r.id !== 'teambuilder').map(roomRow),
     ];
+    // Conversations and challenges, from the client's private message windows.
+    const messages = (Array.isArray(session.messages) ? session.messages : []).map((m) => ({
+      title: m.name, sub: messageSub(m), kind: 'message',
+      tip: [m.name, messageSub(m), m.challenge && m.challenge.formatName].filter(Boolean).join(' · '), id: m.userid, pm: m.userid, closable: true,
+      unread: !!m.unread || !!(m.challenge && m.challenge.dir === 'in'),
+      challenge: !!(m.challenge && m.challenge.dir === 'in'),
+      current: onPlay && current === '' && session.menuTab === 'pm' && session.pmOpen === m.userid,
+    }));
     // Rebuild only on change so hover and focus survive each poll.
-    const key = JSON.stringify([rows, !!session.ready, me, !!session.named]);
+    const key = JSON.stringify([rows, messages, !!session.ready, me, !!session.named]);
+    renderChallenges(session);
     if (key === lastKey) return;
     lastKey = key;
-    list.replaceChildren(...rows.map(row));
+    const nodes = rows.map(row);
+    if (messages.length) {
+      const label = make('div', 'rail-section rail-section--messages');
+      label.append(make('span', '', 'Messages'));
+      nodes.push(label, ...messages.map(row));
+    }
+    list.replaceChildren(...nodes);
     const box = $('account');
     if (box) {
       box.hidden = !session.ready || !me;

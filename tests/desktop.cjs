@@ -149,6 +149,47 @@ app.whenReady().then(async () => {
   await until(() => actions.some((a) => a.action === 'search'), 'Battle again search');
   assert.deepEqual(actions.find((a) => a.action === 'search'), { action: 'search', args: { format: 'gen9randombattle', team: null } });
   await until(() => /index.html$/.test(renderer.getURL()), 'Battle again returns to Home');
+
+  // Challenges and private messages: a bar under the top bar on every page, conversations
+  // under Messages in the rail, and the conversation view on the Showdown screen.
+  const challenge = { userid: 'ashk', name: 'Ash_K', unread: false, active: false, last: '',
+    challenge: { dir: 'in', format: 'gen9ou', formatName: '[Gen 9] OU', message: 'Ash_K wants to battle!',
+      pending: false, needsTeam: true, team: 1, teams: [{ index: 1, name: 'Selected team' }] } };
+  const pm = { userid: 'misty99', name: 'misty99', unread: true, active: false, last: 'gg! rematch later?', challenge: null };
+  current = { ...current, messages: [challenge, pm] };
+  await until(() => run("!!document.querySelector('.challenge-bars:not([hidden]) .banner--challenge-in')"), 'challenge bar on Home');
+  assert.equal(await run("document.querySelector('.banner--challenge-in strong').textContent"), 'Ash_K challenges you to [Gen 9] OU');
+  assert.deepEqual(await run("[...document.querySelectorAll('.rail-section--messages ~ .nav-room .nav-room-title')].map((n) => n.textContent)"), ['Ash_K', 'misty99']);
+  win.showInactive();
+  for (const theme of ['light', 'dark']) {
+    await run(`window.desktop.setTheme('${theme}')`);
+    await pause(250);
+    fs.writeFileSync(path.join(__dirname, '..', 'out', 'desktop-smoke', `challenge-home-${theme}.png`), (await renderer.capturePage()).toPNG());
+  }
+  await load('play.html');
+  await until(() => run("!!document.querySelector('.banner--challenge-in')"), 'challenge bar on play');
+  await until(async () => client.getBounds().y === await run("Math.round(document.querySelector('.client-view').getBoundingClientRect().top)") &&
+    client.getBounds().y > await run("Math.round(document.querySelector('.banner--challenge-in').getBoundingClientRect().bottom) - 1"), 'client view sits below the challenge bar');
+  for (const theme of ['light', 'dark']) {
+    await run(`window.desktop.setTheme('${theme}')`);
+    await pause(250);
+    fs.writeFileSync(path.join(__dirname, '..', 'out', 'desktop-smoke', `challenge-play-${theme}.png`), (await renderer.capturePage()).toPNG());
+  }
+  actions.length = 0;
+  await run("[...document.querySelectorAll('.banner--challenge-in button')].find((b) => b.textContent === 'Accept').click(); 0");
+  await until(() => actions.some((a) => a.action === 'answer-challenge'), 'Accept answers the challenge');
+  assert.deepEqual(actions.find((a) => a.action === 'answer-challenge'), { action: 'answer-challenge', args: { user: 'ashk', answer: 'accept', team: 1 } });
+  actions.length = 0;
+  await run("[...document.querySelectorAll('.rail-section--messages ~ .nav-room .nav-room-main')][1].click(); 0");
+  await until(() => actions.some((a) => a.action === 'open-pm'), 'conversation row opens the conversation');
+  assert.deepEqual(actions.find((a) => a.action === 'open-pm'), { action: 'open-pm', args: { user: 'misty99' } });
+  current = { ...current, current: '', menuTab: 'pm', pmOpen: 'ashk', messages: [{ ...challenge, active: true }, pm] };
+  await until(() => run("document.getElementById('room-title').textContent === 'Ash_K'"), 'top bar names the conversation');
+  assert.equal(await run("document.getElementById('room-status').textContent"), 'Private message');
+  await until(() => run("document.querySelector('.challenge-bars').hidden"), 'no duplicate bar for the open conversation');
+  assert.equal(await run("document.querySelector('.nav-room[aria-current=page] .nav-room-title').textContent"), 'Ash_K');
+  current = { ...current, menuTab: 'battle', pmOpen: '', messages: [challenge, pm] };
+
   await load('play.html');
   win.setSize(1024, 640);
   await until(() => {
@@ -160,6 +201,12 @@ app.whenReady().then(async () => {
   }, 'window bounds saved');
   await load('index.html');
   assert.equal(await run('document.documentElement.scrollWidth <= innerWidth'), true);
+  // The challenge bar fits the minimum window width.
+  await until(() => run("!!document.querySelector('.banner--challenge-in')"), 'challenge bar at minimum width');
+  assert.equal(await run("document.querySelector('.banner--challenge-in').scrollWidth <= document.querySelector('.banner--challenge-in').clientWidth"), true);
+  fs.writeFileSync(path.join(__dirname, '..', 'out', 'desktop-smoke', 'challenge-home-1024.png'), (await renderer.capturePage()).toPNG());
+  current = { ...current, messages: [] };
+  await until(() => run("document.querySelector('.challenge-bars').hidden"), 'bar hides when the challenge is gone');
   const captures = path.join(__dirname, '..', 'out', 'desktop-smoke');
   fs.mkdirSync(captures, { recursive: true });
   win.showInactive();
@@ -168,7 +215,7 @@ app.whenReady().then(async () => {
     await pause(250);
     fs.writeFileSync(path.join(captures, `home-${theme}.png`), (await renderer.capturePage()).toPNG());
   }
-  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, minimum width');
+  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

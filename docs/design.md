@@ -126,6 +126,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 - **Home layout:** modelled on Showdown's main menu. The hero is a launcher column on the left with Teambuilder, Ladder, Watch a battle and Your stats rows beneath it. Beside it sit titled windows: **Latest news** and **Replay notes** in the middle, **Friends** and **Chat rooms** on the right.
 - **Stats page:** a rail page with ladder totals (battles, win rate, highest rating, most played) and a sortable, filterable per-format table of rating, win rate, wins, losses, battles and GXE. **Play** on a row preselects that format on Home; it never starts a search.
 - **Restyled client rooms:** the Ladder, Teambuilder, Community view, chat room list, live battle list, chat rooms, battle rooms and tournaments are the client's own pages restyled in place by `app/client-ladder.css`, `client-teambuilder.css`, `client-community.css`, `client-rooms.css`, `client-chat.css` (chat and battle rooms) and `client-tournament.css` (the tournament bar, bracket, tools, notices and bracket pop-out). They change surfaces, type and layout only; the client's markup and controls are untouched, and every rule is scoped to `sd-launcher-shell` so the client's own look returns if the bridge stops driving it.
+- **Challenges and messages:** conversations are listed under **Messages** in the rail. An incoming challenge is marked there and also shows as a bar under the top bar on every page, with a team picker (Home's last team for the format first), **Open chat**, **Decline** and **Accept**. Your own pending challenge shows **Cancel challenge**, and a withdrawn one shows **OK**. Clicking a conversation shows it full size on the Showdown screen (`app/client-messages.css`), where you read and reply in the client's own window. Every answer goes through the client's own challenge buttons, so team checks, the "build a team first" prompt and the spectator setting still apply, and closing a conversation declines a challenge still waiting there, as in the client. While the app is in the background, a new challenge or message shows a Windows notification and flashes the taskbar button (Settings can turn this off). The client's own browser notifications are denied so they are not doubled.
 - **Friends panel:** structured presence (online, idle, busy, offline as reported), refreshed at most every 30 s. **Open friends list** is the fallback. No battle state or avatars are inferred.
 
 ### Showdown client
@@ -199,7 +200,7 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 ## 6. Security and privacy
 
 - **No automated play on real accounts.** The app and its tests never search, challenge or play on the user's account. Live tests are guest-only and spectate.
-- **Least privilege per view.** Only launcher pages have a preload. Remote views are sandboxed and context-isolated and deny permissions; downloads and popups are blocked.
+- **Least privilege per view.** Only launcher pages have a preload. Remote views are sandboxed and context-isolated and deny permissions; downloads and popups are blocked. The Showdown client is denied notifications; the launcher shows them itself.
 - **Validated IPC.** Every privileged request is validated in main. The renderer never supplies file paths (native dialogs choose them) or replay URLs (main resolves them from note IDs).
 - **Text, not HTML.** Imported and snapshot text is rendered as text.
 - **Private logs.** Fixed event names and numeric codes only: no usernames, credentials, replay URLs or note text.
@@ -211,7 +212,7 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 | Command | Covers |
 | --- | --- |
 | `npm run check` | Syntax |
-| `npm test` | Unit tests: bridge sanitization, action validation, navigation timing, settings, replay storage and imports, practice manifest and runtime, bot service and integrity |
+| `npm test` | Unit tests: bridge sanitization, action validation, navigation timing, challenges and messages, settings, replay storage and imports, practice manifest and runtime, bot service and integrity |
 | `npm run test:desktop` | Electron suites with temporary profiles and simulated Showdown responses (outbound client traffic blocked): connection recovery, view survival and sizing, themes, battle auto-switch, replay notes, review and import. Screenshots go to `out/desktop-smoke/` |
 | `npm run test:shell:live` | Guest, spectate-only drift check of the client hooks the shell depends on. Run before each release |
 | `npm run test:showdex:live`, `npm run test:replays:live` | Guest-only checks of a real Showdex build and a real public replay, in both themes and sizes |
@@ -285,10 +286,11 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 **Verification outstanding**
 
 - [ ] Signed-in checks by the owner: session persistence, ratings, team selection, challenges, a real search becoming a battle, friends data, rail forfeit prompt, result bar.
+- [ ] Challenges and messages with a real second account: incoming challenge bar (accept with a chosen team, decline), sending and cancelling your own, a PM conversation, and a Windows notification while the app is in the background. Packaged builds need the installer's Start menu shortcut for notifications.
 - [ ] Clean-machine install, upgrade and uninstall (release step 1).
 - [ ] Linux image and a real HTTPS deployment of the battle service.
 
-**Not designed yet:** incoming challenges and PMs inside the launcher, a replacement for Showdown's own home screen, Practice view chrome, practice formats beyond Gen 9 Random Battle, macOS and Linux packages.
+**Not designed yet:** a replacement for Showdown's own home screen, Practice view chrome, practice formats beyond Gen 9 Random Battle, macOS and Linux packages.
 
 ## 10. Appendix: visual design
 

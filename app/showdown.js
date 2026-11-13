@@ -104,11 +104,18 @@ function readSession() {
       });
     const menu = app.rooms[''];
     const searching = menu && menu.searching;
+    const messages = readMessages(menu);
+    const has = (name) => Boolean(root && root.classList && root.classList.contains(name));
+    // A conversation view whose window the client has since closed falls back to Battle.
+    let pmOpen = has('sd-menu-pm') ? (messages.find((m) => m.active) || {}).userid || '' : '';
+    if (has('sd-menu-pm') && !pmOpen) root.classList.toggle('sd-menu-pm', false);
     const state = {
       me,
       named: Boolean(app.user.get('named')),
       menuUnread: Boolean(menu && menu.notifications),
-      menuTab: root && root.classList && root.classList.contains('sd-menu-community') ? 'community' : 'battle',
+      menuTab: pmOpen ? 'pm' : has('sd-menu-community') ? 'community' : 'battle',
+      pmOpen,
+      messages,
       rooms,
       current: app.curRoom ? app.curRoom.id : '',
       connected: !app.isDisconnected,
@@ -132,6 +139,122 @@ function readSession() {
     setShell(false);
     return null;
   }
+}
+
+// Private messages and challenges live in the main menu as one .pm-window per user; the
+// client hides a closed one rather than removing it. Each window's .challenge form says
+// which way a challenge goes by its buttons, which are the client's own.
+function readMessages(menu) {
+  const box = menu && menu.$pmBox && menu.$pmBox[0];
+  if (!box || typeof box.querySelectorAll !== 'function') return [];
+  const text = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+  const out = [];
+  for (const el of box.querySelectorAll('.pm-window')) {
+    const userid = el.getAttribute('data-userid');
+    if (!userid || el.classList.contains('news-embed') || el.style.display === 'none') continue;
+    // The client stores the name behind a one-character rank prefix (a space for none).
+    const name = (el.getAttribute('data-name') || ' ' + userid).slice(1);
+    const header = el.querySelector('h3');
+    const form = el.querySelector('.challenge');
+    let challenge = null;
+    if (form) {
+      const button = (n) => form.querySelector('button[name="' + n + '"]');
+      const format = button('format');
+      const base = {
+        format: format ? format.value || '' : '',
+        formatName: text(format),
+        message: text(form.querySelector('p')),
+      };
+      if (button('acceptChallenge')) {
+        const team = button('team');
+        const id = base.format.split('@@@')[0];
+        const info = window.BattleFormats && BattleFormats[id];
+        const teamFormat = info ? info.teambuilderFormat || (info.isTeambuilderFormat ? id : '') : '';
+        const all = (Storage.teams || []).map((t, index) => ({ index, name: t.name, format: t.format }));
+        const matching = all.filter((t) => t.format === teamFormat);
+        challenge = {
+          ...base,
+          dir: 'in',
+          pending: button('acceptChallenge').disabled,
+          // A preset-team format renders a disabled team button: nothing to choose.
+          needsTeam: Boolean(team && !team.disabled),
+          team: team && /^\d+$/.test(team.value) ? Number(team.value) : null,
+          teams: (matching.length ? matching : all).slice(0, 100).map(({ index, name: n }) => ({ index, name: n })),
+        };
+      } else if (button('cancelChallenge')) {
+        challenge = { ...base, dir: 'out' };
+      } else if (button('dismissChallenge')) {
+        challenge = { ...base, dir: 'cancelled' };
+      }
+    }
+    const lines = el.querySelectorAll('.inner > .chat');
+    const lastLine = lines.length ? lines[lines.length - 1] : null;
+    const unread = Boolean(header && header.classList.contains('pm-notifying'));
+    out.push({
+      userid,
+      name,
+      unread,
+      active: el.classList.contains('sd-pm-active'),
+      // Only for an unread conversation, so a notification can quote it.
+      last: unread && lastLine ? text(lastLine.querySelector('em') || lastLine) : '',
+      challenge,
+    });
+  }
+  return out;
+}
+
+function pmWindow(userid) {
+  const menu = app.rooms[''];
+  if (!menu || !menu.$pmBox) return null;
+  const $w = menu.$pmBox.find('.pm-window-' + userid);
+  return $w.length ? $w : null;
+}
+
+// Shows one conversation full size in the main menu (see client-messages.css).
+function openPM(userid) {
+  const menu = app.rooms[''];
+  const $w = pmWindow(userid);
+  if (!$w) return false;
+  const root = document.documentElement;
+  root.classList.toggle('sd-menu-community', false);
+  root.classList.toggle('sd-menu-pm', true);
+  menu.$pmBox.find('.pm-window.sd-pm-active').removeClass('sd-pm-active');
+  $w.addClass('sd-pm-active').show();
+  if ($w.data('minimized')) menu.minimizePM($w);
+  $w.find('h3').removeClass('pm-notifying');
+  app.focusRoom('');
+  $w.find('.pm-log').scrollTop($w.find('.inner').height());
+  return true;
+}
+
+function closePM(userid) {
+  const menu = app.rooms[''];
+  const $w = pmWindow(userid);
+  if (!$w) return true;
+  $w.removeClass('sd-pm-active');
+  // The client's own close also rejects or cancels a challenge still open in the window.
+  menu.closePM(userid);
+  return true;
+}
+
+// Drives the client's own challenge buttons, so team checks and spectator settings apply.
+function answerChallenge(userid, answer, team) {
+  const menu = app.rooms[''];
+  const $w = pmWindow(userid);
+  if (!$w) return false;
+  const name = { accept: 'acceptChallenge', reject: 'rejectChallenge', cancel: 'cancelChallenge', dismiss: 'dismissChallenge' }[answer];
+  const button = $w.find('.challenge button[name=' + name + ']')[0];
+  if (!button || button.disabled) return false;
+  if (answer === 'accept' && team !== null && Storage.teams && Storage.teams[team]) {
+    const $team = $w.find('.challenge button[name=team]');
+    if ($team.length && !$team[0].disabled) {
+      $team.replaceWith(menu.renderTeams($w.find('.challenge button[name=format]').val(), team));
+    }
+  }
+  const popups = app.popups.length;
+  menu[name](null, button);
+  // A popup (such as "build a team first") needs the user to see the client.
+  return app.popups.length > popups ? 'needs-client' : true;
 }
 
 // The server's /cmd friends response is structured data, unlike the /friends HTML page.
@@ -201,6 +324,7 @@ function join(roomid) {
 // Battle and Community are two views of the one main menu room; client-shell.css filters it.
 function showMenu(tab) {
   document.documentElement.classList.toggle('sd-menu-community', tab === 'community');
+  document.documentElement.classList.toggle('sd-menu-pm', false);
   app.focusRoom('');
   return true;
 }
@@ -343,6 +467,11 @@ function call(fn, ...args) {
   return `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(', ')})`;
 }
 
+// Like call, with page-side helper functions declared in scope first.
+function callWith(helpers, fn, ...args) {
+  return `(() => {\n${helpers.map(String).join('\n')}\nreturn ${call(fn, ...args)};\n})()`;
+}
+
 function str(value, max) {
   return typeof value === 'string' ? value.slice(0, max) : '';
 }
@@ -401,14 +530,67 @@ function sanitize(raw) {
   };
 }
 
+const USER_ID = /^[a-z0-9]{1,18}$/;
+const CHALLENGE_DIRS = ['in', 'out', 'cancelled'];
+
+function plain(value, max) {
+  return str(value, max * 2).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+// Conversations and challenges, reduced to bounded plain values. Format strings may carry
+// custom rules after "@@@", so they are kept as bounded text rather than IDs.
+function sanitizeMessages(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const m of raw.slice(0, 50)) {
+    if (!m || typeof m !== 'object' || typeof m.userid !== 'string' || !USER_ID.test(m.userid) || seen.has(m.userid)) continue;
+    seen.add(m.userid);
+    const c = m.challenge;
+    let challenge = null;
+    if (c && typeof c === 'object' && CHALLENGE_DIRS.includes(c.dir)) {
+      const format = plain(c.format, 300);
+      challenge = {
+        dir: c.dir,
+        format: /^[a-z0-9]{1,60}(@@@.*)?$/.test(format) ? format : '',
+        formatName: plain(c.formatName, 80),
+        message: plain(c.message, 200),
+      };
+      if (c.dir === 'in') {
+        const teams = (Array.isArray(c.teams) ? c.teams : [])
+          .filter((t) => t && Number.isSafeInteger(t.index) && t.index >= 0 && t.index < 10000)
+          .slice(0, 100)
+          .map((t) => ({ index: t.index, name: plain(t.name, 80) || 'Untitled team' }));
+        challenge.pending = Boolean(c.pending);
+        challenge.needsTeam = Boolean(c.needsTeam);
+        challenge.teams = teams;
+        challenge.team = Number.isSafeInteger(c.team) && teams.some((t) => t.index === c.team) ? c.team : null;
+      }
+    }
+    out.push({
+      userid: m.userid,
+      name: plain(m.name, 40) || m.userid,
+      unread: Boolean(m.unread),
+      active: Boolean(m.active),
+      last: plain(m.last, 200),
+      challenge,
+    });
+  }
+  return out;
+}
+
 function sanitizeSession(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.rooms)) return { ready: false, rooms: [] };
+  const messages = sanitizeMessages(raw.messages);
+  const pmOpen = typeof raw.pmOpen === 'string' && messages.some((m) => m.userid === raw.pmOpen) ? raw.pmOpen : '';
   return {
     ready: true,
     me: str(raw.me, 40),
     named: Boolean(raw.named),
     menuUnread: Boolean(raw.menuUnread),
-    menuTab: raw.menuTab === 'community' ? 'community' : 'battle',
+    menuTab: raw.menuTab === 'pm' && pmOpen ? 'pm' : raw.menuTab === 'community' ? 'community' : 'battle',
+    pmOpen,
+    messages,
     shell: Boolean(raw.shell),
     connected: Boolean(raw.connected),
     current: typeof raw.current === 'string' && ROOM_ID.test(raw.current) ? raw.current : '',
@@ -547,7 +729,7 @@ class ShowdownBridge {
     const contents = this.getContents();
     if (!contents || contents.isLoading()) return { ready: false, rooms: [] };
     try {
-      return sanitizeSession(await contents.executeJavaScript(call(readSession)));
+      return sanitizeSession(await contents.executeJavaScript(callWith([readMessages], readSession)));
     } catch {
       return { ready: false, rooms: [] };
     }
@@ -619,6 +801,19 @@ class ShowdownBridge {
         if (!(typeof args.room === 'string' && ROOM_ID.test(args.room)) || args.room === 'rooms') return false;
         code = call(leaveRoom, args.room);
         break;
+      case 'open-pm':
+      case 'close-pm':
+        if (typeof args.user !== 'string' || !USER_ID.test(args.user)) return false;
+        code = callWith([pmWindow], action === 'open-pm' ? openPM : closePM, args.user);
+        break;
+      case 'answer-challenge': {
+        const team = args.team === undefined ? null : args.team;
+        if (typeof args.user !== 'string' || !USER_ID.test(args.user) ||
+            !['accept', 'reject', 'cancel', 'dismiss'].includes(args.answer) ||
+            (team !== null && (args.answer !== 'accept' || !Number.isSafeInteger(team) || team < 0 || team > 9999))) return false;
+        code = callWith([pmWindow], answerChallenge, args.user, args.answer, team);
+        break;
+      }
       case 'sounds':
         code = call(openSounds);
         break;

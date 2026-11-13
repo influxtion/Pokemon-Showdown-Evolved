@@ -4,6 +4,7 @@ const controls = {
   theme: document.getElementById('theme'),
   startPage: document.getElementById('start-page'),
   confirmOnClose: document.getElementById('confirm-on-close'),
+  notifyMessages: document.getElementById('notify-messages'),
 };
 const status = document.getElementById('settings-status');
 let saved = null;
@@ -18,6 +19,7 @@ function show(values) {
   controls.theme.value = values.theme;
   controls.startPage.value = values.startPage;
   controls.confirmOnClose.checked = values.confirmOnClose;
+  controls.notifyMessages.checked = values.notifyMessages;
 }
 
 function disableSettings(disabled) {
@@ -58,6 +60,7 @@ async function save(key, value) {
 controls.theme.addEventListener('change', () => save('theme', controls.theme.value));
 controls.startPage.addEventListener('change', () => save('startPage', controls.startPage.value));
 controls.confirmOnClose.addEventListener('change', () => save('confirmOnClose', controls.confirmOnClose.checked));
+controls.notifyMessages.addEventListener('change', () => save('notifyMessages', controls.notifyMessages.checked));
 
 async function runAction(buttonId, method, success) {
   const button = document.getElementById(buttonId);

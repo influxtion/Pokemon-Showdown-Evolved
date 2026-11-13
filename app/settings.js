@@ -6,7 +6,7 @@ const { randomUUID } = require('node:crypto');
 
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
-const DEFAULTS = Object.freeze({ theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false });
+const DEFAULTS = Object.freeze({ theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
 function valid(key, value) {
@@ -14,6 +14,7 @@ function valid(key, value) {
   if (key === 'startPage') return START_PAGES.has(value);
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
+  if (key === 'notifyMessages') return typeof value === 'boolean';
   return false;
 }
 

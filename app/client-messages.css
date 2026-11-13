@@ -1,0 +1,215 @@
+/* Conversation view: one private message window shown full size in the client's main menu,
+   opened from the rail's Messages section. The bridge (openPM in showdown.js) sets
+   sd-menu-pm and marks the window sd-pm-active; the Battle and Community tabs clear it, and
+   readSession clears it if the client closes that window.
+
+   The window, its challenge form and its message box stay the client's own, so sending,
+   accepting and declining behave as upstream. The launcher's top bar names the conversation
+   and the rail closes it, so the window's own header is hidden.
+
+   Loaded after client-battle.css, whose Battle tab rules also match here: equal-specificity
+   rules below win by order. */
+html.sd-launcher-shell.sd-menu-pm {
+  .mainmenuwrapper {
+    background: var(--sd-app) !important;
+  }
+  .mainmenu,
+  .rightmenu,
+  .mainmenufooter,
+  .news-embed,
+  .pm-window:not(.sd-pm-active) {
+    display: none !important;
+  }
+  .leftmenu,
+  .leftmenu:has(.pm-window:not(.news-embed)) {
+    width: auto !important;
+    padding: 20px 24px !important;
+    box-sizing: border-box !important;
+  }
+  .activitymenu {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    max-width: 860px !important;
+    margin: 0 auto !important;
+  }
+  .pmbox {
+    width: auto !important;
+  }
+
+  .pm-window.sd-pm-active {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 40px) !important;
+    min-height: 320px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 4px !important;
+    background: var(--sd-panel) !important;
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif !important;
+  }
+  .sd-pm-active > h3 {
+    display: none !important;
+  }
+
+  /* Challenge form: the client's own, styled by client-battle.css's .battleform rules. */
+  .sd-pm-active .challenge {
+    flex: none !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--sd-border) !important;
+    box-shadow: inset 4px 0 0 var(--sd-primary) !important;
+    background: var(--sd-subtle) !important;
+    color: var(--sd-text) !important;
+  }
+  .sd-pm-active .challenge .battleform {
+    width: auto !important;
+    max-width: 460px !important;
+    margin: 0 !important;
+  }
+  /* client-battle.css sizes .battleform for the Battle tab's big search form; here the rows
+     are compact: label beside a normal-height picker, no row icons. */
+  .sd-pm-active .challenge .battleform > p:first-child {
+    margin: 0 0 8px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+  }
+  .sd-pm-active .challenge .battleform p:has(> .select) {
+    display: grid !important;
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    align-items: center !important;
+    margin: 6px 0 !important;
+  }
+  .sd-pm-active .challenge .battleform p:has(> .select)::before {
+    content: none !important;
+    display: none !important;
+  }
+  .sd-pm-active .challenge .battleform p:has(> .select) > * {
+    grid-area: auto !important;
+  }
+  .sd-pm-active .challenge .battleform p:has(> .select) > .label {
+    align-self: center !important;
+    margin: 0 !important;
+  }
+  .sd-pm-active .challenge .battleform .select,
+  .sd-pm-active .challenge .battleform .select:disabled {
+    height: 40px !important;
+    padding: 0 32px 0 12px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 3px !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+    font-size: 14px !important;
+    opacity: 1 !important;
+  }
+  .sd-pm-active .challenge .battleform .teamselect strong {
+    max-width: calc(100% - 190px) !important;
+    font-size: 14px !important;
+    line-height: 38px !important;
+  }
+  .sd-pm-active .challenge .battleform .teamselect small {
+    right: 28px !important;
+    zoom: 1 !important;
+  }
+  .sd-pm-active .challenge .battleform .checkbox {
+    height: 32px !important;
+    margin-top: 4px !important;
+  }
+  .sd-pm-active .challenge .buttonbar {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+  }
+  .sd-pm-active .challenge .buttonbar .button {
+    height: 34px !important;
+    padding: 0 18px !important;
+    font: 14px "Segoe UI", system-ui, sans-serif !important;
+  }
+  .sd-pm-active .challenge .buttonbar .button[name="acceptChallenge"] {
+    border-color: var(--sd-primary) !important;
+    background: var(--sd-primary) !important;
+    color: var(--sd-on-primary) !important;
+    font-weight: 700 !important;
+  }
+  .sd-pm-active .challenge .buttonbar .button[name="acceptChallenge"]:hover {
+    background: var(--sd-primary-hover) !important;
+  }
+
+  .sd-pm-active .pm-log {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    border: 0 !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+  }
+  .sd-pm-active .pm-buttonbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
+    display: flex !important;
+    gap: 6px !important;
+    height: auto !important;
+    padding: 8px 16px !important;
+    border-bottom: 1px solid var(--sd-border) !important;
+    background: var(--sd-panel) !important;
+  }
+  .sd-pm-active .pm-buttonbar button {
+    /* Without this Chromium paints a gray native button under user-origin styles. */
+    appearance: none !important;
+    float: none !important;
+    height: 28px !important;
+    padding: 0 12px !important;
+    border: 1px solid var(--sd-border-strong) !important;
+    border-radius: 3px !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+    font: 13px "Segoe UI", system-ui, sans-serif !important;
+    cursor: pointer !important;
+  }
+  .sd-pm-active .pm-buttonbar button:hover {
+    border-color: var(--sd-accent) !important;
+    color: var(--sd-accent) !important;
+  }
+  .sd-pm-active .pm-log .inner {
+    padding: 12px 16px !important;
+  }
+  .sd-pm-active .pm-log .chat {
+    padding: 4px 0 !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+
+  .sd-pm-active .pm-log-add {
+    display: block !important;
+    flex: none !important;
+    padding: 10px 12px !important;
+    border: 0 !important;
+    border-top: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-subtle) !important;
+  }
+  .sd-pm-active .pm-log-add form {
+    margin: 0 !important;
+  }
+  .sd-pm-active .pm-log-add textarea {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-height: 36px !important;
+    padding: 8px 10px !important;
+    border: 1px solid var(--sd-border-strong) !important;
+    border-radius: 3px !important;
+    background: var(--sd-input) !important;
+    color: var(--sd-text) !important;
+    font: 14px "Segoe UI", system-ui, sans-serif !important;
+    resize: none !important;
+  }
+  .sd-pm-active .pm-log-add textarea:focus {
+    border-color: var(--sd-accent) !important;
+    outline: none !important;
+  }
+}

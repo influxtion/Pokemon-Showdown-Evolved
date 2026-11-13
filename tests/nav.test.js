@@ -37,6 +37,25 @@ class Node {
   getAttribute(name) { return name in this.attrs ? this.attrs[name] : null; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
   has(cls) { return this.className.split(' ').includes(cls); }
+  querySelectorAll(selector) {
+    const tags = selector.split(',').map((t) => t.trim());
+    const out = [];
+    const walk = (node) => node.children.forEach((c) => {
+      if (!(c instanceof Node)) return;
+      if (tags.includes(c.tag)) out.push(c);
+      walk(c);
+    });
+    walk(this);
+    return out;
+  }
+  find(predicate) {
+    if (predicate(this)) return this;
+    for (const c of this.children) {
+      const hit = c instanceof Node && c.find(predicate);
+      if (hit) return hit;
+    }
+    return null;
+  }
   click() {
     const event = { prevented: false, stopped: false, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
     if (this.listeners.click) this.listeners.click(event);
@@ -53,9 +72,17 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   nav['sign-in'].hidden = true;
   nav.account.hidden = true;
   const location = { href: onPlay ? 'play.html' : 'index.html' };
+  // The challenge bars are inserted after the top bar; the fake records what lands there.
+  const topbar = new Node('header');
+  const after = [];
+  topbar.after = (node) => after.push(node);
   const document = {
     body: { dataset: onPlay ? { page: 'play' } : {} },
-    querySelector: (selector) => nav[/data-nav="(.+)"/.exec(selector)[1]] || null,
+    querySelector: (selector) => {
+      if (selector === '.main > .topbar') return topbar;
+      const match = /data-nav="(.+)"/.exec(selector);
+      return match ? nav[match[1]] || null : null;
+    },
     createElement: (tag) => new Node(tag),
     dispatchEvent: (event) => events.push(event),
   };
@@ -71,6 +98,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     window,
     document,
     sessionStorage: storage,
+    localStorage: storage,
     location,
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init.detail; } },
     setTimeout: (fn, delay) => { const t = { fn, delay }; timers.push(t); return t; },
@@ -78,6 +106,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   });
   return {
     location, nav, events, timers, saved, calls,
+    bars: () => after[0],
     rows: () => nav.rooms.children.filter((c) => c.has('nav-room')),
     row: (i) => nav.rooms.children.filter((c) => c.has('nav-room'))[i],
     tabs: () => nav.rooms.children.filter((c) => c.has('nav-tab')),
@@ -351,4 +380,110 @@ test('close answered true re-polls and leaves play only when no rooms remain', a
   await elsewhere.settle();
   assert.equal(elsewhere.location.href, 'index.html');
   assert.equal(elsewhere.rows().length, 0);
+});
+
+const incoming = (userid, extra = {}) => ({ userid, name: userid.toUpperCase(), unread: false, active: false, last: '',
+  challenge: { dir: 'in', format: 'gen9ou', formatName: '[Gen 9] OU', message: `${userid.toUpperCase()} wants to battle!`,
+    pending: false, needsTeam: true, team: 0, teams: [{ index: 0, name: 'Rain' }, { index: 3, name: 'Sun' }], ...extra } });
+const convo = (userid, extra = {}) => ({ userid, name: userid, unread: false, active: false, last: '', challenge: null, ...extra });
+const button = (bar, label) => bar.find((n) => n.tag === 'button' && n.textContent === label);
+
+test('conversations are listed under Messages; a challenge is marked and opens its conversation', async () => {
+  const h = harness([session([], { messages: [incoming('ashk'), convo('misty', { unread: true })] })]);
+  await h.settle();
+  const label = h.nav.rooms.children.find((c) => c.has('rail-section--messages'));
+  assert.ok(label, 'Messages section shown');
+  const rows = h.nav.rooms.children.slice(h.nav.rooms.children.indexOf(label) + 1);
+  assert.deepEqual(rows.map((r) => h.title(r)), ['ASHK', 'misty']);
+  assert.equal(h.sub(rows[0]), 'Challenge');
+  assert.ok(rows[0].has('nav-item--challenge'));
+  assert.ok(rows[1].children[0].children.some((c) => c.className === 'nav-unread'));
+  h.main(rows[1]).click();
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'open-pm', args: { user: 'misty' } }]);
+  assert.equal(h.location.href, 'play.html');
+
+  const none = harness([session([], { messages: [] })]);
+  await none.settle();
+  assert.equal(none.nav.rooms.children.some((c) => c.has('rail-section--messages')), false);
+});
+
+test('the open conversation is marked current instead of the Battle tab, and close sends close-pm', async () => {
+  const h = harness([session([], { menuTab: 'pm', pmOpen: 'misty', messages: [convo('misty')] })], { onPlay: true });
+  await h.settle();
+  const row = h.nav.rooms.children[h.nav.rooms.children.length - 1];
+  assert.equal(row.getAttribute('aria-current'), 'page');
+  assert.equal(h.tab('Battle').getAttribute('aria-current'), null);
+  const event = h.close(row).click();
+  await h.settle();
+  assert.equal(event.stopped, true);
+  assert.deepEqual(h.calls, [{ action: 'close-pm', args: { user: 'misty' } }]);
+});
+
+test('an incoming challenge shows a bar after the top bar; Accept sends the chosen team', async () => {
+  const h = harness([session([], { messages: [incoming('ashk')] })]);
+  await h.settle();
+  const box = h.bars();
+  assert.equal(box.hidden, false);
+  const bar = box.children[0];
+  assert.ok(bar.has('banner--challenge-in'));
+  assert.equal(bar.find((n) => n.tag === 'strong').textContent, 'ASHK challenges you to [Gen 9] OU');
+  const select = bar.find((n) => n.tag === 'select');
+  assert.deepEqual(select.children.map((o) => [o.value, o.textContent]), [['0', 'Rain'], ['3', 'Sun']]);
+  assert.equal(select.value, '0');
+  select.value = '3';
+  select.listeners.change();
+  button(bar, 'Accept').click();
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'answer-challenge', args: { user: 'ashk', answer: 'accept', team: 3 } }]);
+  assert.equal(button(bar, 'Decline').disabled, true, 'controls lock while answering');
+});
+
+test('the bar prefers the team Home last used for the format, and Decline sends reject', async () => {
+  const saved = new Map([['hub.team.gen9ou', '3']]);
+  const h = harness([session([], { messages: [incoming('ashk')] })], { saved });
+  await h.settle();
+  const bar = h.bars().children[0];
+  assert.equal(bar.find((n) => n.tag === 'select').value, '3');
+  button(bar, 'Decline').click();
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'answer-challenge', args: { user: 'ashk', answer: 'reject' } }]);
+});
+
+test('a preset-team challenge has no team picker; a client popup opens the conversation', async () => {
+  const h = harness([session([], { messages: [incoming('ashk', { needsTeam: false, team: null, teams: [] })] })],
+    { act: async (action) => (action === 'answer-challenge' ? 'needs-client' : true) });
+  await h.settle();
+  const bar = h.bars().children[0];
+  assert.equal(bar.find((n) => n.tag === 'select'), null);
+  button(bar, 'Accept').click();
+  await h.settle();
+  assert.deepEqual(h.calls.map((c) => c.action), ['answer-challenge', 'open-pm']);
+  assert.deepEqual(h.calls[0].args, { user: 'ashk', answer: 'accept' });
+  assert.equal(h.location.href, 'play.html');
+});
+
+test('outgoing, cancelled and starting challenges show their own bars', async () => {
+  const out = convo('misty', { challenge: { dir: 'out', format: 'gen9ou', formatName: '[Gen 9] OU', message: '' } });
+  const gone = convo('brock', { challenge: { dir: 'cancelled', format: '', formatName: '', message: '' } });
+  const starting = incoming('ashk', { pending: true });
+  const h = harness([session([], { messages: [out, gone, starting] })]);
+  await h.settle();
+  const [a, b, c] = h.bars().children;
+  assert.equal(a.find((n) => n.tag === 'strong').textContent, 'Waiting for misty to accept');
+  assert.equal(b.find((n) => n.tag === 'strong').textContent, 'brock cancelled the challenge');
+  assert.equal(c.find((n) => n.tag === 'button'), null, 'no buttons while the battle starts');
+  button(a, 'Cancel challenge').click();
+  button(b, 'OK').click();
+  await h.settle();
+  assert.deepEqual(h.calls.map((x) => x.args.answer), ['cancel', 'dismiss']);
+});
+
+test('the bar hides for the conversation already open on the Showdown screen', async () => {
+  const shown = harness([session([], { menuTab: 'pm', pmOpen: 'ashk', messages: [incoming('ashk')] })], { onPlay: true });
+  await shown.settle();
+  assert.equal(shown.bars().hidden, true);
+  const elsewhere = harness([session([], { menuTab: 'pm', pmOpen: 'ashk', messages: [incoming('ashk')] })]);
+  await elsewhere.settle();
+  assert.equal(elsewhere.bars().children.length, 1);
 });
