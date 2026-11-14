@@ -455,6 +455,761 @@ function installFormatModal() {
   return true;
 }
 
+// Rebuilds the Teambuilder's team list into the launcher's layout (styled in
+// client-teambuilder.css): a header with the list's actions and search, folder chips, team
+// cards grouped by format, and a storage notice. It only moves, labels and adds elements
+// around the client's own markup after each render. Buttons keep their name and value, so
+// the client's click dispatch, drag and drop and search still drive everything.
+function installTeamsView() {
+  if (window.__SD_TEAMS_VIEW || !document.body) return true;
+  window.__SD_TEAMS_VIEW = true;
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const icon = (name) => el('i', `fa ${name}`);
+  const relabel = (button, faIcon, text) => {
+    if (!button) return null;
+    button.replaceChildren(icon(faIcon), document.createTextNode(` ${text}`));
+    return button;
+  };
+  // "[Gen 9] OU" -> ["Gen 9", "OU"]; unknown IDs fall back to "gen9foo" -> ["Gen 9", "FOO"].
+  const formatParts = (id) => {
+    const name = (window.BattleFormats && BattleFormats[id] && BattleFormats[id].name) || '';
+    let m = /^\[Gen (\d+)\]\s*(.*)$/.exec(name);
+    if (m) return [`Gen ${m[1]}`, m[2]];
+    m = /^gen(\d+)(.*)$/.exec(id || '');
+    if (m) return [`Gen ${m[1]}`, m[2].toUpperCase()];
+    return [name || id || 'Other', ''];
+  };
+  const formatOf = (team) => (team && team.format) || 'gen9';
+  const teamCount = (value) => {
+    const teams = (window.Storage && Storage.teams) || [];
+    if (value === 'all') return teams.length;
+    if (value.endsWith('/')) return teams.filter((t) => (t.folder || '') === value.slice(0, -1)).length;
+    return teams.filter((t) => formatOf(t) === value).length;
+  };
+
+  function newTeamIn(format) {
+    const room = window.app && app.rooms && app.rooms.teambuilder;
+    if (!room || typeof room.newTop !== 'function') return;
+    const previous = room.curFolder;
+    room.curFolder = format; // createTeam reads the format from the current folder
+    try {
+      room.newTop('team');
+    } finally {
+      room.curFolder = previous;
+    }
+  }
+
+  function decorateCard(li, team) {
+    const card = li.querySelector(':scope > .team');
+    const parts = formatParts(formatOf(team));
+    card.prepend(el('span', 'sd-tb-badge', parts.filter(Boolean).join(' ')));
+    const capacity = (team && team.capacity) || 6;
+    const icons = card.querySelector(':scope > small');
+    if (icons && capacity <= 6) {
+      const have = icons.querySelectorAll(':scope > .picon').length;
+      for (let i = have; i < capacity; i++) icons.append(el('span', 'sd-tb-slot'));
+    }
+    const mons = team && team.team ? team.team.split(']').length : 0;
+    const foot = el('span', 'sd-tb-foot');
+    foot.append(el('span', 'sd-tb-saved', 'Saved locally'), el('span', 'sd-tb-size', `${mons} / ${capacity} Pokémon`));
+    card.append(foot);
+    const del = li.querySelector(':scope > button[name="delete"]');
+    if (del) {
+      del.title = 'Delete';
+      del.setAttribute('aria-label', 'Delete');
+    }
+  }
+
+  function buildHead(room, pane) {
+    const head = el('div', 'sd-tb-head');
+    const titles = el('div', 'sd-tb-titles');
+    const headings = pane.querySelectorAll(':scope > h2');
+    const h2 = headings[headings.length - 1];
+    let title = 'Your teams';
+    if (room.curFolder && h2) {
+      const copy = h2.cloneNode(true);
+      copy.querySelectorAll('button, small').forEach((n) => n.remove());
+      title = copy.textContent.trim();
+      if (!room.curFolder.endsWith('/')) title = formatParts(room.curFolder).filter(Boolean).join(' ');
+    }
+    titles.append(el('h1', '', title), el('p', '', 'Build, organize and back up teams for every format.'));
+    const actions = el('div', 'sd-tb-actions');
+    if (h2) h2.querySelectorAll('button').forEach((b) => actions.append(b));
+    if (!room.curFolder) {
+      const importButton = el('button', 'button');
+      importButton.name = 'import';
+      actions.append(relabel(importButton, 'fa-upload', 'Import'));
+    }
+    const box = relabel(pane.querySelector('button[name="newTop"][value="box"]'), 'fa-archive', 'New box');
+    const team = relabel(pane.querySelector('button[name="newTop"][value="team"]'), 'fa-plus', 'New team');
+    if (box) actions.append(box);
+    if (team) actions.append(team);
+    const search = el('label', 'sd-tb-search');
+    const input = pane.querySelector('#teamSearchBar');
+    if (input) {
+      input.placeholder = 'Search teams or Pokémon';
+      search.append(input, el('kbd', '', 'Ctrl K'));
+    }
+    head.append(titles, actions, search);
+    return head;
+  }
+
+  function buildBanner(room, pane) {
+    const banner = el('div', 'sd-tb-banner');
+    const text = el('div', 'sd-tb-banner-text');
+    text.append(el('strong', '', 'Your teams live in this app\'s local storage'),
+      el('span', '', 'Clearing cookies or localStorage deletes them. Back up first, or sign in to sync to the server.'));
+    const actions = el('div', 'sd-tb-banner-actions');
+    const uploaded = pane.querySelector('button[name="send"][value="/teams"]');
+    if (uploaded) {
+      uploaded.className = 'sd-tb-link';
+      uploaded.textContent = 'View uploaded teams';
+      actions.append(uploaded);
+    }
+    const backup = relabel(pane.querySelector('button[name="backup"]'), 'fa-download',
+      room.curFolder ? 'Back up this folder' : 'Backup / Restore');
+    if (backup) actions.append(backup);
+    banner.append(el('span', 'sd-tb-banner-icon'), text, actions);
+    return banner;
+  }
+
+  function renderList(root, pane) {
+    const list = pane.querySelector(':scope > ul.teamlist');
+    if (!list || list.dataset.sd) return;
+    list.dataset.sd = '1';
+    const room = window.app && app.rooms && app.rooms.teambuilder;
+    if (!room || !window.Storage) return;
+    // While searching, the old head still holds the focused search box. The client's
+    // re-render looks it up by ID and finds that one first, so take the focus from it.
+    const active = document.activeElement;
+    const typing = active && active.id === 'teamSearchBar' && !pane.contains(active);
+    const caret = typing ? active.selectionStart : 0;
+    root.querySelectorAll(':scope > .sd-tb-head').forEach((n) => n.remove());
+    root.prepend(buildHead(room, pane));
+    const input = root.querySelector(':scope > .sd-tb-head #teamSearchBar');
+    if (typing && input) {
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    }
+
+    const groups = new Map();
+    for (const li of [...list.children]) {
+      const card = li.querySelector(':scope > .team');
+      if (!card) continue;
+      const team = Storage.teams[Number(card.dataset.value)];
+      const format = formatOf(team);
+      if (!groups.has(format)) {
+        const section = el('section', 'sd-tb-group');
+        section.append(el('h3', '', formatParts(format).filter(Boolean).join(' · ')));
+        const grid = el('ul', 'teamlist sd-tb-grid');
+        grid.dataset.sd = '1';
+        section.append(grid);
+        groups.set(format, { section, grid });
+      }
+      decorateCard(li, team);
+      groups.get(format).grid.append(li);
+    }
+    const wrap = el('div', 'sd-tb-groups');
+    for (const [format, { section, grid }] of groups) {
+      if (room.curFolder && room.curFolder !== format) {
+        wrap.append(section);
+        continue;
+      }
+      const li = el('li', 'sd-tb-new');
+      const add = el('button', 'sd-tb-new-btn');
+      add.type = 'button';
+      add.append(el('span', 'sd-tb-new-plus'), el('span', '', `New ${formatParts(format).filter(Boolean).join(' ')} team`));
+      add.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        newTeamIn(format);
+      });
+      li.append(add);
+      grid.append(li);
+      wrap.append(section);
+    }
+    list.after(wrap);
+    pane.append(buildBanner(room, pane));
+  }
+
+  function renderFolders(pane) {
+    const list = pane.querySelector('.folderlist');
+    if (!list || list.dataset.sd) return;
+    list.dataset.sd = '1';
+    for (const chip of list.querySelectorAll('.selectFolder')) {
+      const value = chip.dataset.value || '';
+      if (value === '+' || value === '++') continue;
+      if (value === '/') chip.replaceChildren(document.createTextNode('No folder'));
+      if (value !== 'all' && !value.endsWith('/')) {
+        // Format folders are labelled without their generation, which the hidden group
+        // headings used to give; spell it out on the chip.
+        chip.querySelectorAll(':scope > i').forEach((n) => n.remove());
+        chip.replaceChildren(document.createTextNode(formatParts(value).filter(Boolean).join(' ')));
+      }
+      chip.append(el('span', 'sd-tb-count', String(teamCount(value))));
+    }
+  }
+
+  const update = () => {
+    if (!document.documentElement.classList.contains('sd-launcher-shell')) return;
+    const root = document.getElementById('room-teambuilder');
+    if (!root) return;
+    const folders = root.querySelector(':scope > .folderpane');
+    const pane = root.querySelector(':scope > .teampane');
+    if (!folders || !pane) return;
+    try {
+      renderFolders(folders);
+      renderList(root, pane);
+    } catch (e) {} // the client's own list stays usable if this ever fails
+  };
+  new MutationObserver(update).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return;
+    const input = document.querySelector('#room-teambuilder .sd-tb-head #teamSearchBar');
+    if (!input || !input.offsetParent) return;
+    event.preventDefault();
+    input.focus();
+    input.select();
+  }, true);
+  update();
+  return true;
+}
+
+// Lays the Teambuilder's team editor out as the launcher's design (client-teambuilder.css):
+// a header with the team's actions and a card per set. Like installTeamsView it only moves,
+// labels and adds elements around the client's own markup after each render, so every
+// input and button keeps the client's handlers. The client has three editor modes, read
+// from its markup: "team" (all sets), "set" (one set with the search pane) and "export".
+function installTeamEditor() {
+  if (window.__SD_TEAM_EDITOR || !document.body) return true;
+  window.__SD_TEAM_EDITOR = true;
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const icon = (name) => el('i', `fa ${name}`);
+  const getRoom = () => window.app && app.rooms && app.rooms.teambuilder;
+  const statName = (id) => (window.BattleStatNames && BattleStatNames[id]) || id;
+  // Writes only on change, so the observer that called us settles instead of looping.
+  const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+
+  function buildHead(wrapper, room, mode) {
+    const pad = wrapper.querySelector(':scope > .pad');
+    if (!pad || pad.querySelector(':scope > .sd-te-head')) return;
+    const head = el('div', 'sd-te-head');
+    const back = pad.querySelector(':scope > button[name="back"]');
+    if (back) {
+      back.replaceChildren(icon('fa-chevron-left'));
+      back.title = mode === 'set' ? 'Back to team' : 'Back to teams';
+      back.setAttribute('aria-label', back.title);
+      head.append(back);
+    }
+    const name = pad.querySelector(':scope > input.teamnameedit');
+    if (name) {
+      const label = el('label', 'sd-te-name');
+      label.append(name, icon('fa-pencil'));
+      head.append(label);
+    } else {
+      head.append(el('h1', 'sd-te-title', room.curTeam.name || 'Untitled'));
+    }
+    const actions = el('div', 'sd-te-actions');
+    const format = pad.querySelector('button.teambuilderformatselect');
+    const validate = pad.querySelector('button[name="validate"]');
+    if (format) actions.append(format);
+    if (validate) actions.append(validate);
+    for (const button of pad.querySelectorAll(':scope > button[name="import"], :scope > button[name="saveImport"]')) {
+      actions.append(button);
+    }
+    const primary = actions.querySelector('button[name="import"]');
+    if (primary) primary.classList.add('sd-te-primary');
+    head.append(actions);
+    pad.prepend(head);
+  }
+
+  // Which tab the team view shows, per team: a set index or "full" for the whole team.
+  const tabs = new WeakMap();
+  const speciesName = (room, set) => set.name || room.curTeam.dex.species.get(set.species).baseSpecies || set.species;
+
+  function tabBody(room, set, index) {
+    const box = el('span', 'sd-te-tab-icon');
+    const picon = el('span', `picon pokemonicon-${index}`);
+    picon.setAttribute('style', Dex.getPokemonIcon(set));
+    box.append(picon);
+    const text = el('span', 'sd-te-tab-text');
+    text.append(el('strong', '', speciesName(room, set)), el('small', '', set.item || 'No item'));
+    return [box, text];
+  }
+
+  function selectedTab(room) {
+    const count = room.curSetList.filter((set) => set.species).length;
+    let tab = tabs.has(room.curTeam) ? tabs.get(room.curTeam) : 0;
+    if (typeof tab === 'number' && tab >= count) tab = count ? count - 1 : 'full';
+    return tab;
+  }
+
+  function showTab(wrapper, room) {
+    const tab = selectedTab(room);
+    for (const button of wrapper.querySelectorAll('.sd-te-tabs > .sd-te-tab[data-tab]')) {
+      const on = button.dataset.tab === String(tab);
+      button.classList.toggle('cur', on);
+      button.setAttribute('aria-selected', String(on));
+    }
+    for (const li of wrapper.querySelectorAll('.teamchart > li[value]')) {
+      li.classList.toggle('sd-te-cur', li.getAttribute('value') === String(tab));
+    }
+    const paste = wrapper.querySelector('.sd-te-paste');
+    if (paste) paste.hidden = tab !== 'full';
+  }
+
+  function fullTabBody(room) {
+    const box = el('span', 'sd-te-tab-icon');
+    box.append(icon('fa-users'));
+    const text = el('span', 'sd-te-tab-text');
+    const count = room.curSetList.filter((set) => set.species).length;
+    text.append(el('strong', '', 'Full Team'), el('small', '', `${count} Pokémon`));
+    return [box, text];
+  }
+
+  // The whole team as text, like a PokePaste: the client's own export of each set, with the
+  // species, Tera type and move dashes coloured by type. Built as text nodes, never HTML.
+  function buildPaste(wrapper, room) {
+    const box = wrapper.querySelector('.teamchartbox');
+    if (!box || box.querySelector(':scope > .sd-te-paste')) return;
+    if (!room.curSetList.some((set) => set.species)) return;
+    const team = room.curTeam;
+    const paste = el('section', 'sd-te-paste');
+    const head = el('div', 'sd-paste-head');
+    head.append(el('h3', '', team.name || 'Untitled'), el('span', '', `Format: ${team.format || 'gen9'}`));
+    paste.append(head);
+    const typeOf = (kind, name) => {
+      try {
+        const data = team.dex[kind].get(name);
+        return (data.types ? data.types[0] : data.type) || '';
+      } catch (e) {
+        return '';
+      }
+    };
+    const colored = (text, type) => el('span', type ? `sd-t-${type}` : '', text);
+    room.curSetList.forEach((set, index) => {
+      if (!set.species) return;
+      const entry = el('article', 'sd-paste-set');
+      entry.title = 'Edit this Pokémon';
+      entry.addEventListener('click', () => {
+        tabs.set(team, index);
+        showTab(wrapper, room);
+      });
+      const art = el('div', 'sd-paste-art');
+      const sprite = el('span', 'sd-paste-sprite');
+      sprite.setAttribute('style', Dex.getTeambuilderSprite(set, team.dex));
+      art.append(sprite);
+      if (set.item) {
+        const item = el('span', 'sd-paste-item');
+        item.setAttribute('style', Dex.getItemIcon(set.item));
+        art.append(item);
+      }
+      const text = el('pre', 'sd-paste-text');
+      const lines = Storage.exportTeam([set]).replace(/\s+$/, '').split('\n');
+      lines.forEach((line, i) => {
+        const row = el('span', 'sd-paste-line');
+        let m;
+        if (i === 0) {
+          const at = line.lastIndexOf(' @ ');
+          const name = at >= 0 ? line.slice(0, at) : line;
+          row.append(colored(name, typeOf('species', set.species)));
+          if (at >= 0) row.append(el('span', 'sd-paste-at', ' @ '), document.createTextNode(line.slice(at + 3)));
+        } else if ((m = /^- (.*)$/.exec(line))) {
+          row.append(colored('- ', typeOf('moves', m[1])), document.createTextNode(m[1]));
+        } else if ((m = /^(Tera Type): (.*)$/.exec(line))) {
+          row.append(el('span', 'sd-paste-label', `${m[1]}: `), colored(m[2], m[2]));
+        } else if ((m = /^([A-Za-z ]+): (.*)$/.exec(line))) {
+          row.append(el('span', 'sd-paste-label', `${m[1]}: `), document.createTextNode(m[2]));
+        } else {
+          row.textContent = line;
+        }
+        text.append(row, document.createTextNode('\n'));
+      });
+      entry.append(art, text);
+      paste.append(entry);
+    });
+    box.append(paste);
+  }
+
+  // Team view: a tab per set above one card; the add tab is the client's addPokemon action.
+  function buildTabs(wrapper, room) {
+    const pad = wrapper.querySelector(':scope > .pad');
+    const head = pad && pad.querySelector(':scope > .sd-te-head');
+    if (!head || pad.querySelector(':scope > .sd-te-tabs')) return;
+    const strip = el('div', 'sd-te-tabs');
+    strip.setAttribute('role', 'tablist');
+    const full = el('button', 'sd-te-tab sd-te-full');
+    full.type = 'button';
+    full.dataset.tab = 'full';
+    full.setAttribute('role', 'tab');
+    full.append(...fullTabBody(room));
+    full.addEventListener('click', () => {
+      tabs.set(room.curTeam, 'full');
+      showTab(wrapper, room);
+    });
+    strip.append(full);
+    room.curSetList.forEach((set, index) => {
+      if (!set.species) return;
+      const button = el('button', 'sd-te-tab');
+      button.type = 'button';
+      button.dataset.tab = String(index);
+      button.setAttribute('role', 'tab');
+      button.append(...tabBody(room, set, index));
+      button.addEventListener('click', () => {
+        tabs.set(room.curTeam, index);
+        showTab(wrapper, room);
+      });
+      strip.append(button);
+    });
+    if (wrapper.querySelector('.teamchart button[name="addPokemon"]')) {
+      const add = el('button', 'sd-te-tab sd-te-add');
+      add.type = 'button';
+      add.name = 'addPokemon';
+      add.append(icon('fa-plus'), el('span', '', 'Add Pokémon'));
+      strip.append(add);
+    }
+    head.after(strip);
+  }
+
+  // Set view: the client's own Pokémon bar, given the same look and each set's item.
+  function decorateTeambar(wrapper, room) {
+    tabs.set(room.curTeam, room.curSetLoc);
+    const bar = wrapper.querySelector(':scope > .teambar');
+    if (bar && !bar.querySelector(':scope > .sd-te-full')) {
+      // Back to the team view, opened on its Full Team tab.
+      const full = el('button', 'sd-te-tab sd-te-full');
+      full.type = 'button';
+      full.dataset.sd = '1';
+      full.append(...fullTabBody(room));
+      full.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        room.back();
+        tabs.set(room.curTeam, 'full');
+      });
+      bar.prepend(full);
+    }
+    for (const button of wrapper.querySelectorAll('.teambar > button.pokemon:not([data-sd])')) {
+      button.dataset.sd = '1';
+      const picon = button.querySelector('.picon');
+      const index = picon && Number((/pokemonicon-(\d+)/.exec(picon.className) || [])[1]);
+      const set = room.curSetList[index];
+      if (!set) continue;
+      button.classList.add('sd-te-tab');
+      if (button.disabled) button.classList.add('cur');
+      button.replaceChildren(...tabBody(room, set, index));
+    }
+    for (const button of wrapper.querySelectorAll('.teambar > button:not(.pokemon):not([data-sd])')) {
+      button.dataset.sd = '1';
+      button.classList.add('sd-te-tab', 'sd-te-add');
+      button.append(el('span', '', 'Add Pokémon'));
+    }
+  }
+
+  // Team view side panel: the client's upload form, and its tier resource links (loaded
+  // from Smogon after the first render, which re-renders the editor).
+  function buildAside(wrapper, room) {
+    const box = wrapper.querySelector('.teamchartbox');
+    if (!box || box.querySelector(':scope > .sd-te-aside')) return;
+    const aside = el('aside', 'sd-te-aside');
+    const form = box.querySelector('#pokepasteForm');
+    if (form) {
+      const card = el('section', 'sd-te-card');
+      card.append(el('h3', '', 'Save & share'));
+      const label = (button, faIcon, title, note) => {
+        const text = el('span', 'sd-te-btext');
+        text.append(el('strong', '', title));
+        if (note) text.append(el('small', '', note));
+        button.replaceChildren(icon(faIcon), text);
+      };
+      for (const button of form.querySelectorAll('button')) {
+        if (button.name === 'psExport') label(button, 'fa-cloud-upload', 'Upload to Showdown', 'Saves across devices');
+        else if (button.value === 'openteamsheet') label(button, 'fa-link', 'Upload to PokePaste', 'Open Team Sheet');
+        else label(button, 'fa-link', 'Upload to PokePaste');
+      }
+      card.append(form);
+      aside.append(card);
+    }
+    const links = [...box.querySelectorAll(':scope > ul a[href]')];
+    if (links.length) {
+      const card = el('section', 'sd-te-card sd-te-resources');
+      const format = window.BattleFormats && BattleFormats[room.curTeam.format];
+      const tier = format ? format.name.replace(/^\[Gen \d+\]\s*/, '') : 'Tier';
+      card.append(el('h3', '', `${tier} resources`));
+      const list = el('ul');
+      for (const link of links) {
+        const copy = link.cloneNode(true);
+        copy.append(icon('fa-external-link'));
+        const item = el('li');
+        item.append(copy);
+        list.append(item);
+      }
+      card.append(list);
+      const dex = box.querySelector(':scope > div > a[href*="smogon.com"]');
+      if (dex) {
+        const more = el('p', 'sd-te-more', 'More for this tier on ');
+        more.append(dex.cloneNode(true));
+        card.append(more);
+      }
+      aside.append(card);
+    }
+    box.append(aside);
+  }
+
+  // Set view: the client's results pane (search results, or the stats and details forms)
+  // shown as a centered modal. The client's own field stays behind it; the modal's search
+  // box mirrors it and passes keys through, so choosing a result moves on to the next field
+  // as before and the modal follows. Closing returns to the team view.
+  const MODAL_TITLES = {
+    pokemon: 'Choose a Pokémon', item: 'Choose an item', ability: 'Choose an ability',
+    stats: 'EVs, IVs and nature', details: 'Details',
+  };
+  const searching = (room) => ['pokemon', 'item', 'ability', 'move'].includes(room.curChartType);
+  const chartInput = (wrapper, room) => wrapper.querySelector(`.teamchart input[name="${room.curChartName}"]`);
+
+  function closeModal(wrapper, room) {
+    const real = searching(room) && chartInput(wrapper, room);
+    if (real) {
+      try { room.chartChange({ currentTarget: real }); } catch (e) {}
+    }
+    room.back();
+  }
+
+  function buildModal(wrapper, room) {
+    let frame = wrapper.querySelector(':scope > .sd-te-modal');
+    if (!frame) {
+      const backdrop = el('div', 'sd-te-backdrop');
+      backdrop.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        closeModal(wrapper, room);
+      });
+      frame = el('div', 'sd-te-modal');
+      frame.setAttribute('role', 'dialog');
+      frame.setAttribute('aria-modal', 'true');
+      const head = el('div', 'sd-te-modal-head');
+      const title = el('h2');
+      const close = el('button', 'sd-te-modal-close');
+      close.type = 'button';
+      close.setAttribute('aria-label', 'Close');
+      close.title = 'Close';
+      close.addEventListener('click', () => closeModal(wrapper, room));
+      const search = el('label', 'sd-te-modal-search');
+      const proxy = el('input');
+      proxy.type = 'text';
+      proxy.autocomplete = 'off';
+      proxy.spellcheck = false;
+      proxy.addEventListener('input', () => {
+        const real = chartInput(wrapper, room);
+        if (!real) return;
+        real.value = proxy.value;
+        room.updateChart();
+      });
+      proxy.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          closeModal(wrapper, room);
+          return;
+        }
+        const real = chartInput(wrapper, room);
+        if (!real) return;
+        real.value = proxy.value;
+        room.chartKeydown({
+          keyCode: event.keyCode, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey,
+          altKey: event.altKey, metaKey: event.metaKey, currentTarget: real,
+          preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation(),
+        });
+        if (proxy.value !== real.value) proxy.value = real.value;
+      });
+      search.append(proxy);
+      head.append(title, close, search);
+      frame.append(head);
+      wrapper.append(backdrop, frame);
+    }
+    // After a choice the client focuses the next field; follow it even if no focus event
+    // fired (an unfocused window still moves the active element).
+    const active = document.activeElement;
+    if (active && active.classList.contains('chartinput') && wrapper.contains(active) &&
+        active.name !== room.curChartName) {
+      room.chartFocus({ currentTarget: active });
+    }
+    const importing = wrapper.querySelector('.teambuilder-pokemon-import[style*="block"]');
+    const open = Boolean(room.curChartType) && !importing;
+    wrapper.classList.toggle('sd-te-modal-open', open);
+    if (!open) return;
+    const isSearch = searching(room);
+    wrapper.classList.toggle('sd-te-modal-form', !isSearch);
+    const move = /^move(\d)$/.exec(room.curChartName || '');
+    const title = move ? `Choose move ${move[1]}` : MODAL_TITLES[room.curChartType] || 'Edit';
+    const species = room.curSet && room.curSet.species;
+    setText(frame.querySelector('h2'), species ? `${title} · ${species}` : title);
+    const proxy = frame.querySelector('input');
+    const real = isSearch && chartInput(wrapper, room);
+    if (!real) return;
+    if (proxy.dataset.for !== room.curChartName) {
+      proxy.dataset.for = room.curChartName;
+      proxy.value = real.value;
+      proxy.placeholder = `Search ${room.curChartType === 'pokemon' ? 'Pokémon' : `${room.curChartType}s`}`;
+    }
+    // The client focuses its own field (on open, and after each choice); take the focus.
+    if (document.activeElement === real) {
+      proxy.value = real.value;
+      proxy.focus();
+      proxy.select();
+    }
+  }
+
+  function natureText(set) {
+    const nature = set.nature || 'Serious';
+    const data = window.BattleNatures && BattleNatures[nature];
+    const effect = data && data.plus ? `+${statName(data.plus)} −${statName(data.minus)}` : 'Neutral';
+    return [nature, effect];
+  }
+
+  function decorateSet(li, room) {
+    const set = room.curSetList && room.curSetList[Number(li.getAttribute('value'))];
+    const chart = li.querySelector(':scope > .setchart');
+    if (!set || !chart) return;
+    const team = room.curTeam;
+    const format = team.format || '';
+    const usesEVs = team.gen > 2 && !format.includes('letsgo') && !format.includes('champions');
+
+    if (!li.dataset.sd) {
+      li.dataset.sd = '1';
+      if (set.species) {
+        const meta = el('div', 'sd-te-meta');
+        meta.append(el('span', 'sd-te-chips'));
+        const nickname = li.querySelector(':scope > .setchart-nickname');
+        if (nickname) meta.append(nickname);
+        li.append(meta, el('div', 'sd-te-rule'));
+      }
+      const itemIcon = li.querySelector('.setrow-icons .itemicon');
+      const itemCell = li.querySelector('.setcell-item');
+      if (itemIcon && itemCell) itemCell.prepend(itemIcon);
+      const stats = li.querySelector('.setcol-stats');
+      if (stats) {
+        stats.append(el('span', 'sd-te-evleft'));
+        if (usesEVs) {
+          // Not name="stats": the client rewrites every such button with the stat graph.
+          const nature = el('button', 'sd-te-nature');
+          nature.type = 'button';
+          nature.addEventListener('click', () => room.stats(undefined, nature));
+          stats.append(nature);
+        }
+      }
+    }
+
+    // The client draws the sprite as the chart's background; the card shows it in its box.
+    const sprite = li.querySelector('.setcell-sprite');
+    if (sprite && sprite.style.backgroundImage !== chart.style.backgroundImage) {
+      sprite.style.backgroundImage = chart.style.backgroundImage;
+      sprite.style.backgroundSize = chart.style.backgroundSize;
+    }
+    if (sprite) sprite.classList.toggle('pixelated', chart.classList.contains('pixelated'));
+
+    const chips = li.querySelector('.sd-te-chips');
+    if (chips) {
+      const species = team.dex.species.get(set.species);
+      const types = species.types || [];
+      const tera = team.gen === 9 && !format.includes('champions') ?
+        (set.teraType || species.requiredTeraType || types[0] || '') : '';
+      const key = `${types.join(',')}|${tera}`;
+      if (chips.dataset.key !== key) {
+        chips.dataset.key = key;
+        chips.replaceChildren(...types.map((type) => el('span', `sd-te-type sd-t-${type}`, type)));
+        if (tera) chips.append(el('span', `sd-te-tera sd-t-${tera}`, `Tera ${tera}`));
+      }
+    }
+
+    const left = li.querySelector('.sd-te-evleft');
+    if (left) {
+      let text = '';
+      if (usesEVs && !room.ignoreEVLimits) {
+        const total = Object.values(set.evs || {}).reduce((sum, ev) => sum + (Number(ev) || 0), 0);
+        text = total > 510 ? `${total - 510} over` : `${Math.max(508 - total, 0)} left`;
+      }
+      setText(left, text);
+    }
+    const nature = li.querySelector('.sd-te-nature');
+    if (nature) {
+      const [name, effect] = natureText(set);
+      if (nature.dataset.key !== `${name}|${effect}`) {
+        nature.dataset.key = `${name}|${effect}`;
+        nature.replaceChildren(el('span', '', 'Nature'), el('strong', '', name), el('span', 'sd-te-effect', effect));
+      }
+    }
+
+    // Stat rows are re-rendered as markup on each change; restyle the fresh ones.
+    for (const row of li.querySelectorAll('.setstats .statrow:not(.statrow-head):not([data-sd])')) {
+      row.dataset.sd = '1';
+      const bar = row.querySelector('.statgraph span');
+      if (bar) bar.style.width = `${Math.min(100, (parseFloat(bar.style.width) || 0) / 75 * 100)}%`;
+      const mark = row.querySelector('small');
+      if (mark) row.classList.add(mark.textContent === '+' ? 'sd-plus' : 'sd-minus');
+      const ev = row.querySelector('em');
+      if (ev && !ev.textContent) {
+        ev.textContent = '0';
+        row.classList.add('sd-zero');
+      }
+    }
+  }
+
+  let watched = null;
+  const update = () => {
+    if (!document.documentElement.classList.contains('sd-launcher-shell')) return;
+    const root = document.getElementById('room-teambuilder');
+    if (!root) return;
+    if (watched !== root) {
+      // Sprite and stat updates change inline styles only; watch those inside the room.
+      watched = root;
+      new MutationObserver(update).observe(root, { attributes: true, attributeFilter: ['style'], subtree: true });
+    }
+    const room = getRoom();
+    const wrapper = root.querySelector(':scope > .teamwrapper');
+    if (!room || !room.curTeam || !wrapper) return;
+    const mode = wrapper.querySelector(':scope > .teambar') ? 'set' :
+      wrapper.querySelector(':scope > .teamedit') ? 'export' : 'team';
+    if (wrapper.dataset.sdMode !== mode) wrapper.dataset.sdMode = mode;
+    try {
+      buildHead(wrapper, room, mode);
+      if (mode === 'team') {
+        buildTabs(wrapper, room);
+        buildPaste(wrapper, room);
+        buildAside(wrapper, room);
+        showTab(wrapper, room);
+      }
+      if (mode === 'set') {
+        decorateTeambar(wrapper, room);
+        buildModal(wrapper, room);
+      }
+      for (const li of wrapper.querySelectorAll('.teamchart > li[value]')) decorateSet(li, room);
+    } catch (e) {} // the client's own editor stays usable if this ever fails
+  };
+  new MutationObserver(update).observe(document.body, { childList: true, subtree: true });
+  // Esc closes the modal; the client's own Esc handler only closes its popups.
+  window.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || (window.app && app.popups && app.popups.length)) return;
+    const wrapper = document.querySelector('#room-teambuilder > .teamwrapper.sd-te-modal-open');
+    const room = getRoom();
+    if (!wrapper || !room) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeModal(wrapper, room);
+  }, true);
+  update();
+  return true;
+}
+
 function readShowdex() {
   const state = window.__SHOWDOWN_DESKTOP_SHOWDEX;
   // The pinned bootstrap sets this only after render; closing its room does not unload it.
@@ -661,6 +1416,22 @@ class ShowdownBridge {
     if (!contents) return false;
     try {
       return await contents.executeJavaScript(call(installFormatModal)) === true;
+    } catch { return false; }
+  }
+
+  async installTeamEditor() {
+    const contents = this.getContents();
+    if (!contents) return false;
+    try {
+      return await contents.executeJavaScript(call(installTeamEditor)) === true;
+    } catch { return false; }
+  }
+
+  async installTeamsView() {
+    const contents = this.getContents();
+    if (!contents) return false;
+    try {
+      return await contents.executeJavaScript(call(installTeamsView)) === true;
     } catch { return false; }
   }
 
