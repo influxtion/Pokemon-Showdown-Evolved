@@ -3,6 +3,10 @@
 // Rail: one row per room open in the Showdown client, so the launcher owns navigation.
 // Other pages can listen for the "showdown-session" event instead of polling again.
 (() => {
+  // Following the current page's link reloads the renderer and resets its UI.
+  const currentPage = document.querySelector('.rail a.nav-item[aria-current="page"]');
+  if (currentPage) currentPage.addEventListener('click', (event) => event.preventDefault());
+
   const $ = (name) => document.querySelector(`[data-nav="${name}"]`);
   const list = $('rooms');
   if (!list || !window.desktop) return;
@@ -143,7 +147,10 @@
       dot.title = 'New activity';
       main.append(dot);
     }
-    main.addEventListener('click', () => (pm ? openConversation(pm) : tab ? openTab(tab) : focusRoom(id)));
+    main.addEventListener('click', () => {
+      if (current) return;
+      return pm ? openConversation(pm) : tab ? openTab(tab) : focusRoom(id);
+    });
     node.append(main);
     if (closable) {
       const close = make('button', 'rail-icon-btn nav-close');

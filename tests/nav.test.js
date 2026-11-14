@@ -74,11 +74,13 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const location = { href: onPlay ? 'play.html' : 'index.html' };
   // The challenge bars are inserted after the top bar; the fake records what lands there.
   const topbar = new Node('header');
+  const currentPage = onPlay ? null : new Node('a');
   const after = [];
   topbar.after = (node) => after.push(node);
   const document = {
     body: { dataset: onPlay ? { page: 'play' } : {} },
     querySelector: (selector) => {
+      if (selector === '.rail a.nav-item[aria-current="page"]') return currentPage;
       if (selector === '.main > .topbar') return topbar;
       const match = /data-nav="(.+)"/.exec(selector);
       return match ? nav[match[1]] || null : null;
@@ -105,7 +107,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     clearTimeout: (t) => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); },
   });
   return {
-    location, nav, events, timers, saved, calls,
+    location, nav, events, timers, saved, calls, currentPage,
     bars: () => after[0],
     rows: () => nav.rooms.children.filter((c) => c.has('nav-room')),
     row: (i) => nav.rooms.children.filter((c) => c.has('nav-room'))[i],
@@ -119,6 +121,28 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     async poll() { assert.ok(timers.length); timers.shift().fn(); await this.settle(); },
   };
 }
+
+test('clicking the current launcher page prevents a reload', async () => {
+  const h = harness([session([])]);
+  await h.settle();
+  assert.equal(h.currentPage.click().prevented, true);
+  assert.deepEqual(h.calls, []);
+});
+
+test('clicking the selected client tab leaves its view alone', async () => {
+  for (const [title, state] of [
+    ['Battle', session([])],
+    ['Teambuilder', session([], { current: 'teambuilder' })],
+    ['Community', session([], { menuTab: 'community' })],
+  ]) {
+    const h = harness([state], { onPlay: true });
+    await h.settle();
+    h.main(h.tab(title)).click();
+    await h.settle();
+    assert.deepEqual(h.calls, [], title);
+    assert.equal(h.location.href, 'play.html');
+  }
+});
 
 test('new player battle switches after names arrive', async () => {
   const h = harness([session([]), session([room('battle-gen9ou-1')]), session([room('battle-gen9ou-1', ['Player', 'Rival'])])]);
@@ -318,7 +342,7 @@ test('clicking a row or Join a room focuses and opens play', async () => {
   on.location.href = 'unchanged';
   on.main(on.row(0)).click();
   await on.settle();
-  assert.deepEqual(on.calls, [{ action: 'focus-room', args: { room: 'lobby' } }]);
+  assert.deepEqual(on.calls, [], 'the current room does not need to be focused again');
   assert.equal(on.location.href, 'unchanged', 'already on play: no navigation');
 
   const join = harness([session([])]);
