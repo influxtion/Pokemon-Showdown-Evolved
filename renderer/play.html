@@ -15,40 +15,46 @@
       <span class="rail-brand-text"><strong>Showdown</strong><span>Desktop</span></span>
     </div>
     <div class="rail-nav">
-      <a class="nav-item" href="index.html">
+      <a class="nav-item" href="index.html" title="Home">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/></svg>
-        Home
+        <span class="nav-text">Home</span>
       </a>
-      <div class="rail-rooms" data-nav="rooms"></div>
-      <a class="nav-item" href="stats.html">
+      <a class="nav-item" href="play.html" data-nav="teambuilder" title="Teambuilder">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 13l.5-3L10.5 3l2.5 2.5L6 12.5z"/></svg>
+        <span class="nav-text">Teambuilder</span>
+      </a>
+      <a class="nav-item" href="stats.html" title="Stats">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg>
-        Stats
+        <span class="nav-text">Stats</span>
       </a>
-      <div class="rail-section"><span>Tools</span></div>
-      <a class="nav-item" href="replays.html">
+      <div class="rail-sep" aria-hidden="true"></div>
+      <a class="nav-item" href="replays.html" title="Replay notes">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
-        Replay notes
+        <span class="nav-text">Replays</span>
       </a>
-      <a class="nav-item" href="practice.html">
+      <a class="nav-item" href="practice.html" title="Practice">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg>
-        Practice
+        <span class="nav-text">Practice</span>
       </a>
-      <a class="nav-item" href="settings.html">
+      <a class="nav-item nav-item--end" href="settings.html" title="Settings">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/></svg>
-        Settings
+        <span class="nav-text">Settings</span>
       </a>
     </div>
     <div class="rail-foot">
       <div class="rail-user" data-nav="account" hidden>
         <span class="rail-avatar" data-nav="avatar" aria-hidden="true"></span>
         <span class="rail-user-text"><strong data-nav="me"></strong><span>v0.2.0-dev</span></span>
-        <a href="play.html" data-nav="sign-in" hidden>Sign in</a>
+        <a href="play.html" data-nav="sign-in" title="Sign in" hidden>Sign in</a>
       </div>
       <span class="rail-version">v0.2.0-dev</span>
     </div>
   </nav>
 
   <div class="main">
+    <nav class="tabstrip" aria-label="Open rooms">
+      <div class="rail-rooms" data-nav="rooms"></div>
+    </nav>
     <header class="topbar">
       <div class="room-title">
         <h1 id="room-title">Showdown</h1>

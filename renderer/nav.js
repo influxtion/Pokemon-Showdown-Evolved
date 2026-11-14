@@ -1,6 +1,7 @@
 'use strict';
 
-// Rail: one row per room open in the Showdown client, so the launcher owns navigation.
+// Tab strip: small tabs for launcher pages, then one tab per room open in the Showdown
+// client, so the launcher owns navigation.
 // Other pages can listen for the "showdown-session" event instead of polling again.
 (() => {
   // Following the current page's link reloads the renderer and resets its UI.
@@ -27,6 +28,11 @@
     // Two crossed swords: blades, crossguards and grips.
     swords: svg('<path d="M2.5 2.5h2.5l6 6M11 11l2.5 2.5M9.5 12.5l3-3M13.5 2.5H11l-6 6M5 11l-2.5 2.5M3.5 9.5l3 3"/>', ' stroke-linecap="round" stroke-linejoin="round"'),
     other: svg('<rect x="3" y="3" width="10" height="10" rx="1.5"/>'),
+    home: svg('<path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/>', round),
+    stats: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
+    replays: svg('<path d="M4 2.5h8v11l-4-3-4 3z"/>', round),
+    practice: svg('<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/>'),
+    settings: svg('<path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/>', ' stroke-linecap="round"'),
     x: svg('<path d="M4 4l8 8M12 4l-8 8"/>', ' stroke-linecap="round"'),
   };
 
@@ -178,6 +184,91 @@
   }
 
   let lastKey = null;
+  let lastSession = null;
+
+  // Launcher pages are small tabs ahead of the room tabs. Home is always first; the others
+  // appear once opened from the icon bar and stay until closed or the app restarts.
+  // Teambuilder is the client's own room, so its tab follows that room being open.
+  const PAGES = {
+    'index.html': { title: 'Home', kind: 'home' },
+    'stats.html': { title: 'Stats', kind: 'stats' },
+    'replays.html': { title: 'Replays', kind: 'replays' },
+    'practice.html': { title: 'Practice', kind: 'practice' },
+    'settings.html': { title: 'Settings', kind: 'settings' },
+    teambuilder: { title: 'Teambuilder', kind: 'teambuilder', room: true },
+  };
+  const isPage = (file) => Object.prototype.hasOwnProperty.call(PAGES, file);
+  const pagesKey = 'nav.pages';
+  const thisPage = (/([a-z]+\.html)(?:[?#].*)?$/.exec(String(location.href)) || [])[1] || '';
+
+  function savedPages() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(pagesKey));
+      if (Array.isArray(saved)) {
+        return saved.filter((file, i) => file !== 'index.html' && isPage(file) && saved.indexOf(file) === i);
+      }
+    } catch {}
+    return [];
+  }
+
+  function savePages() {
+    try {
+      sessionStorage.setItem(pagesKey, JSON.stringify(pages));
+    } catch {}
+  }
+
+  const pages = savedPages();
+  if (thisPage !== 'index.html' && isPage(thisPage) && !pages.includes(thisPage)) {
+    pages.push(thisPage);
+    savePages();
+  }
+
+  // Closing the page being shown moves to the tab on its left.
+  function closePage(file) {
+    const at = pages.indexOf(file);
+    if (at < 0) return;
+    pages.splice(at, 1);
+    savePages();
+    if (file === thisPage) {
+      location.href = pages[at - 1] || 'index.html';
+      return;
+    }
+    lastKey = null;
+    if (lastSession) render(lastSession);
+  }
+
+  function pageTab({ file, current }) {
+    const { title, kind, room } = PAGES[file];
+    const node = make('div', 'nav-item nav-page');
+    node.title = title;
+    if (current) node.setAttribute('aria-current', 'page');
+    const main = make('button', 'nav-room-main');
+    main.type = 'button';
+    main.append(icon(ICONS[kind], 'nav-room-icon'));
+    const text = make('span', 'nav-room-text');
+    text.append(make('span', 'nav-room-title nav-label', title));
+    main.append(text);
+    main.addEventListener('click', () => {
+      if (current) return;
+      if (room) openTab(file);
+      else location.href = file;
+    });
+    node.append(main);
+    if (file !== 'index.html') {
+      const close = make('button', 'rail-icon-btn nav-close');
+      close.type = 'button';
+      close.setAttribute('aria-label', `Close ${title}`);
+      close.title = `Close ${title}`;
+      close.append(icon(ICONS.x));
+      close.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (room) closeRoom(file);
+        else closePage(file);
+      });
+      node.append(close);
+    }
+    return node;
+  }
 
   // Challenge bars sit under the top bar on every page, so a challenge can be answered
   // without leaving the current screen. Answers go through the client's own buttons.
@@ -301,11 +392,10 @@
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
-    // The Teambuilder tab stands in for its room, so it never gets a row of its own.
+    // The Teambuilder room is a small page tab, so it never gets a row of its own.
     const rows = [
       tabRow('battle', current === '' && !community && session.menuTab !== 'pm', !!session.menuUnread),
       ...rooms.filter(inBattle).map(roomRow),
-      tabRow('teambuilder', current === 'teambuilder', rooms.some((r) => r.id === 'teambuilder' && r.unread)),
       tabRow('community', (current === '' && community) || current === 'rooms', false),
       ...rooms.filter((r) => !inBattle(r) && r.id !== 'teambuilder').map(roomRow),
     ];
@@ -318,25 +408,64 @@
       current: onPlay && current === '' && session.menuTab === 'pm' && session.pmOpen === m.userid,
     }));
     // Rebuild only on change so hover and focus survive each poll.
-    const key = JSON.stringify([rows, messages, !!session.ready, me, !!session.named]);
+    // The Teambuilder page tab exists exactly while its room is open in the client.
+    const teambuilding = onPlay && current === 'teambuilder';
+    if (session.ready) {
+      const open = rooms.some((r) => r.id === 'teambuilder');
+      const at = pages.indexOf('teambuilder');
+      if (open && at < 0) pages.push('teambuilder');
+      else if (!open && at >= 0) pages.splice(at, 1);
+      if (open !== at >= 0) savePages();
+    }
+    const railTeambuilder = $('teambuilder');
+    if (railTeambuilder) {
+      if (teambuilding) railTeambuilder.setAttribute('aria-current', 'page');
+      else railTeambuilder.removeAttribute('aria-current');
+    }
+    const pageRows = ['index.html', ...pages].map((file) => ({
+      file, current: PAGES[file].room ? teambuilding : !onPlay && file === thisPage,
+    }));
+    lastSession = session;
+    const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named]);
     renderChallenges(session);
     if (key === lastKey) return;
     lastKey = key;
-    const nodes = rows.map(row);
+    const nodes = [...pageRows.map(pageTab), ...rows.map(row)];
     if (messages.length) {
       const label = make('div', 'rail-section rail-section--messages');
       label.append(make('span', '', 'Messages'));
       nodes.push(label, ...messages.map(row));
     }
     list.replaceChildren(...nodes);
+    // Keep the open tab visible when the strip has scrolled.
+    const open = typeof list.querySelector === 'function' && list.querySelector('[aria-current="page"]');
+    if (open && typeof open.scrollIntoView === 'function') open.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     const box = $('account');
     if (box) {
       box.hidden = !session.ready || !me;
       $('me').textContent = me;
+      box.title = me;
       const avatar = $('avatar');
       if (avatar) avatar.textContent = (/[a-z0-9]/i.exec(me) || ['?'])[0].toUpperCase();
       $('sign-in').hidden = !!session.named;
     }
+  }
+
+  // A vertical wheel scrolls the tab strip sideways.
+  if (typeof list.addEventListener === 'function') {
+    list.addEventListener('wheel', (event) => {
+      if (!event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      list.scrollLeft += event.deltaY;
+      event.preventDefault();
+    }, { passive: false });
+  }
+
+  // The icon bar's Teambuilder entry opens the client's Teambuilder room.
+  if ($('teambuilder')) {
+    $('teambuilder').addEventListener('click', (event) => {
+      event.preventDefault();
+      if (!(onPlay && lastSession && lastSession.current === 'teambuilder')) openTab('teambuilder');
+    });
   }
 
   $('sign-in').addEventListener('click', async (event) => {

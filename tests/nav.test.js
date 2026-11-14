@@ -35,6 +35,7 @@ class Node {
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(name, value) { this.attrs[name] = String(value); }
   getAttribute(name) { return name in this.attrs ? this.attrs[name] : null; }
+  removeAttribute(name) { delete this.attrs[name]; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
   has(cls) { return this.className.split(' ').includes(cls); }
   querySelectorAll(selector) {
@@ -68,7 +69,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const events = [];
   const calls = [];
   const nav = {};
-  for (const name of ['rooms', 'sign-in', 'account', 'me']) nav[name] = new Node('x');
+  for (const name of ['rooms', 'sign-in', 'account', 'me', 'teambuilder']) nav[name] = new Node('x');
   nav['sign-in'].hidden = true;
   nav.account.hidden = true;
   const location = { href: onPlay ? 'play.html' : 'index.html' };
@@ -132,7 +133,6 @@ test('clicking the current launcher page prevents a reload', async () => {
 test('clicking the selected client tab leaves its view alone', async () => {
   for (const [title, state] of [
     ['Battle', session([])],
-    ['Teambuilder', session([], { current: 'teambuilder' })],
     ['Community', session([], { menuTab: 'community' })],
   ]) {
     const h = harness([state], { onPlay: true });
@@ -201,7 +201,7 @@ test('rooms render as rows with titles, sub-lines, unread dots and close labels'
   const tb = chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' });
   const h = harness([session([live, done, lobby, tb])]);
   await h.settle();
-  assert.equal(h.rows().length, 3, 'the Teambuilder room is its tab, not a row');
+  assert.equal(h.rows().length, 3, 'the Teambuilder room is a page tab, not a row');
   assert.equal(h.title(h.row(0)), 'vs. Rival');
   assert.equal(h.sub(h.row(0)), 'Gen 9 OU · Turn 7');
   assert.ok(h.row(0).has('nav-item--live'));
@@ -283,21 +283,38 @@ test('the Battle tab focuses the main menu and opens play', async () => {
   assert.equal(h.location.href, 'play.html');
 });
 
-test('the Teambuilder tab is always shown and opens its room', async () => {
+test('Teambuilder opens from the icon bar as a small page tab that follows its room', async () => {
+  const pageTabs = (h) => h.nav.rooms.children.filter((c) => c.has('nav-page'));
   const closed = harness([session([])]);
   await closed.settle();
-  assert.equal(closed.tab('Teambuilder').children.length, 1, 'tabs cannot be closed');
-  closed.main(closed.tab('Teambuilder')).click();
+  assert.equal(closed.tab('Teambuilder'), undefined, 'no fixed Teambuilder tab');
+  assert.deepEqual(pageTabs(closed).map((t) => closed.title(t)), ['Home']);
+  assert.equal(closed.nav.teambuilder.click().prevented, true);
   await closed.settle();
   assert.deepEqual(closed.calls, [{ action: 'join', args: { room: 'teambuilder' } }]);
   assert.equal(closed.location.href, 'play.html');
 
   const tb = chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' });
-  const open = harness([session([tb], { current: 'teambuilder' })], { onPlay: true });
+  const saved = new Map([['nav.pages', '["stats.html"]']]);
+  const open = harness([session([tb], { current: 'teambuilder' }), session([])], { onPlay: true, saved });
   await open.settle();
-  assert.equal(open.tab('Teambuilder').getAttribute('aria-current'), 'page');
+  assert.deepEqual(pageTabs(open).map((t) => open.title(t)), ['Home', 'Stats', 'Teambuilder']);
+  assert.deepEqual(pageTabs(open).map((t) => t.getAttribute('aria-current')), [null, null, 'page']);
+  assert.equal(open.nav.teambuilder.getAttribute('aria-current'), 'page');
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html', 'teambuilder']);
   assert.equal(open.tab('Battle').getAttribute('aria-current'), null);
   assert.equal(open.rows().length, 0);
+  // Clicking the open Teambuilder does nothing; closing it leaves the room.
+  open.nav.teambuilder.click();
+  open.main(pageTabs(open)[2]).click();
+  await open.settle();
+  assert.deepEqual(open.calls, []);
+  open.close(pageTabs(open)[2]).click();
+  await open.settle();
+  assert.deepEqual(open.calls, [{ action: 'leave-room', args: { room: 'teambuilder' } }]);
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
+  assert.equal(open.nav.teambuilder.getAttribute('aria-current'), null);
+  open.calls.length = 0;
 });
 
 test('the Community tab is always shown, opens its menu view and marks it current', async () => {
@@ -326,7 +343,7 @@ test('tabs keep their order and open rooms nest under the tab they belong to', a
   ])]);
   await h.settle();
   assert.deepEqual(h.nav.rooms.children.map((r) => h.title(r)),
-    ['Battle', 'Ladder', 'Battles', 'Tournaments', 'Alice vs. Bob', 'Teambuilder', 'Community', 'Lobby']);
+    ['Home', 'Teambuilder', 'Battle', 'Ladder', 'Battles', 'Tournaments', 'Alice vs. Bob', 'Community', 'Lobby']);
 });
 
 test('clicking a row or Join a room focuses and opens play', async () => {
@@ -510,4 +527,33 @@ test('the bar hides for the conversation already open on the Showdown screen', a
   const elsewhere = harness([session([], { menuTab: 'pm', pmOpen: 'ashk', messages: [incoming('ashk')] })]);
   await elsewhere.settle();
   assert.equal(elsewhere.bars().children.length, 1);
+});
+
+test('Home is the first small tab, and opened launcher pages follow it until closed', async () => {
+  const fresh = harness([session([])]);
+  await fresh.settle();
+  const pageTabs = (h) => h.nav.rooms.children.filter((c) => c.has('nav-page'));
+  assert.deepEqual(pageTabs(fresh).map((t) => fresh.title(t)), ['Home']);
+  assert.equal(pageTabs(fresh)[0].getAttribute('aria-current'), 'page');
+  assert.equal(pageTabs(fresh)[0].children.length, 1, 'Home has no close button');
+  assert.ok(fresh.nav.rooms.children[0].has('nav-page'), 'page tabs come before room tabs');
+
+  // Unknown files, duplicates and Home itself are dropped from the saved list.
+  const saved = new Map([['nav.pages', JSON.stringify(['stats.html', 'evil.html', 'index.html', 'stats.html', 'settings.html'])]]);
+  const h = harness([session([])], { saved });
+  await h.settle();
+  assert.deepEqual(pageTabs(h).map((t) => h.title(t)), ['Home', 'Stats', 'Settings']);
+  h.main(pageTabs(h)[1]).click();
+  assert.equal(h.location.href, 'stats.html');
+  h.location.href = 'index.html';
+  assert.equal(h.close(pageTabs(h)[1]).getAttribute('aria-label'), 'Close Stats');
+  h.close(pageTabs(h)[1]).click();
+  assert.deepEqual(pageTabs(h).map((t) => h.title(t)), ['Home', 'Settings']);
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['settings.html']);
+  assert.equal(h.location.href, 'index.html');
+
+  // On the Showdown screen no page tab is the open one.
+  const play = harness([session([])], { onPlay: true, saved: new Map([['nav.pages', '["stats.html"]']]) });
+  await play.settle();
+  assert.deepEqual(pageTabs(play).map((t) => t.getAttribute('aria-current')), [null, null]);
 });

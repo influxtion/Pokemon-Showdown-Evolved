@@ -46,6 +46,11 @@
   --rail-selected: #173b7c;
   --rail-indicator: #f5c42c;
 
+  /* Room tabs: a darker strip; --tab-border is the hairline between tabs */
+  --strip-bg: #163874;
+  --tab-hover: #2a58ab;
+  --tab-border: #4170c2;
+
   /* Top bar */
   --topbar-bg: #ffffff;
   --topbar-border: #d2dae7;
@@ -69,7 +74,8 @@
 
   /* Shape and spacing */
   --radius: 3px;
-  --rail-w: 212px;
+  --rail-w: 84px;
+  --tabstrip-h: 38px;
   --topbar-h: 40px;
   --control-h: 28px;
   --space-1: 4px;
@@ -111,6 +117,10 @@
     --rail-muted: #7f9ace;
     --rail-hover: #234c98;
     --rail-selected: #11306b;
+
+    --strip-bg: #102c63;
+    --tab-hover: #234c98;
+    --tab-border: #3561ad;
 
     --topbar-bg: #2c3a57;
     --topbar-border: #3d4d6d;
@@ -995,10 +1005,13 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 
 /* ---------- Challenges and private messages ----------
    Challenge bars sit under the top bar on every page (nav.js inserts them), so .main gets a
-   row for them; conversations are listed in the rail under Messages. */
+   row for them; conversations get tabs after a Messages label in the tab strip. */
 
-.main { grid-template-rows: var(--topbar-h) auto minmax(0, 1fr); }
-.main > :not(.topbar):not(.challenge-bars) { grid-row: 3; }
+.main { grid-template-rows: var(--tabstrip-h) var(--topbar-h) auto minmax(0, 1fr); }
+.main > .tabstrip { grid-row: 1; }
+.main > .topbar { grid-row: 2; }
+.main > .challenge-bars { grid-row: 3; }
+.main > :not(.tabstrip):not(.topbar):not(.challenge-bars) { grid-row: 4; }
 .challenge-bars { display: flex; flex-direction: column; min-width: 0; }
 .challenge-bars[hidden] { display: none; }
 .banner--challenge { border-left-color: var(--primary); gap: var(--space-2); padding: 6px var(--space-4); font-size: var(--fs-md); min-width: 0; }
@@ -1295,3 +1308,133 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .record-bar { flex: 1; height: 8px; border-radius: 2px; background: var(--err); overflow: hidden; }
 .record-won { display: block; height: 100%; background: var(--ok); border-right: 2px solid var(--bg-panel); }
 .record-text { width: 38px; text-align: right; font-weight: 600; }
+
+/* ---------- Icon bar and room tabs ----------
+   The rail holds the launcher's own pages as an icon with its name underneath. Showdown
+   rooms are tabs in a strip across the top of .main. Tabs sit flat on the strip with a
+   short hairline between neighbours; the open tab takes the top bar's colour so it joins
+   the page below it, and the hairlines beside it (and beside a hovered tab) drop away. */
+
+.rail-brand { justify-content: center; padding: 12px 0 10px; }
+.rail-brand-text { display: none; }
+.rail-logo { width: 32px; height: 32px; border-radius: 8px; }
+.rail-nav { flex: 1; gap: 4px; padding: var(--space-1) 6px; overflow-x: hidden; }
+.rail .nav-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  height: 54px;
+  padding: 0 2px;
+  font-size: 10.5px;
+  line-height: 1.15;
+  text-align: center;
+}
+.rail .nav-item svg { width: 20px; height: 20px; }
+.rail .nav-item[aria-current="page"]::before { left: -6px; height: 28px; }
+.nav-text { max-width: 100%; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-sep { height: 1px; margin: 4px 10px; background: var(--rail-hover); flex: none; }
+.nav-item--end { margin-top: auto; }
+.rail-foot { padding: 8px 6px 12px; align-items: center; }
+.rail-version { display: none; }
+.rail-user { flex-direction: column; gap: 4px; padding: 0; border: 0; background: transparent; width: 100%; }
+.rail-avatar { width: 32px; height: 32px; background: var(--primary); color: var(--on-primary); }
+.rail-user-text { flex: none; width: 100%; text-align: center; }
+.rail-user-text span { display: none; }
+.rail-user-text strong { display: block; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.rail-user a { padding: 3px 8px; font-size: 10.5px; white-space: nowrap; }
+
+.tabstrip { display: flex; align-items: flex-end; min-width: 0; padding: 0 8px; background: var(--strip-bg); }
+.tabstrip :focus-visible { outline-color: var(--rail-text-strong); outline-offset: -2px; }
+.tabstrip .rail-rooms {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 5px;
+  padding-top: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tabstrip .rail-rooms::-webkit-scrollbar { display: none; }
+
+.tabstrip .nav-item {
+  flex: 1 1 140px;
+  min-width: 104px;
+  max-width: 150px;
+  height: 100%;
+  min-height: 0;
+  gap: 2px;
+  padding: 0 5px 0 11px;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--rail-text);
+  font-weight: 400;
+}
+.tabstrip .nav-tab { padding-right: 11px; }
+.tabstrip .nav-tab:has(.rail-icon-btn) { padding-right: 5px; }
+.tabstrip .nav-item:hover { background: var(--tab-hover); color: var(--rail-text-strong); }
+.tabstrip .nav-room-main { padding: 0; gap: 7px; }
+.tabstrip .nav-room-icon svg { width: 14px; height: 14px; }
+.tabstrip .nav-room-text { flex: 0 1 auto; flex-direction: row; align-items: baseline; gap: 6px; line-height: 1.2; }
+/* The name wins the space; the format and turn shrink first. */
+.tabstrip .nav-room-title { flex: 0 1 auto; min-width: 3ch; }
+.tabstrip .nav-room-sub { flex: 0 99999 auto; min-width: 0; font-size: var(--fs-xs); }
+
+/* Hairline between neighbouring tabs, centred in the gap and shorter than the tab. */
+.tabstrip .nav-item + .nav-item::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: 9px;
+  bottom: 9px;
+  width: 1px;
+  background: var(--tab-border);
+}
+.tabstrip .nav-item[aria-current="page"]::after,
+.tabstrip .nav-item[aria-current="page"] + .nav-item::after,
+.tabstrip .nav-item:hover::after,
+.tabstrip .nav-item:hover + .nav-item::after { display: none; }
+
+/* The open tab is marked by taking the page's colour; it has no line along its top. */
+.tabstrip .nav-item[aria-current="page"],
+.tabstrip .nav-item[aria-current="page"]:hover {
+  background: var(--topbar-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+.tabstrip .nav-item[aria-current="page"]::before { display: none; }
+
+/* Close buttons are always shown, in the tab's text colour rather than a faint one. */
+.tabstrip .nav-item .nav-close { visibility: visible; width: 20px; height: 20px; color: var(--rail-text); }
+.tabstrip .nav-item .nav-close svg { width: 14px; height: 14px; stroke-width: 1.8; color: inherit; }
+.tabstrip .nav-item .nav-close:hover { background: var(--strip-bg); color: var(--rail-text-strong); }
+.tabstrip .nav-item[aria-current="page"] .nav-room-icon,
+.tabstrip .nav-item[aria-current="page"] .nav-room-icon svg { color: var(--accent); }
+.tabstrip .nav-item[aria-current="page"] .rail-icon-btn svg { color: inherit; }
+.tabstrip .nav-item[aria-current="page"] .nav-room-sub { color: var(--text-3); font-weight: 400; }
+.tabstrip .nav-item[aria-current="page"] .nav-label { color: var(--text); }
+.tabstrip .nav-item[aria-current="page"] .rail-icon-btn { color: var(--text-2); }
+.tabstrip .nav-item[aria-current="page"] .rail-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Page tabs: Home, then any launcher page opened from the icon bar. They are only as wide
+   as their label, and a wider gap (no hairline) sets them apart from the room tabs. */
+.tabstrip .nav-page { flex: none; min-width: 0; max-width: none; padding: 0 14px; gap: 6px; }
+.tabstrip .nav-page:has(.nav-close) { padding-right: 6px; }
+.tabstrip .nav-page .nav-room-main { gap: 8px; }
+.tabstrip .nav-page .nav-room-icon svg { width: 16px; height: 16px; }
+.tabstrip .nav-page + .nav-item:not(.nav-page) { margin-left: 14px; }
+.tabstrip .nav-page + .nav-item:not(.nav-page)::after { display: none; }
+
+/* Messages: a quiet label before the conversation tabs. */
+.tabstrip .rail-section {
+  flex: none;
+  align-self: center;
+  height: 18px;
+  margin: 0 6px 0 2px;
+  padding: 0 4px 0 12px;
+  border-left: 1px solid var(--tab-border);
+  font-size: 10px;
+}

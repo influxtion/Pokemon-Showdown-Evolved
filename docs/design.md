@@ -35,7 +35,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - External links open in the system browser; only Google sign-in may open a popup.
 
 ### Showdown overhaul
-- **Rail:** Home, Showdown, Stats, Practice, Replay notes, Settings, account at the foot. Open rooms are listed with close buttons and **Join a room**.
+- **Icon bar and room tabs:** a slim icon bar on the left for Home, Stats, Replay notes, Practice and Settings, with the account at the foot. Showdown rooms are tabs across the top, with close buttons and **Join a room**.
 - **Battles persist** across page changes. A new battle takes focus; Home shows **Return to battle**; an ended battle offers **Save replay note**, **Close battle**, **Battle again**.
 - **Home:** format and team pickers, **Battle**, **Cancel**, **Challenge a user**, the format's rating, win rate, record and GXE, plus news, replay notes, friends and chat rooms.
 - **Stats:** ladder totals and a sortable per-format table; **Play** preselects a format, never starts a search.
@@ -158,7 +158,9 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Launcher shell and Home
 
-- **Rail:** Home, Showdown, Stats, Practice, Replay notes and Settings, with the account at the foot. While rooms are open, a Showdown section lists them (battles, chats, teambuilder, ladder) with close buttons and a **Join a room** button. Closing an own live battle goes through the client's own leave path, so the forfeit prompt still appears.
+- **Icon bar:** an 84px cobalt bar on the left; each page (Home, Teambuilder, Stats, Replay notes, Practice, Settings) is an icon with its name underneath, and the account avatar and name sit at the foot.
+- **Page tabs:** the tab strip across the top of every page starts with small, label-width tabs for launcher pages, as in Showdown's own header. Home is always first and cannot be closed. Opening Stats, Replay notes, Practice or Settings from the icon bar adds its small tab after Home; it stays until closed or the app restarts, and closing the page being shown moves to the tab on its left. Teambuilder is the client's own room: its small tab is shown exactly while that room is open, and closing the tab leaves the room. A wider gap separates these from the room tabs.
+- **Room tabs:** the normal-sized tabs that follow. Fixed tabs for Battle and Community (with **Join a room**), then one tab per open room (battles, chats, ladder) with a close button, then conversations after a Messages label. Tabs sit flat on a darker strip with a short hairline between neighbours; the open tab takes the page colour, close buttons are always visible, and the hairlines beside it or beside a hovered tab drop away. Tabs share one width (up to 150px), shrink together to a 104px minimum, and then the strip scrolls (the mouse wheel scrolls it sideways). Closing an own live battle goes through the client's own leave path, so the forfeit prompt still appears.
 - **Persistence:** the client stays loaded across page changes, so navigating never loses a battle. A newly started battle switches to the Showdown view and takes priority. Home shows **Return to battle** while one runs. An ended battle shows a result bar: **Save replay note**, **Close battle**, **Battle again**.
 - **Home hero:** format and team pickers (with the team's sprites), **Battle**, **Cancel** and **Challenge a user**. Search runs in the background with an animated state. Choices are remembered per format as a convenience only.
 - **Home hero record:** the selected format's rating, win rate, win–loss record and GXE, from the public profile endpoint (cached 2 minutes), with user and battle counts and **Edit teams** (opens the selected team).
