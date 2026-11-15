@@ -2,7 +2,6 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, WebContentsView, Menu, ipcMain, nativeTheme, shell, dialog,
   protocol, session: electronSession, screen, Notification } = require('electron');
 require('./profile').configureProfile(app);
@@ -18,6 +17,7 @@ const { PracticeView } = require('./practice-view');
 const { Logger } = require('./logging');
 const { WindowState } = require('./window-state');
 const { MessageAlerts } = require('./message-alerts');
+const { launcherUrl, launcherFrame, httpsHost, denyPermissions } = require('./security');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
 
 if (!app.isReady()) registerShowdexScheme(protocol);
@@ -33,7 +33,6 @@ const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
 // Window and view fills shown before pages paint; match --bg-app in each theme.
 const BACKGROUND = { light: '#e6ecf5', dark: '#24304a' };
-const RENDERER_URL = pathToFileURL(RENDERER_DIR + path.sep).href;
 const CLIENT_URL = 'https://play.pokemonshowdown.com/';
 // Persistent partition keeps the Showdown login across launches, isolated from the launcher.
 const CLIENT_PARTITION = 'persist:showdown';
@@ -78,9 +77,7 @@ function parseUrl(url) {
 }
 
 function isShowdownUrl(url) {
-  const u = parseUrl(url);
-  return Boolean(u && u.protocol === 'https:' &&
-    (u.hostname === 'pokemonshowdown.com' || u.hostname.endsWith('.pokemonshowdown.com')));
+  return httpsHost(url, ['play.pokemonshowdown.com']);
 }
 
 function openExternal(url) {
@@ -89,8 +86,7 @@ function openExternal(url) {
 }
 
 function isLauncherFrame(event) {
-  return Boolean(win && event.sender === win.webContents &&
-    event.senderFrame && event.senderFrame.url.startsWith(RENDERER_URL));
+  return launcherFrame(event, win?.webContents, RENDERER_DIR);
 }
 
 function reviewNoteId(event) {
@@ -133,8 +129,7 @@ function ensureClient() {
   const contents = client.webContents;
   // The launcher sends challenge and message notifications itself (see announce), so the
   // client's own would only duplicate them, and clicking those cannot raise the window.
-  contents.session.setPermissionRequestHandler((_contents, permission, respond) => respond(permission !== 'notifications'));
-  contents.session.setPermissionCheckHandler((_contents, permission) => permission !== 'notifications');
+  denyPermissions(contents.session);
   contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
     if (isMainFrame) logger.write('client-load-failed', code);
   });
@@ -153,7 +148,7 @@ function ensureClient() {
   });
   contents.setWindowOpenHandler(({ url }) => {
     const u = parseUrl(url);
-    if (u && u.protocol === 'https:' && POPUP_HOSTS.has(u.hostname)) {
+    if (u && httpsHost(url, [...POPUP_HOSTS])) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -170,6 +165,19 @@ function ensureClient() {
       event.preventDefault();
       openExternal(url);
     }
+  });
+  contents.on('will-redirect', (event, url) => {
+    if (!isShowdownUrl(url)) event.preventDefault();
+  });
+  contents.on('did-create-window', popup => {
+    const child = popup.webContents;
+    denyPermissions(child.session);
+    child.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const guard = (event, url) => {
+      if (!httpsHost(url, ['accounts.google.com', 'pokemonshowdown.com', 'play.pokemonshowdown.com'])) event.preventDefault();
+    };
+    child.on('will-navigate', guard);
+    child.on('will-redirect', guard);
   });
 
   win.contentView.addChildView(client);
@@ -247,16 +255,21 @@ function createWindow() {
   }
 
   const contents = win.webContents;
+  denyPermissions(contents.session);
   contents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
     return { action: 'deny' };
   });
   contents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(RENDERER_URL)) {
+    if (!launcherUrl(url, RENDERER_DIR)) {
       event.preventDefault();
       openExternal(url);
     }
   });
+  contents.on('will-frame-navigate', event => {
+    if (!event.isMainFrame || !launcherUrl(event.url, RENDERER_DIR)) event.preventDefault();
+  });
+  contents.on('will-redirect', event => event.preventDefault());
   // Every launcher page change hides the client; play.html shows it again with fresh bounds.
   contents.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) {

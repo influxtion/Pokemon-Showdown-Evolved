@@ -95,7 +95,6 @@ app.whenReady().then(async () => {
   assert.ok(battle.formatId && Number.isInteger(battle.turn), 'battle format and turn readable');
   assert.equal(await js('Object.keys(app.rooms).filter((id) => app.rooms[id].el && app.rooms[id].el.getClientRects().length).length'), 1, 'one room at a time');
   assert.equal(await roomTop(), 0);
-  const battleTitle = (await rail()).find((row) => row.live).title;
 
   assert.equal(await clickRow('Lobby', '.nav-room-main'), true);
   await until(async () => (await js('app.curRoom.id')) === 'lobby', 'rail click focuses Lobby');
@@ -123,11 +122,34 @@ app.whenReady().then(async () => {
     assert.equal(await clickRow(title, '.nav-close'), true);
     await until(async () => !(await rail()).some((row) => row.title === title), `${title} closed`);
   }
-  assert.equal(await clickRow(battleTitle, '.nav-close'), true);
+  // A live battle's displayed title can change while the preceding checks run.
+  assert.equal(await page(`(() => {
+    const buttons = document.querySelectorAll('[data-nav="rooms"] .nav-room .nav-close');
+    if (buttons.length !== 1) return false;
+    buttons[0].click(); return true;
+  })()`), true);
   await until(() => page("location.pathname.endsWith('index.html')"), 'Home after the last room closes');
   assert.deepEqual(await js("Object.keys(app.rooms).filter((id) => id && id !== 'rooms')"), []);
   assert.equal(await js('app.popups.length'), 0);
 
-  console.log('PASS launcher shell live guest check: client hooks present, header hidden, one room, rail focus/close, popups, fail-safe header restore');
+  // Team text import/export and local persistence in this disposable guest profile.
+  assert.equal(await page("window.desktop.showdown('join', { room: 'teambuilder' })"), true);
+  await until(() => js("Boolean(app.rooms.teambuilder && app.curRoom.id === 'teambuilder')"), 'Teambuilder');
+  const teamText = 'Pikachu\nAbility: Static\nLevel: 50\n- Thunderbolt\n- Quick Attack\n';
+  const imported = await js(`(() => {
+    const sets = Storage.importTeam(${JSON.stringify(teamText)});
+    const packed = Storage.packTeam(sets);
+    const exported = Storage.exportTeam(Storage.unpackTeam(packed));
+    Storage.teams.push({ name: 'Security regression fixture', format: 'gen9ou', team: packed, folder: '' });
+    Storage.saveTeams();
+    return { species: sets[0].species, exported };
+  })()`);
+  assert.equal(imported.species, 'Pikachu');
+  assert.match(imported.exported, /Thunderbolt/);
+  await client.reload();
+  await until(() => js("Boolean(window.Storage && Storage.teams?.some(t => t.name === 'Security regression fixture'))"), 'team survives reload');
+  assert.match(await js("Storage.exportTeam(Storage.unpackTeam(Storage.teams.find(t => t.name === 'Security regression fixture').team))"), /Quick Attack/);
+
+  console.log('PASS launcher shell live guest check: client hooks present, header hidden, one room, rail focus/close, popups, fail-safe header restore, team text import/export and persistence');
   app.exit(0);
 }).catch((error) => { console.error(error); app.exit(1); });

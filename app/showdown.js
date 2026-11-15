@@ -6,6 +6,7 @@
 // as JSON, never spliced into code as strings.
 
 const { net } = require('electron');
+const { boundedJson } = require('./bounded-json');
 
 const SHOWDOWN = 'https://play.pokemonshowdown.com/';
 const ID = /^[a-z0-9]{1,80}$/;
@@ -1513,9 +1514,11 @@ class ShowdownBridge {
     const value = {};
     const stats = {};
     try {
-      const res = await net.fetch(`https://pokemonshowdown.com/users/${userid}.json`, { credentials: 'omit' });
+      const res = await net.fetch(`https://pokemonshowdown.com/users/${userid}.json`, {
+        credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000),
+      });
       if (res.ok) {
-        const data = await res.json();
+        const data = await boundedJson(res, 1024 * 1024);
         for (const [format, r] of Object.entries((data && data.ratings) || {})) {
           const elo = count(r && r.elo);
           if (!isId(format) || elo === null) continue;

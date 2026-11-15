@@ -103,9 +103,9 @@ test('hosted runtime cancels an in-flight create and deletes the late session', 
   const deleted = [];
   const runtime = new HostedPractice({ url: 'http://127.0.0.1:8787', key, intervalMs: 60000,
     fetcher: async (url, options) => {
-      if (options.method === 'POST') return new Promise(resolve => { complete = () => resolve({ ok: true, text: async () => JSON.stringify({ id: 'c'.repeat(64) }) }); });
+      if (options.method === 'POST') return new Promise(resolve => { complete = () => resolve(Response.json({ id: 'c'.repeat(64) })); });
       if (options.method === 'DELETE') deleted.push(url);
-      return { ok: true, text: async () => JSON.stringify({ opponents: [] }) };
+      return Response.json({ opponents: [] });
     } });
   t.after(() => runtime.dispose());
   const start = runtime.start({ opponent: 'laplace', preset: 'full' });

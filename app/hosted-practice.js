@@ -1,6 +1,7 @@
 'use strict';
 
 const { EventEmitter } = require('node:events');
+const { boundedJson } = require('./bounded-json');
 
 function serviceUrl(value) {
   const url = new URL(value);
@@ -34,9 +35,7 @@ class HostedPractice extends EventEmitter {
       headers: { Authorization: `Bearer ${this.key || ''}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(response.status === 429 ? 'Battle server is full. Try again shortly.' : 'Battle service unavailable. Check its address and access key.');
-    const raw = await response.text();
-    if (raw.length > 65536) throw new Error('Invalid battle service response.');
-    return JSON.parse(raw);
+    return boundedJson(response);
   }
 
   async refresh() {
