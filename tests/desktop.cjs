@@ -250,7 +250,55 @@ app.whenReady().then(async () => {
   renderer.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
   await pause(400);
   assert.match(renderer.getURL(), /settings\.html$/);
-  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab');
+
+  // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home,
+  // Battle or Community.
+  const chord = (contents, keyCode) => {
+    contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
+    contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
+  };
+  chord(renderer, '1');
+  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+1 opens Home');
+  await stripReady();
+  chord(renderer, 'W');
+  await pause(500);
+  assert.match(renderer.getURL(), /index\.html$/, 'Ctrl+W leaves Home open');
+  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  chord(renderer, '2');
+  await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+2 opens the second tab');
+  await stripReady();
+  chord(renderer, 'W');
+  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+W closes the open page tab');
+  await stripReady();
+  assert.deepEqual(await run(titles), ['Home', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  chord(renderer, '2');
+  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+2 opens the Battle tab');
+  await until(() => client.getVisible(), 'client shown after Ctrl+2');
+  await stripReady();
+  actions.length = 0;
+  chord(client.webContents, 'W');
+  await pause(500);
+  assert.equal(actions.some((a) => a.action === 'leave-room'), false, 'Ctrl+W leaves the Battle tab open');
+  assert.match(renderer.getURL(), /play\.html$/);
+  current = { ...current, current: 'lobby' };
+  await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'Lobby'"), 'Lobby is the open tab');
+  chord(client.webContents, 'W');
+  await until(() => actions.some((a) => a.action === 'leave-room'), 'Ctrl+W inside the client closes the open room');
+  assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'lobby' } }]);
+  // Real middle clicks: on Community nothing happens, on a room it closes.
+  const middle = async (selector) => {
+    const { x, y } = await run(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.left + 12), y: Math.round(r.top + r.height / 2) }; })()`);
+    renderer.sendInputEvent({ type: 'mouseDown', x, y, button: 'middle', clickCount: 1 });
+    renderer.sendInputEvent({ type: 'mouseUp', x, y, button: 'middle', clickCount: 1 });
+  };
+  actions.length = 0;
+  await middle('[data-nav=rooms] .nav-tab:not([aria-current])');
+  await pause(400);
+  assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [], 'a middle click leaves a fixed tab open');
+  await middle('[data-nav=rooms] .nav-room:not([aria-current])');
+  await until(() => actions.some((a) => a.action === 'leave-room'), 'a middle click closes a room tab');
+  assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'battle-test-2' } }]);
+  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab, Ctrl+W, Ctrl+1-9, middle-click close');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

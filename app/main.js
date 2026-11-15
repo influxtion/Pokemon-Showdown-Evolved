@@ -19,7 +19,7 @@ const { WindowState } = require('./window-state');
 const { MessageAlerts } = require('./message-alerts');
 const { launcherUrl, launcherFrame, httpsHost, denyPermissions } = require('./security');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
-const { tabCycle } = require('./shortcuts');
+const { tabShortcut } = require('./shortcuts');
 
 if (!app.isReady()) registerShowdexScheme(protocol);
 const showdex = new ShowdexIntegration();
@@ -86,9 +86,10 @@ function openExternal(url) {
   if (u && (u.protocol === 'https:' || u.protocol === 'http:')) shell.openExternal(u.href);
 }
 
-// Ctrl+Tab cycles the tab strip. The focus can be in the launcher page or in a view on top
-// of it (the Showdown client, a replay, a practice battle), so the key is caught here and
-// passed to the launcher, which owns the tab order. Sign-in popups are left alone.
+// Tab strip shortcuts: Ctrl+Tab cycles, Ctrl+W closes the open tab, Ctrl+1–9 jump to a tab.
+// The focus can be in the launcher page or in a view on top of it (the Showdown client, a
+// replay, a practice battle), so the keys are caught here and passed to the launcher, which
+// owns the tab order and knows which tabs can close. Sign-in popups are left alone.
 let cycleFocus = false;
 let cycleFocusTimer = null;
 
@@ -99,14 +100,14 @@ function inMainWindow(contents) {
 
 app.on('web-contents-created', (_event, contents) => {
   contents.on('before-input-event', (event, input) => {
-    const direction = tabCycle(input);
-    if (!direction || !inMainWindow(contents)) return;
+    const shortcut = tabShortcut(input);
+    if (!shortcut || !inMainWindow(contents)) return;
     event.preventDefault();
     // The keyboard follows the tab: the client takes it when shown, the launcher otherwise.
     cycleFocus = true;
     clearTimeout(cycleFocusTimer);
     cycleFocusTimer = setTimeout(() => { cycleFocus = false; }, 2000);
-    win.webContents.send('nav:cycle', direction);
+    win.webContents.send('nav:shortcut', shortcut);
   });
 });
 

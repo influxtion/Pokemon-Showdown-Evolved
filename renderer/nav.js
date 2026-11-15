@@ -137,8 +137,27 @@
     else go('play.html');
   }
 
+  // How a tab closes, or null when it cannot: Home, Battle and Community always stay.
+  // The close button, a middle click and Ctrl+W all go through these.
+  const rowCloser = ({ closable, pm, id }) => (!closable ? null : pm ? () => closeConversation(pm) : () => closeRoom(id));
+  const pageCloser = (file) => (file === 'index.html' ? null : PAGES[file].room ? () => closeRoom(file) : () => closePage(file));
+
+  // A middle click anywhere on a closable tab closes it, as in a browser.
+  function closeOnMiddleClick(node, close) {
+    if (!close) return;
+    // Stops the middle button's scroll cursor from appearing over the strip.
+    node.addEventListener('mousedown', (event) => { if (event.button === 1) event.preventDefault(); });
+    node.addEventListener('auxclick', (event) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      close();
+    });
+  }
+
   function row({ title, sub, tip, kind, live, unread, current, id, closable, tab, pm, challenge }) {
+    const shut = rowCloser({ closable, pm, id });
     const node = make('div', `nav-item ${tab ? 'nav-tab' : 'nav-room'}${live ? ' nav-item--live' : ''}${challenge ? ' nav-item--challenge' : ''}`);
+    closeOnMiddleClick(node, shut);
     node.title = tip || (sub ? `${title} · ${sub}` : title);
     if (current) node.setAttribute('aria-current', 'page');
     const main = make('button', 'nav-room-main');
@@ -158,7 +177,7 @@
       return pm ? openConversation(pm) : tab ? openTab(tab) : focusRoom(id);
     });
     node.append(main);
-    if (closable) {
+    if (shut) {
       const close = make('button', 'rail-icon-btn nav-close');
       close.type = 'button';
       close.setAttribute('aria-label', `Close ${title}`);
@@ -166,8 +185,7 @@
       close.append(icon(ICONS.x));
       close.addEventListener('click', (event) => {
         event.stopPropagation();
-        if (pm) closeConversation(pm);
-        else closeRoom(id);
+        shut();
       });
       node.append(close);
     }
@@ -256,7 +274,9 @@
       else location.href = file;
     });
     node.append(main);
-    if (file !== 'index.html') {
+    const shut = pageCloser(file);
+    closeOnMiddleClick(node, shut);
+    if (shut) {
       const close = make('button', 'rail-icon-btn nav-close');
       close.type = 'button';
       close.setAttribute('aria-label', `Close ${title}`);
@@ -264,8 +284,7 @@
       close.append(icon(ICONS.x));
       close.addEventListener('click', (event) => {
         event.stopPropagation();
-        if (room) closeRoom(file);
-        else closePage(file);
+        shut();
       });
       node.append(close);
     }
@@ -431,9 +450,12 @@
     strip = [
       ...pageRows.map(({ file, current: open }) => ({
         current: open, open: () => (PAGES[file].room ? openTab(file) : void (location.href = file)),
+        close: pageCloser(file),
       })),
-      ...rows.map((r) => ({ current: r.current, open: () => (r.tab ? openTab(r.tab) : focusRoom(r.id)) })),
-      ...messages.map((m) => ({ current: m.current, open: () => openConversation(m.pm) })),
+      ...rows.map((r) => ({
+        current: r.current, open: () => (r.tab ? openTab(r.tab) : focusRoom(r.id)), close: rowCloser(r),
+      })),
+      ...messages.map((m) => ({ current: m.current, open: () => openConversation(m.pm), close: rowCloser(m) })),
     ];
     const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named]);
     renderChallenges(session);
@@ -561,23 +583,55 @@
   // left, wrapping at the ends. Presses queue, so each one steps from where the last landed.
   let cycling = Promise.resolve();
 
-  function cycleTab(direction) {
+  // A step answers false when it changed nothing.
+  function queued(step) {
     cycling = cycling.then(async () => {
-      if (!strip.length) return;
-      const at = strip.findIndex((tab) => tab.current);
-      const next = at < 0 ? (direction < 0 ? strip.length - 1 : 0) : (at + direction + strip.length) % strip.length;
-      if (next === at) return;
-      await strip[next].open();
-      if (!onPlay) return;
-      // A read that began before the switch can still say the old tab is open.
+      if ((await step()) === false || !onPlay) return;
+      // A read that began before the change can still say the old tab is open.
       await inflight;
       await pollNow();
     }).catch(() => {});
     return cycling;
   }
 
-  if (typeof desktop.onCycleTab === 'function') desktop.onCycleTab(cycleTab);
+  function cycleTab(direction) {
+    return queued(() => {
+      if (!strip.length) return false;
+      const at = strip.findIndex((tab) => tab.current);
+      const next = at < 0 ? (direction < 0 ? strip.length - 1 : 0) : (at + direction + strip.length) % strip.length;
+      return next === at ? false : strip[next].open();
+    });
+  }
 
-  window.showdownNav = { matchup, closeRoom, pollNow, cycleTab };
+  // Ctrl+1 to Ctrl+8 open that tab counted from the left; Ctrl+9 opens the last one.
+  function jumpTab(index) {
+    return queued(() => {
+      const tab = index === 9 ? strip[strip.length - 1] : strip[index - 1];
+      return !tab || tab.current ? false : tab.open();
+    });
+  }
+
+  // Ctrl+W closes the open tab the way its close button does. Home, Battle and Community
+  // have no close button, so nothing happens on them.
+  function closeTab() {
+    return queued(() => {
+      const tab = strip.find((t) => t.current);
+      return tab && tab.close ? tab.close() : false;
+    });
+  }
+
+  function tabShortcut(shortcut) {
+    if (!shortcut || typeof shortcut !== 'object') return undefined;
+    if (shortcut.type === 'cycle') return cycleTab(shortcut.direction === -1 ? -1 : 1);
+    if (shortcut.type === 'close') return closeTab();
+    if (shortcut.type === 'jump' && Number.isInteger(shortcut.index) && shortcut.index >= 1 && shortcut.index <= 9) {
+      return jumpTab(shortcut.index);
+    }
+    return undefined;
+  }
+
+  if (typeof desktop.onTabShortcut === 'function') desktop.onTabShortcut(tabShortcut);
+
+  window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut };
   pollNow();
 })();

@@ -64,7 +64,7 @@ class Node {
   }
 }
 
-function harness(states, { onPlay = false, saved = new Map(), act = async () => true } = {}) {
+function harness(states, { onPlay = false, saved = new Map(), act = async () => true, page = 'index.html' } = {}) {
   const timers = [];
   const events = [];
   const calls = [];
@@ -72,7 +72,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   for (const name of ['rooms', 'sign-in', 'account', 'me', 'teambuilder']) nav[name] = new Node('x');
   nav['sign-in'].hidden = true;
   nav.account.hidden = true;
-  const location = { href: onPlay ? 'play.html' : 'index.html' };
+  const location = { href: onPlay ? 'play.html' : page };
   // The challenge bars are inserted after the top bar; the fake records what lands there.
   const topbar = new Node('header');
   const currentPage = onPlay ? null : new Node('a');
@@ -94,7 +94,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const cycleHandlers = [];
   const window = {
     desktop: {
-      onCycleTab: (handler) => cycleHandlers.push(handler),
+      onTabShortcut: (handler) => cycleHandlers.push(handler),
       getSession: async () => (states.length ? (last = states.shift()) : last),
       showdown: async (action, args) => { calls.push({ action, args: JSON.parse(JSON.stringify(args)) }); return act(action, args); },
     },
@@ -112,8 +112,16 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   return {
     location, nav, events, timers, saved, calls, currentPage,
     bars: () => after[0],
-    // What the main process sends for Ctrl+Tab (1) and Ctrl+Shift+Tab (-1).
-    cycle: (direction) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](direction); },
+    // What the main process sends for Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+W and Ctrl+1 to Ctrl+9.
+    shortcut: (value) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](value); },
+    cycle(direction) { return this.shortcut({ type: 'cycle', direction }); },
+    jump(index) { return this.shortcut({ type: 'jump', index }); },
+    closeOpen() { return this.shortcut({ type: 'close' }); },
+    middleClick: (node, button = 1) => {
+      const event = { button, prevented: false, preventDefault() { this.prevented = true; } };
+      if (node.listeners.auxclick) node.listeners.auxclick(event);
+      return event;
+    },
     rows: () => nav.rooms.children.filter((c) => c.has('nav-room')),
     row: (i) => nav.rooms.children.filter((c) => c.has('nav-room'))[i],
     tabs: () => nav.rooms.children.filter((c) => c.has('nav-tab')),
@@ -615,4 +623,136 @@ test('Ctrl+Tab on the Showdown screen focuses rooms through the client and queue
   await team.cycle(1);
   assert.deepEqual(team.calls, [{ action: 'join', args: { room: 'teambuilder' } }], 'the Teambuilder tab opens its room');
   assert.equal(team.location.href, 'play.html');
+});
+
+test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', async () => {
+  // Home cannot close.
+  const home = harness([session([chat('lobby', 'Lobby')])], { saved: new Map([['nav.pages', '["stats.html"]']]) });
+  await home.settle();
+  await home.closeOpen();
+  assert.deepEqual(home.calls, []);
+  assert.equal(home.location.href, 'index.html');
+  assert.equal(home.nav.rooms.children.filter((c) => c.has('nav-page')).length, 2);
+
+  // Battle and Community cannot close, including Community showing the room list.
+  for (const extra of [{ current: '' }, { current: '', menuTab: 'community' }, { current: 'rooms' }]) {
+    const fixed = harness([session([chat('lobby', 'Lobby')], extra)], { onPlay: true });
+    await fixed.settle();
+    fixed.location.href = 'unchanged';
+    await fixed.closeOpen();
+    assert.deepEqual(fixed.calls, [], JSON.stringify(extra));
+    assert.equal(fixed.location.href, 'unchanged');
+  }
+
+  // A room closes through the client, exactly like its close button.
+  const inRoom = harness([
+    session([chat('lobby', 'Lobby'), chat('help', 'Help')], { current: 'lobby' }),
+    session([chat('help', 'Help')], { current: 'help' }),
+  ], { onPlay: true });
+  await inRoom.settle();
+  await inRoom.closeOpen();
+  assert.deepEqual(inRoom.calls, [{ action: 'leave-room', args: { room: 'lobby' } }]);
+  assert.equal(inRoom.location.href, 'play.html');
+  assert.equal(inRoom.title(inRoom.row(0)), 'Help');
+
+  // A conversation closes with close-pm; the Teambuilder tab leaves its room.
+  const pm = harness([session([], { menuTab: 'pm', pmOpen: 'misty', messages: [convo('misty')] })], { onPlay: true });
+  await pm.settle();
+  await pm.closeOpen();
+  assert.deepEqual(pm.calls, [{ action: 'close-pm', args: { user: 'misty' } }]);
+  const tb = chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' });
+  const team = harness([session([tb, chat('lobby', 'Lobby')], { current: 'teambuilder' })], { onPlay: true });
+  await team.settle();
+  await team.closeOpen();
+  assert.deepEqual(team.calls, [{ action: 'leave-room', args: { room: 'teambuilder' } }]);
+
+  // Off the Showdown screen no room is the open tab, so rooms are never closed from there.
+  const off = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' })]);
+  await off.settle();
+  await off.closeOpen();
+  assert.deepEqual(off.calls, []);
+});
+
+test('Ctrl+W on a launcher page tab closes it and moves to the tab on its left', async () => {
+  const saved = new Map([['nav.pages', '["stats.html","settings.html"]']]);
+  const h = harness([session([])], { saved, page: 'settings.html' });
+  await h.settle();
+  await h.closeOpen();
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
+  assert.equal(h.location.href, 'stats.html');
+  assert.deepEqual(h.calls, []);
+});
+
+test('a middle click closes a closable tab and leaves the fixed tabs alone', async () => {
+  const saved = new Map([['nav.pages', '["stats.html"]']]);
+  const h = harness([session([chat('lobby', 'Lobby')], { messages: [convo('misty')] })], { saved });
+  await h.settle();
+  const pageTabs = () => h.nav.rooms.children.filter((c) => c.has('nav-page'));
+  assert.equal(pageTabs()[0].listeners.auxclick, undefined, 'Home has no middle-click close');
+  assert.equal(h.tab('Battle').listeners.auxclick, undefined);
+  assert.equal(h.tab('Community').listeners.auxclick, undefined);
+
+  // Other mouse buttons do nothing.
+  assert.equal(h.middleClick(h.row(0), 2).prevented, false);
+  await h.settle();
+  assert.deepEqual(h.calls, []);
+
+  assert.equal(h.middleClick(h.row(0)).prevented, true);
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'leave-room', args: { room: 'lobby' } }]);
+  h.calls.length = 0;
+  const message = h.nav.rooms.children[h.nav.rooms.children.length - 1];
+  h.middleClick(message);
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'close-pm', args: { user: 'misty' } }]);
+
+  h.middleClick(pageTabs()[1]);
+  assert.deepEqual(pageTabs().map((t) => h.title(t)), ['Home']);
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), []);
+  assert.equal(h.location.href, 'index.html', 'closing a page tab that is not open stays put');
+});
+
+test('Ctrl+1 to Ctrl+8 open that tab from the left and Ctrl+9 opens the last one', async () => {
+  const saved = () => new Map([['nav.pages', '["stats.html"]']]);
+  const state = session([chat('lobby', 'Lobby')], { messages: [convo('misty')] });
+  // Strip order: Home, Stats, Battle, Community, Lobby, misty.
+  const page = harness([state], { saved: saved() });
+  await page.settle();
+  await page.jump(1);
+  assert.equal(page.location.href, 'index.html', 'the open tab is left alone');
+  await page.jump(2);
+  assert.equal(page.location.href, 'stats.html');
+  assert.deepEqual(page.calls, []);
+
+  const menu = harness([state], { saved: saved() });
+  await menu.settle();
+  await menu.jump(3);
+  assert.deepEqual(menu.calls, [{ action: 'show-menu', args: { tab: 'battle' } }]);
+  assert.equal(menu.location.href, 'play.html');
+
+  const roomTab = harness([state], { saved: saved() });
+  await roomTab.settle();
+  await roomTab.jump(5);
+  assert.deepEqual(roomTab.calls, [{ action: 'focus-room', args: { room: 'lobby' } }]);
+
+  const last = harness([state], { saved: saved() });
+  await last.settle();
+  await last.jump(9);
+  assert.deepEqual(last.calls, [{ action: 'open-pm', args: { user: 'misty' } }]);
+
+  // A number past the end, and anything malformed, does nothing.
+  const none = harness([state], { saved: saved() });
+  await none.settle();
+  await none.jump(8);
+  await none.shortcut({ type: 'jump', index: 0 });
+  await none.shortcut({ type: 'jump', index: '2' });
+  await none.shortcut({ type: 'unknown' });
+  await none.shortcut(null);
+  assert.deepEqual(none.calls, []);
+  assert.equal(none.location.href, 'index.html');
+
+  const home = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' })], { onPlay: true });
+  await home.settle();
+  await home.jump(1);
+  assert.equal(home.location.href, 'index.html', 'Ctrl+1 is always Home');
 });
