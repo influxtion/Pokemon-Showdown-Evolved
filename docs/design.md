@@ -344,5 +344,3 @@ Two themes share one identity: a cobalt rail, a cobalt Home hero and a Showdown-
 | `--accent` | `#2459b8` | `#7db2ff` | Links, focus, selection |
 | `--primary` | `#f5c42c` | `#f5c42c` | One primary button per region |
 | `--rail-bg` | `#1f4b9a` | `#193f85` | Navigation rail |
-
-Rules: flat and dense; color always has a job; no purple, gradients, glassy buttons or web fonts; waiting states animate, with reduced motion respected. Pokémon type, HP, stat and damage colors are never restyled. Subjective visual changes are mocked up as 2–3 options for the owner to choose from before they are built.
