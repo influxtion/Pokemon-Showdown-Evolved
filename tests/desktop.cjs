@@ -215,7 +215,42 @@ app.whenReady().then(async () => {
     await pause(250);
     fs.writeFileSync(path.join(captures, `home-${theme}.png`), (await renderer.capturePage()).toPNG());
   }
-  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width');
+
+  // Ctrl+Tab and Ctrl+Shift+Tab step through the tab strip from real key presses, whether
+  // the focus is in the launcher page or in the Showdown client view.
+  const press = (contents, shift) => {
+    const modifiers = shift ? ['control', 'shift'] : ['control'];
+    contents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab', modifiers });
+    contents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab', modifiers });
+  };
+  const stripReady = () => until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-tab').length === 2"), 'tab strip rendered');
+  const titles = "[...document.querySelectorAll('[data-nav=rooms] .nav-item .nav-room-title')].map((n) => n.textContent)";
+  current = { ...current, current: '', menuTab: 'battle' };
+  await load('index.html');
+  await stripReady();
+  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  press(renderer, false);
+  await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Tab opens the next tab');
+  await stripReady();
+  press(renderer, true);
+  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab opens the previous tab');
+  await stripReady();
+  actions.length = 0;
+  press(renderer, true);
+  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab wraps from Home to the last tab');
+  assert.deepEqual(actions.find((a) => a.action === 'focus-room'), { action: 'focus-room', args: { room: 'lobby' } });
+  await until(() => client.getVisible(), 'client shown after Ctrl+Tab');
+  await stripReady();
+  // The session still reports the Battle tab; its neighbour on the left is Settings.
+  press(client.webContents, true);
+  await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab inside the client view');
+  assert.equal(client.getVisible(), false);
+  await stripReady();
+  // A plain Tab is not a tab switch.
+  renderer.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+  await pause(400);
+  assert.match(renderer.getURL(), /settings\.html$/);
+  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

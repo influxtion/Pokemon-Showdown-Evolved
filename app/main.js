@@ -19,6 +19,7 @@ const { WindowState } = require('./window-state');
 const { MessageAlerts } = require('./message-alerts');
 const { launcherUrl, launcherFrame, httpsHost, denyPermissions } = require('./security');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
+const { tabCycle } = require('./shortcuts');
 
 if (!app.isReady()) registerShowdexScheme(protocol);
 const showdex = new ShowdexIntegration();
@@ -84,6 +85,30 @@ function openExternal(url) {
   const u = parseUrl(url);
   if (u && (u.protocol === 'https:' || u.protocol === 'http:')) shell.openExternal(u.href);
 }
+
+// Ctrl+Tab cycles the tab strip. The focus can be in the launcher page or in a view on top
+// of it (the Showdown client, a replay, a practice battle), so the key is caught here and
+// passed to the launcher, which owns the tab order. Sign-in popups are left alone.
+let cycleFocus = false;
+let cycleFocusTimer = null;
+
+function inMainWindow(contents) {
+  if (!win || win.isDestroyed()) return false;
+  return contents === win.webContents || win.contentView.children.some((view) => view.webContents === contents);
+}
+
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('before-input-event', (event, input) => {
+    const direction = tabCycle(input);
+    if (!direction || !inMainWindow(contents)) return;
+    event.preventDefault();
+    // The keyboard follows the tab: the client takes it when shown, the launcher otherwise.
+    cycleFocus = true;
+    clearTimeout(cycleFocusTimer);
+    cycleFocusTimer = setTimeout(() => { cycleFocus = false; }, 2000);
+    win.webContents.send('nav:cycle', direction);
+  });
+});
 
 function isLauncherFrame(event) {
   return launcherFrame(event, win?.webContents, RENDERER_DIR);
@@ -281,6 +306,11 @@ function createWindow() {
   contents.on('did-navigate', () => {
     // An outgoing page's ResizeObserver can enqueue bounds during navigation.
     if (!parseUrl(contents.getURL())?.pathname.endsWith('/practice.html')) practiceView?.hide();
+    // After Ctrl+Tab away from the client, typing must not go to the hidden view.
+    if (cycleFocus && !parseUrl(contents.getURL())?.pathname.endsWith('/play.html')) {
+      cycleFocus = false;
+      contents.focus();
+    }
   });
 
   win.on('close', (event) => {
@@ -371,6 +401,10 @@ ipcMain.on('client:show', (event, value) => {
   const view = ensureClient();
   view.setBounds(bounds);
   view.setVisible(true);
+  if (cycleFocus) {
+    cycleFocus = false;
+    view.webContents.focus();
+  }
 });
 
 ipcMain.handle('review:show', (event, bounds) => {

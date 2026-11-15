@@ -91,8 +91,10 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   };
   const storage = { getItem: (key) => saved.get(key) || null, setItem: (key, value) => saved.set(key, value) };
   let last = states[states.length - 1];
+  const cycleHandlers = [];
   const window = {
     desktop: {
+      onCycleTab: (handler) => cycleHandlers.push(handler),
       getSession: async () => (states.length ? (last = states.shift()) : last),
       showdown: async (action, args) => { calls.push({ action, args: JSON.parse(JSON.stringify(args)) }); return act(action, args); },
     },
@@ -110,6 +112,8 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   return {
     location, nav, events, timers, saved, calls, currentPage,
     bars: () => after[0],
+    // What the main process sends for Ctrl+Tab (1) and Ctrl+Shift+Tab (-1).
+    cycle: (direction) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](direction); },
     rows: () => nav.rooms.children.filter((c) => c.has('nav-room')),
     row: (i) => nav.rooms.children.filter((c) => c.has('nav-room'))[i],
     tabs: () => nav.rooms.children.filter((c) => c.has('nav-tab')),
@@ -556,4 +560,59 @@ test('Home is the first small tab, and opened launcher pages follow it until clo
   const play = harness([session([])], { onPlay: true, saved: new Map([['nav.pages', '["stats.html"]']]) });
   await play.settle();
   assert.deepEqual(pageTabs(play).map((t) => t.getAttribute('aria-current')), [null, null]);
+});
+
+test('Ctrl+Tab steps through page tabs, client tabs, rooms and conversations, wrapping at the ends', async () => {
+  const saved = new Map([['nav.pages', '["stats.html"]']]);
+  const state = session([chat('lobby', 'Lobby')], { messages: [convo('misty')] });
+  // Strip order: Home, Stats, Battle, Community, Lobby, misty.
+  const home = harness([state], { saved });
+  await home.settle();
+  await home.cycle(1);
+  assert.equal(home.location.href, 'stats.html');
+  assert.deepEqual(home.calls, []);
+
+  const back = harness([state], { saved });
+  await back.settle();
+  await back.cycle(-1);
+  assert.deepEqual(back.calls, [{ action: 'open-pm', args: { user: 'misty' } }], 'backwards from the first tab wraps to the last');
+  assert.equal(back.location.href, 'play.html');
+
+  const battle = harness([session([chat('lobby', 'Lobby')])], { onPlay: true, saved });
+  await battle.settle();
+  await battle.cycle(-1);
+  assert.equal(battle.location.href, 'stats.html', 'the Battle tab steps back to the last page tab');
+
+  const last = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' })], { onPlay: true });
+  await last.settle();
+  await last.cycle(1);
+  assert.equal(last.location.href, 'index.html', 'forwards from the last tab wraps to Home');
+});
+
+test('Ctrl+Tab on the Showdown screen focuses rooms through the client and queues repeated presses', async () => {
+  const rooms = [chat('lobby', 'Lobby'), chat('help', 'Help')];
+  // Strip order: Home, Battle, Community, Lobby, Help.
+  const h = harness([
+    session(rooms, { current: '' }),
+    // Each step reads the session twice: once after the switch and once more to be sure.
+    session(rooms, { current: '', menuTab: 'community' }),
+    session(rooms, { current: '', menuTab: 'community' }),
+    session(rooms, { current: 'lobby' }),
+  ], { onPlay: true });
+  await h.settle();
+  h.cycle(1);
+  await h.cycle(1);
+  assert.deepEqual(h.calls, [
+    { action: 'show-menu', args: { tab: 'community' } },
+    { action: 'focus-room', args: { room: 'lobby' } },
+  ], 'the second press steps from where the first one landed');
+  assert.equal(h.location.href, 'play.html');
+  assert.equal(h.row(0).getAttribute('aria-current'), 'page');
+
+  const tb = chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' });
+  const team = harness([session([tb])]);
+  await team.settle();
+  await team.cycle(1);
+  assert.deepEqual(team.calls, [{ action: 'join', args: { room: 'teambuilder' } }], 'the Teambuilder tab opens its room');
+  assert.equal(team.location.href, 'play.html');
 });

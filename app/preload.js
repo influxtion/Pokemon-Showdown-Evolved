@@ -39,4 +39,8 @@ contextBridge.exposeInMainWorld('desktop', {
   getReplayDraft: () => ipcRenderer.invoke('replays:draft'),
   confirmDiscardReplayNote: () => ipcRenderer.invoke('replays:confirm-discard'),
   setReplayNoteDirty: (dirty) => ipcRenderer.send('replays:dirty', dirty),
+  // Ctrl+Tab and Ctrl+Shift+Tab, caught in the main process wherever the focus is.
+  onCycleTab: (handler) => {
+    ipcRenderer.on('nav:cycle', (_event, direction) => handler(direction === -1 ? -1 : 1));
+  },
 });

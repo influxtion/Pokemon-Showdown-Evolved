@@ -185,6 +185,8 @@
 
   let lastKey = null;
   let lastSession = null;
+  // Every tab in strip order, with how to open it; Ctrl+Tab steps through this.
+  let strip = [];
 
   // Launcher pages are small tabs ahead of the room tabs. Home is always first; the others
   // appear once opened from the icon bar and stay until closed or the app restarts.
@@ -426,6 +428,13 @@
       file, current: PAGES[file].room ? teambuilding : !onPlay && file === thisPage,
     }));
     lastSession = session;
+    strip = [
+      ...pageRows.map(({ file, current: open }) => ({
+        current: open, open: () => (PAGES[file].room ? openTab(file) : void (location.href = file)),
+      })),
+      ...rows.map((r) => ({ current: r.current, open: () => (r.tab ? openTab(r.tab) : focusRoom(r.id)) })),
+      ...messages.map((m) => ({ current: m.current, open: () => openConversation(m.pm) })),
+    ];
     const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named]);
     renderChallenges(session);
     if (key === lastKey) return;
@@ -548,6 +557,27 @@
     return session;
   }
 
-  window.showdownNav = { matchup, closeRoom, pollNow };
+  // Ctrl+Tab opens the tab to the right of the open one and Ctrl+Shift+Tab the one to its
+  // left, wrapping at the ends. Presses queue, so each one steps from where the last landed.
+  let cycling = Promise.resolve();
+
+  function cycleTab(direction) {
+    cycling = cycling.then(async () => {
+      if (!strip.length) return;
+      const at = strip.findIndex((tab) => tab.current);
+      const next = at < 0 ? (direction < 0 ? strip.length - 1 : 0) : (at + direction + strip.length) % strip.length;
+      if (next === at) return;
+      await strip[next].open();
+      if (!onPlay) return;
+      // A read that began before the switch can still say the old tab is open.
+      await inflight;
+      await pollNow();
+    }).catch(() => {});
+    return cycling;
+  }
+
+  if (typeof desktop.onCycleTab === 'function') desktop.onCycleTab(cycleTab);
+
+  window.showdownNav = { matchup, closeRoom, pollNow, cycleTab };
   pollNow();
 })();
