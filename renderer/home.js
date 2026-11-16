@@ -242,20 +242,81 @@ function renderHero() {
   if (challengeSubmit) challengeSubmit.disabled = !sessionReady || !sessionConnected;
 }
 
+// News: each post opens in place to its full text. Links inside it, and the post's page on
+// the website, open in the system browser. Rebuilt only when the news changes, so an open
+// post stays open through Home's regular refreshes.
+let newsKey = '';
+const openPosts = new Set();
+
+function showdownRoom(href) {
+  try {
+    const url = new URL(href);
+    const match = /^\/([a-z0-9-]{1,80})\/?$/.exec(url.pathname);
+    return url.protocol === 'https:' && url.hostname === 'play.pokemonshowdown.com' && match ? match[1] : '';
+  } catch {
+    return '';
+  }
+}
+
+function postBody(n) {
+  const body = el('div', 'post-body');
+  for (const para of n.body && n.body.length ? n.body : [[{ text: n.text }]]) {
+    const p = el('p');
+    for (const run of para) {
+      if (run.href) {
+        const link = el('a', null, run.text);
+        link.href = run.href;
+        // A link to a Showdown room (play.pokemonshowdown.com/thecafe) opens that room here,
+        // through the same path as the chat room shortcuts, instead of the website.
+        const room = showdownRoom(run.href);
+        if (room) link.dataset.room = room;
+        p.append(link);
+      } else {
+        p.append(document.createTextNode(run.text));
+      }
+    }
+    body.append(p);
+  }
+  const source = el('a', 'post-source', 'Open on pokemonshowdown.com');
+  source.href = n.id ? `https://pokemonshowdown.com/news/${n.id}` : 'https://pokemonshowdown.com/news';
+  body.append(source);
+  return body;
+}
+
 function renderNews() {
+  const key = JSON.stringify(state.news);
+  if (key === newsKey) return;
+  newsKey = key;
   if (!state.news.length) {
     els.news.replaceChildren(el('div', 'empty', 'No news loaded yet.'));
     return;
   }
-  els.news.replaceChildren(...state.news.map((n) => {
-    const post = el('a', 'post');
-    post.href = n.id ? `https://pokemonshowdown.com/news/${n.id}` : 'https://pokemonshowdown.com/news';
+  els.news.replaceChildren(...state.news.map((n, i) => {
+    const id = n.id || `post-${i}`;
+    const open = openPosts.has(id);
+    const post = el('article', `post${open ? ' is-open' : ''}`);
+    const toggle = el('button', 'post-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-controls', `post-body-${i}`);
     const date = n.date ? new Date(n.date * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-    post.append(
+    toggle.append(
       el('span', 'post-title', n.title),
       el('span', 'post-meta', [n.author, date].filter(Boolean).join(' · ')),
       el('span', 'post-text', n.text),
     );
+    const body = postBody(n);
+    body.id = `post-body-${i}`;
+    body.hidden = !open;
+    toggle.addEventListener('click', () => {
+      const opening = !openPosts.has(id);
+      if (opening) openPosts.add(id);
+      else openPosts.delete(id);
+      post.classList.toggle('is-open', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+      body.hidden = !opening;
+    });
+    post.append(toggle, body);
     return post;
   }));
 }

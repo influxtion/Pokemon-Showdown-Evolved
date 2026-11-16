@@ -104,17 +104,50 @@ app.whenReady().then(async () => {
   await until(() => renderer.getURL().endsWith('/play.html'), 'selected team shortcut');
   assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: 1, name: 'Selected team', format: 'gen9ou' } });
 
-  // News: a post and All news open in the system browser, and Home stays put.
-  snapshot.news = [{ id: '123', date: 1763251200, title: 'Test post', text: 'Body', author: 'Staff' }];
+  // News: a post opens in place to its full text; its links, its page on the website and
+  // All news open in the system browser, and Home stays put.
+  snapshot.news = [{
+    id: '123', date: 1763251200, title: 'Test post', text: 'Sign up now. More below.', author: 'Staff',
+    body: [
+      [{ text: 'Sign up now in the ' }, { text: 'tournament thread', href: 'https://www.smogon.com/forums/threads/1/' }, { text: '.' }],
+      [{ text: 'Second paragraph that only the full post shows. Join ' }, { text: 'Cafe', href: 'https://play.pokemonshowdown.com/thecafe' }, { text: '.' }],
+    ],
+  }];
   await load('index.html');
-  await until(() => run("!!document.querySelector('#news a.post')"), 'news rendered');
-  await run("document.querySelector('#news a.post').click(); 0");
-  await until(() => openedExternally.length === 1, 'news post opens in the browser');
-  assert.deepEqual(openedExternally, ['https://pokemonshowdown.com/news/123']);
+  await until(() => run("!!document.querySelector('#news .post-toggle')"), 'news rendered');
+  assert.equal(await run("document.querySelector('#news .post-body').hidden"), true, 'closed at first');
+  await run("document.querySelector('#news .post-toggle').click(); 0");
+  assert.equal(await run("document.querySelector('#news .post-body').hidden"), false, 'opens in place');
+  assert.equal(await run("document.querySelector('#news .post-toggle').getAttribute('aria-expanded')"), 'true');
+  assert.match(await run("document.querySelector('#news .post-body').textContent"), /Second paragraph that only the full post shows/);
+  assert.equal(openedExternally.length, 0, 'opening a post never leaves the app');
+  // Home re-reads regularly; the open post stays open.
+  await pause(1500);
+  assert.equal(await run("document.querySelector('#news .post-body').hidden"), false, 'still open after a refresh');
+  await run("document.querySelector('#news .post-body p a').click(); 0");
+  await until(() => openedExternally.length === 1, 'a link in the post opens in the browser');
+  assert.deepEqual(openedExternally, ['https://www.smogon.com/forums/threads/1/']);
+  await run("document.querySelector('#news .post-source').click(); 0");
+  await until(() => openedExternally.length === 2, 'the post on the website opens in the browser');
+  assert.equal(openedExternally[1], 'https://pokemonshowdown.com/news/123');
   await run("document.querySelector('a[href=\"https://pokemonshowdown.com/news\"]').click(); 0");
-  await until(() => openedExternally.length === 2, 'All news opens in the browser');
-  assert.equal(openedExternally[1], 'https://pokemonshowdown.com/news');
+  await until(() => openedExternally.length === 3, 'All news opens in the browser');
+  assert.equal(openedExternally[2], 'https://pokemonshowdown.com/news');
   assert.match(renderer.getURL(), /index\.html$/, 'Home stays open');
+  win.showInactive();
+  for (const theme of ['light', 'dark']) {
+    await run(`window.desktop.setTheme('${theme}')`);
+    await pause(250);
+    fs.writeFileSync(path.join(captures, `home-news-open-${theme}.png`), (await renderer.capturePage()).toPNG());
+  }
+  await run("document.querySelector('#news .post-toggle').click(); 0");
+  assert.equal(await run("document.querySelector('#news .post-body').hidden"), true, 'closes again');
+  // A link to a Showdown room joins it in the app rather than opening the website.
+  await run("document.querySelector('#news .post-toggle').click(); document.querySelector('#news [data-room=thecafe]').click(); 0");
+  await until(() => actions.some((a) => a.action === 'join' && a.args.room === 'thecafe'), 'room link joins the room');
+  await until(() => /play\.html$/.test(renderer.getURL()), 'room link opens the Showdown screen');
+  assert.equal(openedExternally.length, 3, 'the room link did not open the browser');
+  actions.length = 0;
   snapshot.news = [];
 
   // Chat room shortcuts: suggested from the busiest rooms until edited, then the player's own.

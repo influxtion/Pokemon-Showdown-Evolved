@@ -72,6 +72,29 @@ test('snapshot bounds untrusted client data and rejects malformed fields', async
   assert.equal(state.rooms[1].desc.length, 200);
 });
 
+test('a news post\'s full text arrives as bounded plain-text runs with safe links only', async () => {
+  const raw = {
+    ready: true, user: {}, counts: {}, formats: [], teams: [], rooms: [],
+    news: [{ id: '7', title: 'Post', text: 'Preview', body: [
+      [{ text: '  Join   the ' }, { text: 'thread', href: 'https://www.smogon.com/forums/threads/1/' }, { text: ' today.\n' }],
+      [{ text: 'Bad ' }, { text: 'script', href: 'javascript:alert(1)' }, { text: ' and ' }, { text: 'creds', href: 'https://u:p@evil.example/' },
+        { text: ' and ' }, { text: 'file', href: 'file:///C:/secret' }, { text: '<b>not html</b>' }],
+      'not a paragraph', [null, { text: 5 }], [{ text: '   ' }],
+      [{ text: 'x'.repeat(9000) }],
+    ] }],
+  };
+  const state = await new ShowdownBridge(() => fakeContents(raw)).snapshot();
+  const body = state.news[0].body;
+  assert.deepEqual(body[0], [{ text: 'Join the ' }, { text: 'thread', href: 'https://www.smogon.com/forums/threads/1/' }, { text: ' today.' }]);
+  // Unsafe links become plain text, joined with their neighbours; markup stays literal text.
+  assert.deepEqual(body[1], [{ text: 'Bad script and creds and file<b>not html</b>' }]);
+  assert.equal(body.length, 3, 'malformed and empty paragraphs are dropped');
+  assert.ok(body[2][0].text.length <= 1000, 'runs are bounded');
+  const total = body.flat().reduce((sum, r) => sum + r.text.length, 0);
+  assert.ok(total <= 6000, 'the post is bounded');
+  assert.deepEqual((await new ShowdownBridge(() => fakeContents({ ...raw, news: [{ id: '8', title: 'Old' }] })).snapshot()).news[0].body, []);
+});
+
 test('team sprites are worked out once per team, not on every Home read', async () => {
   const unpacked = [];
   const window = {};

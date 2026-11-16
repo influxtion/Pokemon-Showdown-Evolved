@@ -63,6 +63,21 @@ function readClient() {
   });
   window.__sdTeamSprites2d = seen;
   const rd = app.roomsData || {};
+  // A paragraph as runs of plain text and links, so Home can show the whole post without
+  // ever inserting the page's HTML. Links keep only their text and resolved address.
+  const runs = (p) => {
+    const out = [];
+    const walk = (node) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) out.push({ text: child.textContent });
+        else if (child.nodeName === 'A') out.push({ text: child.textContent, href: child.href });
+        else if (child.nodeName === 'BR') out.push({ text: ' ' });
+        else if (child.nodeType === 1) walk(child);
+      }
+    };
+    walk(p);
+    return out;
+  };
   const news = [...document.querySelectorAll('.newsentry')].slice(0, 3).map((n) => {
     const paras = [...n.querySelectorAll('p')];
     const byline = paras.length > 1 ? paras.pop() : null;
@@ -71,6 +86,7 @@ function readClient() {
       date: Number(n.dataset.date),
       title: text(n.querySelector('h4')),
       text: paras.map(text).join(' '),
+      body: paras.map(runs),
       author: text(byline && byline.querySelector('strong')),
     };
   });
@@ -1275,6 +1291,43 @@ function spriteUrl(path) {
   return typeof path === 'string' && SPRITE.test(path) ? `${SHOWDOWN}${path}.png` : null;
 }
 
+// A news post's full text for Home: paragraphs of plain-text runs, some of them links. Links
+// must be http(s) and open in the system browser; anything else stays as plain text. Bounded
+// in paragraphs, runs and total length, and whitespace is collapsed as a browser would.
+function newsBody(value) {
+  if (!Array.isArray(value)) return [];
+  let budget = 6000;
+  const out = [];
+  for (const para of value.slice(0, 20)) {
+    if (!Array.isArray(para) || budget <= 0) continue;
+    const runs = [];
+    for (const run of para.slice(0, 80)) {
+      if (!run || typeof run.text !== 'string' || budget <= 0) continue;
+      const text = run.text.replace(/\s+/g, ' ').slice(0, Math.min(1000, budget));
+      if (!text) continue;
+      budget -= text.length;
+      let href = '';
+      if (typeof run.href === 'string' && run.href.length <= 500) {
+        try {
+          const url = new URL(run.href);
+          if ((url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password) href = url.href;
+        } catch {}
+      }
+      const last = runs[runs.length - 1];
+      // Neighbouring plain text joins up, so the paragraph is a few runs rather than many.
+      if (!href && last && !last.href) last.text += text;
+      else runs.push(href ? { text, href } : { text });
+    }
+    if (runs.length) {
+      runs[0].text = runs[0].text.replace(/^ /, '');
+      const end = runs[runs.length - 1];
+      end.text = end.text.replace(/ $/, '');
+      if (runs.some((r) => r.text)) out.push(runs.filter((r) => r.text));
+    }
+  }
+  return out;
+}
+
 // Everything from the page is treated as untrusted and reduced to plain, bounded values.
 function sanitize(raw) {
   if (!raw || typeof raw !== 'object' || !raw.ready) return { ready: false };
@@ -1308,6 +1361,7 @@ function sanitize(raw) {
       date: count(n && n.date),
       title: str(n && n.title, 120),
       text: str(n && n.text, 400),
+      body: newsBody(n && n.body),
       author: str(n && n.author, 40),
     })),
     rooms: list(raw.rooms).slice(0, 300).map((r) => ({
