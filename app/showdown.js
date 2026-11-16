@@ -31,9 +31,13 @@ function readClient() {
     return { ready: false };
   }
   const text = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+  // Showdown's 2D sprites (the gen 5 style, as its "BW sprites" option shows them), not the
+  // 3D Pokémon HOME renders the Teambuilder uses for recent generations. Asking for them
+  // through a gen 5 dex gives sprites/gen5 for every Pokémon, including newer ones.
+  const dex2d = Dex.forGen ? Dex.forGen(5) : undefined;
   const sprite = (set) => {
     try {
-      const d = Dex.getTeambuilderSpriteData(set);
+      const d = Dex.getTeambuilderSpriteData(set, dex2d);
       return d.spriteDir + '/' + d.spriteid;
     } catch (e) {
       return null;
@@ -42,7 +46,7 @@ function readClient() {
   // Unpacking every team for its sprites is the costly part of this read, and it runs in the
   // page that also runs battles. Sprites depend only on a team's packed text, so they are
   // remembered by it; only new or edited teams are unpacked, and removed teams are dropped.
-  const known = window.__sdTeamSprites instanceof Map ? window.__sdTeamSprites : new Map();
+  const known = window.__sdTeamSprites2d instanceof Map ? window.__sdTeamSprites2d : new Map();
   const seen = new Map();
   const teams = (Storage.teams || []).map((t, index) => {
     const key = typeof t.team === 'string' ? t.team : '';
@@ -57,7 +61,7 @@ function readClient() {
     seen.set(key, sprites);
     return { index, name: t.name, format: t.format, sprites: sprites.slice() };
   });
-  window.__sdTeamSprites = seen;
+  window.__sdTeamSprites2d = seen;
   const rd = app.roomsData || {};
   const news = [...document.querySelectorAll('.newsentry')].slice(0, 3).map((n) => {
     const paras = [...n.querySelectorAll('p')];

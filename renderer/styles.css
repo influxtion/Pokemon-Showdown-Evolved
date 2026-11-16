@@ -775,6 +775,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   object-fit: contain;
   background: var(--hero-team-bg);
   border-radius: 3px;
+  /* Showdown's 2D pixel sprites: keep them crisp when scaled. */
+  image-rendering: pixelated;
 }
 .hero-team-name { font-size: var(--fs-sm); color: var(--hero-muted); display: flex; justify-content: space-between; }
 .hero-team-name a { color: var(--hero-text); }

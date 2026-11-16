@@ -83,9 +83,14 @@ test('team sprites are worked out once per team, not on every Home read', async 
     app: { rooms: { '': { curFormat: 'gen9ou' } }, roomsData: {}, user: { get: () => '' } },
     BattleFormats: {}, Storage,
   });
+  // Like the client: a gen 5 dex gives the 2D gen5 sprites; the default dex gives HOME renders.
+  const gen5 = { gen: 5 };
   const context = vm.createContext({
     window, app: window.app, BattleFormats: {}, Storage,
-    Dex: { getTeambuilderSpriteData: (set) => ({ spriteDir: 'sprites/gen5', spriteid: set.species }) },
+    Dex: {
+      forGen: (gen) => (gen === 5 ? gen5 : null),
+      getTeambuilderSpriteData: (set, dex) => ({ spriteDir: dex === gen5 ? 'sprites/gen5' : 'sprites/home-centered', spriteid: set.species }),
+    },
     document: { querySelectorAll: () => [] },
   });
   const contents = { isLoading: () => false, executeJavaScript: async (code) => vm.runInContext(code, context) };
@@ -101,7 +106,7 @@ test('team sprites are worked out once per team, not on every Home read', async 
   Storage.teams = [{ name: 'A', format: 'gen9ou', team: 'packed-a2' }];
   assert.deepEqual(sprites(await bridge.snapshot()), ['https://play.pokemonshowdown.com/sprites/gen5/packed-a2.png']);
   assert.deepEqual(unpacked, ['packed-a', 'packed-b', 'packed-a2']);
-  assert.deepEqual([...window.__sdTeamSprites.keys()], ['packed-a2']);
+  assert.deepEqual([...window.__sdTeamSprites2d.keys()], ['packed-a2']);
 });
 
 test('snapshot and session survive malformed client results', async () => {
