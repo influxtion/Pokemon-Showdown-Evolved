@@ -66,28 +66,49 @@
     </header>
     <main class="content content--flush practice-content">
       <section class="practice-setup panel" id="practice-setup">
-        <div class="panel-head">Choose an opponent</div>
+        <div class="panel-head">Practice against Foul Play</div>
         <div class="panel-body">
           <p>Play an unrated battle with generated teams. Your online Showdown account is separate.</p>
-          <div class="field">
-            <label class="field-label" for="practice-opponent">Opponent</label>
-            <select class="select" id="practice-opponent">
-              <option value="laplace">Laplace</option>
-              <option value="foulplay">Foul Play</option>
-            </select>
-            <div class="field-hint" id="practice-opponent-description"></div>
+          <p class="field-hint" id="practice-opponent-description"></p>
+          <fieldset class="field engine-field">
+            <legend class="field-label">Run Foul Play on</legend>
+            <div class="engine-choice" role="radiogroup" aria-label="Run Foul Play on">
+              <label class="engine-option">
+                <input type="radio" name="practice-engine" value="cloud" id="practice-engine-cloud" checked>
+                <span class="engine-text"><strong>Cloud server</strong><span class="engine-note" id="practice-engine-cloud-note">Nothing to install. Needs an internet connection.</span></span>
+              </label>
+              <label class="engine-option">
+                <input type="radio" name="practice-engine" value="local" id="practice-engine-local">
+                <span class="engine-text"><strong>This computer</strong><span class="engine-note" id="practice-engine-local-note">Works offline after a one-time install. Uses your CPU while it thinks.</span></span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="local-install" id="practice-local" hidden>
+            <p class="local-install-text" id="practice-local-text"></p>
+            <div class="install-progress" id="practice-install-progress" hidden>
+              <div class="install-progress-head">
+                <span id="practice-install-step">Preparing</span>
+                <span class="num" id="practice-install-percent">0%</span>
+              </div>
+              <progress id="practice-install-bar" max="1000" value="0" aria-labelledby="practice-install-step"></progress>
+              <div class="install-detail" id="practice-install-detail"></div>
+            </div>
+            <div class="local-actions">
+              <button class="btn" id="practice-install">Install Foul Play</button>
+              <button class="btn" id="practice-install-cancel" hidden>Cancel install</button>
+              <button class="btn btn-danger" id="practice-local-remove" hidden>Remove from this computer</button>
+            </div>
           </div>
           <div class="field">
             <label class="field-label" for="practice-preset">Computation</label>
             <select class="select" id="practice-preset">
               <option value="quiet">Quiet · 1 search thread</option>
-              <option value="balanced">Balanced · 2 search threads</option>
-              <option value="full" selected>Full · 8 search threads</option>
+              <option value="balanced" selected>Balanced · 2 search threads</option>
+              <option value="full">Full · 8 search threads</option>
             </select>
-            <div class="field-hint">More threads use more CPU. These settings control computation, not difficulty or Elo.</div>
+            <div class="field-hint" id="practice-preset-hint">More threads search deeper in the same time. These settings control computation, not difficulty or Elo.</div>
           </div>
-          <p class="faint" id="practice-location">The engine and battle server run on this computer. Pokémon artwork needs an internet connection.</p>
-          <button class="btn btn-primary" id="practice-start" disabled>Play against bot</button>
+          <button class="btn btn-primary" id="practice-start" disabled>Play against Foul Play</button>
         </div>
       </section>
       <div class="banner banner--bar banner--warn" id="practice-message" role="status" hidden></div>
