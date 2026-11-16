@@ -92,9 +92,11 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const storage = { getItem: (key) => saved.get(key) || null, setItem: (key, value) => saved.set(key, value) };
   let last = states[states.length - 1];
   const cycleHandlers = [];
+  const changeHandlers = [];
   const window = {
     desktop: {
       onTabShortcut: (handler) => cycleHandlers.push(handler),
+      onClientChange: (handler) => changeHandlers.push(handler),
       getSession: async () => (states.length ? (last = states.shift()) : last),
       showdown: async (action, args) => { calls.push({ action, args: JSON.parse(JSON.stringify(args)) }); return act(action, args); },
     },
@@ -115,6 +117,8 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     // What the main process sends for Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+W and Ctrl+1 to Ctrl+9.
     shortcut: (value) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](value); },
     cycle(direction) { return this.shortcut({ type: 'cycle', direction }); },
+    // What main sends when the client opens or switches rooms itself.
+    clientChange: () => { assert.equal(changeHandlers.length, 1); changeHandlers[0](); },
     jump(index) { return this.shortcut({ type: 'jump', index }); },
     closeOpen() { return this.shortcut({ type: 'close' }); },
     middleClick: (node, button = 1) => {
@@ -359,6 +363,26 @@ test('the Community tab is always shown, opens its menu view and marks it curren
   const list = harness([session([], { current: 'rooms' })], { onPlay: true });
   await list.settle();
   assert.equal(list.tab('Community').getAttribute('aria-current'), 'page', 'the room list belongs to Community');
+});
+
+test('a room opened inside the client shows in the strip at once, not at the next poll', async () => {
+  const rooms = [chat('lobby', 'Lobby')];
+  const h = harness([
+    session([], { current: '', menuTab: 'community' }),
+    session(rooms, { current: 'lobby' }),
+  ], { onPlay: true });
+  await h.settle();
+  assert.equal(h.tab('Community').getAttribute('aria-current'), 'page');
+  const pollsBefore = h.timers.length;
+  // Joining Lobby from Community's room list: the client's address changes and main says so.
+  h.clientChange();
+  h.clientChange();
+  await h.settle();
+  assert.equal(h.row(0).getAttribute('aria-current'), 'page', 'Lobby is the open tab without waiting');
+  assert.equal(h.tab('Community').getAttribute('aria-current'), null);
+  // One regular poll, plus a single follow-up read for the room's title from the server.
+  assert.equal(h.timers.length, pollsBefore + 1, 'the regular poll is rescheduled, not doubled');
+  assert.deepEqual(h.timers.map((t) => t.delay).sort(), [1000, 350]);
 });
 
 test('a new page draws the strip from the last session at once, then from the live read', async () => {

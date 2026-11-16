@@ -195,6 +195,12 @@ function ensureClient() {
   contents.on('will-redirect', (event, url) => {
     if (!isShowdownUrl(url)) event.preventDefault();
   });
+  // The client moves its address (/lobby, /battle-…) whenever it opens or switches rooms.
+  // Tell the launcher page at once, so its tabs and top bar follow without waiting for the
+  // next poll. It carries no data; the page reads the session through the bridge as usual.
+  contents.on('did-navigate-in-page', (_event, _url, isMainFrame) => {
+    if (isMainFrame && win && !win.isDestroyed()) win.webContents.send('client:changed');
+  });
   contents.on('did-create-window', popup => {
     const child = popup.webContents;
     denyPermissions(child.session);

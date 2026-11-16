@@ -647,6 +647,25 @@
 
   if (typeof desktop.onTabShortcut === 'function') desktop.onTabShortcut(tabShortcut);
 
+  // A room opened or switched inside the client (from Community's room list, a link in chat):
+  // read the session now instead of at the next poll, up to a second away. A read already
+  // under way may predate the change, so one more follows it.
+  // A newly joined room is named by its ID ("lobby") until the server sends its title a
+  // moment later, so one more read follows shortly to pick that up.
+  let changeQueued = false;
+  let titleTimer = null;
+  function clientChanged() {
+    clearTimeout(titleTimer);
+    titleTimer = setTimeout(pollNow, 350);
+    if (changeQueued) return;
+    changeQueued = true;
+    Promise.resolve(inflight).then(() => {
+      changeQueued = false;
+      return pollNow();
+    }).catch(() => { changeQueued = false; });
+  }
+  if (typeof desktop.onClientChange === 'function') desktop.onClientChange(clientChanged);
+
   window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut };
   // Every launcher page is a fresh document. Draw the tab strip from the last session read in
   // this window straight away, so it never flashes empty while the first read is on its way;
