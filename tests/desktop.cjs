@@ -85,7 +85,13 @@ app.whenReady().then(async () => {
   assert.doesNotMatch(await run("document.getElementById('friends').textContent"), /Battling/);
   const actions = [];
   ipcMain.removeHandler('showdown:action');
-  ipcMain.handle('showdown:action', (_event, action, args) => { actions.push({ action, args }); return true; });
+  ipcMain.handle('showdown:action', (_event, action, args) => {
+    actions.push({ action, args });
+    // The simulated client follows focus changes, as the real one does.
+    if (action === 'focus-room') current = { ...current, current: args.room };
+    if (action === 'show-menu') current = { ...current, current: '', menuTab: args.tab };
+    return true;
+  });
   await run("document.getElementById('edit-team').click(); 0");
   await until(() => renderer.getURL().endsWith('/play.html'), 'random-format team list shortcut');
   assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: null } });
@@ -161,7 +167,7 @@ app.whenReady().then(async () => {
   await load('play.html');
   await until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-room').length === 2"), 'rail rooms rendered');
   assert.equal(await run("document.querySelector('[data-nav=rooms] .nav-room[aria-current=page] .nav-room-title').textContent"), 'vs. Opponent');
-  assert.deepEqual(await run("[...document.querySelectorAll('[data-nav=rooms] .nav-tab .nav-room-title')].map((n) => n.textContent)"), ['Battle', 'Community']);
+  assert.deepEqual(await run("[...document.querySelectorAll('[data-nav=rooms] .nav-tab .nav-room-title')].map((n) => n.textContent)"), ['Community']);
   assert.equal(await run("document.querySelector('[data-nav=rooms] .nav-room-sub').textContent"), 'Random Battle · Turn 3');
   assert.equal(await run("document.querySelectorAll('[data-nav=rooms] .nav-unread').length"), 1);
   assert.equal(await run("document.querySelector('[data-nav=me]').textContent"), 'Tester');
@@ -235,7 +241,8 @@ app.whenReady().then(async () => {
   assert.equal(await run("document.getElementById('room-status').textContent"), 'Private message');
   await until(() => run("document.querySelector('.challenge-bars').hidden"), 'no duplicate bar for the open conversation');
   assert.equal(await run("document.querySelector('.nav-room[aria-current=page] .nav-room-title').textContent"), 'Ash_K');
-  current = { ...current, menuTab: 'battle', pmOpen: '', messages: [challenge, pm] };
+  // Back in a room: the client's bare main menu would hand the Showdown screen back to Home.
+  current = { ...current, current: 'lobby', menuTab: 'battle', pmOpen: '', messages: [challenge, pm] };
 
   await load('play.html');
   win.setSize(1024, 640);
@@ -297,12 +304,13 @@ app.whenReady().then(async () => {
     contents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab', modifiers });
     contents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab', modifiers });
   };
-  const stripReady = () => until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-tab').length === 2"), 'tab strip rendered');
+  const stripReady = () => until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-tab').length === 1"), 'tab strip rendered');
   const titles = "[...document.querySelectorAll('[data-nav=rooms] .nav-item .nav-room-title')].map((n) => n.textContent)";
   current = { ...current, current: '', menuTab: 'battle' };
   await load('index.html');
   await stripReady();
-  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  // No Battle tab: Home and the launcher pages, Community, then the open rooms.
+  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Community', 'vs. Opponent', 'Lobby']);
   press(renderer, false);
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Tab opens the next tab');
   await stripReady();
@@ -315,7 +323,17 @@ app.whenReady().then(async () => {
   assert.deepEqual(actions.find((a) => a.action === 'focus-room'), { action: 'focus-room', args: { room: 'lobby' } });
   await until(() => client.getVisible(), 'client shown after Ctrl+Tab');
   await stripReady();
-  // The session still reports the Battle tab; its neighbour on the left is Settings.
+  // Inside the client view: Lobby, then the battle, then Community, then Settings.
+  await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'Lobby'"), 'Lobby open');
+  actions.length = 0;
+  press(client.webContents, true);
+  await until(() => actions.some((a) => a.action === 'focus-room'), 'Ctrl+Shift+Tab inside the client focuses the battle');
+  assert.deepEqual(actions.pop(), { action: 'focus-room', args: { room: 'battle-test-2' } });
+  await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'vs. Opponent'"), 'battle open');
+  press(client.webContents, true);
+  await until(() => actions.some((a) => a.action === 'show-menu'), 'then Community');
+  assert.deepEqual(actions.pop(), { action: 'show-menu', args: { tab: 'community' } });
+  await until(() => run("document.querySelector('.nav-tab[aria-current=page] .nav-room-title')?.textContent === 'Community'"), 'Community open');
   press(client.webContents, true);
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab inside the client view');
   assert.equal(client.getVisible(), false);
@@ -325,8 +343,8 @@ app.whenReady().then(async () => {
   await pause(400);
   assert.match(renderer.getURL(), /settings\.html$/);
 
-  // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home,
-  // Battle or Community.
+  // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home
+  // or Community.
   const chord = (contents, keyCode) => {
     contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
     contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
@@ -337,22 +355,22 @@ app.whenReady().then(async () => {
   chord(renderer, 'W');
   await pause(500);
   assert.match(renderer.getURL(), /index\.html$/, 'Ctrl+W leaves Home open');
-  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  assert.deepEqual(await run(titles), ['Home', 'Settings', 'Community', 'vs. Opponent', 'Lobby']);
   chord(renderer, '2');
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+2 opens the second tab');
   await stripReady();
   chord(renderer, 'W');
   await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+W closes the open page tab');
   await stripReady();
-  assert.deepEqual(await run(titles), ['Home', 'Battle', 'vs. Opponent', 'Community', 'Lobby']);
+  assert.deepEqual(await run(titles), ['Home', 'Community', 'vs. Opponent', 'Lobby']);
   chord(renderer, '2');
-  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+2 opens the Battle tab');
+  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+2 opens Community');
   await until(() => client.getVisible(), 'client shown after Ctrl+2');
   await stripReady();
   actions.length = 0;
   chord(client.webContents, 'W');
   await pause(500);
-  assert.equal(actions.some((a) => a.action === 'leave-room'), false, 'Ctrl+W leaves the Battle tab open');
+  assert.equal(actions.some((a) => a.action === 'leave-room'), false, 'Ctrl+W leaves Community open');
   assert.match(renderer.getURL(), /play\.html$/);
   current = { ...current, current: 'lobby' };
   await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'Lobby'"), 'Lobby is the open tab');
@@ -372,7 +390,12 @@ app.whenReady().then(async () => {
   await middle('[data-nav=rooms] .nav-room:not([aria-current])');
   await until(() => actions.some((a) => a.action === 'leave-room'), 'a middle click closes a room tab');
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'battle-test-2' } }]);
-  console.log('PASS desktop smoke: first-launch welcome (asked once), both Home layouts, editable chat rooms, connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab, Ctrl+W, Ctrl+1-9, middle-click close');
+  // The client's own main menu has no tab: the Showdown screen hands it back to Home.
+  current = { ...current, current: '', menuTab: 'battle' };
+  await until(() => /index\.html$/.test(renderer.getURL()), 'main menu returns to Home');
+  assert.equal(client.getVisible(), false);
+
+  console.log('PASS desktop smoke: first-launch welcome (asked once), both Home layouts, editable chat rooms, no Battle tab (main menu returns Home), connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab, Ctrl+W, Ctrl+1-9, middle-click close');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

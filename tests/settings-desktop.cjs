@@ -209,6 +209,10 @@ app.whenReady().then(async () => {
   await until(() => readSettings().showdexEnabled === false, 'Showdex preference disabled');
   showdexState = { ...showdexState, enabled: false, pendingReload: true };
   await until(() => run("document.getElementById('showdex-status').textContent === 'Loaded · reload to disable' && !document.getElementById('showdex-reload-banner').hidden"), 'Showdex disable pending');
+  // A room is open, so the Showdown screen stays up (its bare main menu would return to Home).
+  await client().executeJavaScript(`app.rooms['battle-gen9ou-2'] = {
+    title:'Spectating', battle:{p1:{name:'Alpha'},p2:{name:'Beta'},tier:'[Gen 9] OU',ended:false}
+  }; app.curRoom = {id:'battle-gen9ou-2'}; 0`);
   await load('play.html');
   await until(() => run("document.getElementById('showdex-status').textContent === 'Showdex: Loaded · reload to disable'"), 'Play loaded pending label');
   showdexState = { ...showdexState, loaded: false, status: 'failed', pendingReload: false, error: 'Test load error' };

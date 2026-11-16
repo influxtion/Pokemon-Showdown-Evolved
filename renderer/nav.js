@@ -88,21 +88,21 @@
       go('play.html');
     } else if (result === true) {
       const session = await pollNow();
-      if (onPlay && session && session.ready && session.rooms.length === 0) location.href = 'index.html';
+      // With nothing left to show, or only the client's main menu, Home takes over.
+      if (onPlay && session && session.ready && (session.rooms.length === 0 || onMainMenu(session))) location.href = 'index.html';
     }
     return result;
   }
 
-  // Fixed rail tabs. Each one says how to reach its view in the client.
+  // Fixed rail tabs. Each one says how to reach its view in the client. There is no tab for
+  // the client's own main menu: Home replaces it (see onMainMenu and update below).
   const TABS = {
-    battle: { title: 'Battle', kind: 'battle', action: 'show-menu', args: { tab: 'battle' } },
     teambuilder: { title: 'Teambuilder', kind: 'teambuilder', action: 'join', args: { room: 'teambuilder' } },
     community: { title: 'Community', kind: 'community', action: 'show-menu', args: { tab: 'community' } },
   };
 
-  // Rooms reached from the Battle tab's links nest under it; the rest are Community's.
-  const BATTLE_ROOMS = new Set(['ladder', 'battles', 'tournaments', 'smogtours']);
-  const inBattle = (room) => room.battle || BATTLE_ROOMS.has(room.id);
+  // The client is showing its own main menu, which has no tab: Home stands in for it.
+  const onMainMenu = (session) => Boolean(session && session.ready && session.current === '' && session.menuTab === 'battle');
 
   async function openConversation(user) {
     await act('open-pm', { user });
@@ -137,7 +137,7 @@
     else go('play.html');
   }
 
-  // How a tab closes, or null when it cannot: Home, Battle and Community always stay.
+  // How a tab closes, or null when it cannot: Home and Community always stay.
   // The close button, a middle click and Ctrl+W all go through these.
   const rowCloser = ({ closable, pm, id }) => (!closable ? null : pm ? () => closeConversation(pm) : () => closeRoom(id));
   const pageCloser = (file) => (file === 'index.html' ? null : PAGES[file].room ? () => closeRoom(file) : () => closePage(file));
@@ -413,12 +413,11 @@
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
-    // The Teambuilder room is a small page tab, so it never gets a row of its own.
+    // Community, then every open room in the client's order. The Teambuilder room is a
+    // small page tab, so it never gets a row of its own.
     const rows = [
-      tabRow('battle', current === '' && !community && session.menuTab !== 'pm', !!session.menuUnread),
-      ...rooms.filter(inBattle).map(roomRow),
       tabRow('community', (current === '' && community) || current === 'rooms', false),
-      ...rooms.filter((r) => !inBattle(r) && r.id !== 'teambuilder').map(roomRow),
+      ...rooms.filter((r) => r.id !== 'teambuilder').map(roomRow),
     ];
     // Conversations and challenges, from the client's private message windows.
     const messages = (Array.isArray(session.messages) ? session.messages : []).map((m) => ({
@@ -552,6 +551,7 @@
 
   let timer = null;
   let inflight = null;
+  let menuReads = 0;
 
   // Resolves with the session just read; overlapping calls share one read.
   function pollNow() {
@@ -571,6 +571,14 @@
     render(session);
     if (session.ready && battleStarted(session) && !onPlay) {
       location.href = 'play.html';
+      return session;
+    }
+    // The Showdown screen never shows the client's main menu; Home replaces it. Two reads
+    // in a row must agree, so a room that is still opening does not bounce back to Home,
+    // and a client popup (such as a forfeit prompt) is left on screen.
+    menuReads = onPlay && onMainMenu(session) && !session.popups ? menuReads + 1 : 0;
+    if (menuReads >= 2) {
+      location.href = 'index.html';
       return session;
     }
     document.dispatchEvent(new CustomEvent('showdown-session', { detail: session }));
@@ -611,7 +619,7 @@
     });
   }
 
-  // Ctrl+W closes the open tab the way its close button does. Home, Battle and Community
+  // Ctrl+W closes the open tab the way its close button does. Home and Community
   // have no close button, so nothing happens on them.
   function closeTab() {
     return queued(() => {
