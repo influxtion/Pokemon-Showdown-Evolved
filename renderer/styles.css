@@ -1299,7 +1299,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 /* ---------- Welcome (first launch) ---------- */
 
 .welcome {
-  width: min(760px, calc(100vw - 48px));
+  width: min(900px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   padding: 32px;
   border: 1px solid var(--border);
@@ -1334,7 +1334,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .welcome-option-title { font-size: var(--fs-xl); font-weight: 600; }
 .welcome-option-desc { font-size: var(--fs-md); color: var(--text-2); line-height: 1.45; }
 
-/* Layout previews: schematic, drawn in the app's own colors. */
+/* Layout previews: a small, labelled copy of each Home layout in the app's own colors and
+   real proportions, so a new player can recognise the battle panel, news and chat rooms. */
 .layout-preview {
   display: flex;
   width: 100%;
@@ -1343,37 +1344,116 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   border-radius: 4px;
   overflow: hidden;
   background: var(--bg-app);
+  color: var(--text);
+  font-size: 8px;
+  line-height: 1.25;
+  text-align: left;
 }
 /* Zero specificity, so each part's own flex or grid display wins. */
-:where(.layout-preview span) { display: block; }
-.lp-rail { flex: none; width: 7%; background: var(--rail-bg); }
-.lp-body { flex: 1; min-width: 0; display: flex; gap: 6%; padding: 6%; }
-.lp-col { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.layout-preview--classic .lp-col:first-child { flex: 0 0 38%; }
-.layout-preview--classic .lp-col:last-child { flex: 1; }
-.lp-center { flex: 1; display: flex; flex-direction: column; gap: 7px; padding: 0 6%; }
+:where(.layout-preview span) { display: block; min-width: 0; white-space: nowrap; overflow: hidden; }
+.lp-rail { flex: none; width: 5%; background: var(--rail-bg); }
+.lp-app { flex: 1; display: flex; flex-direction: column; }
+.lp-strip { flex: none; display: flex; align-items: flex-end; gap: 2px; height: 16px; padding: 0 5px; background: var(--strip-bg); }
+.lp-tab { padding: 2px 7px; border-radius: 2px 2px 0 0; color: var(--rail-text); font-size: 7px; }
+.lp-tab--on { background: var(--topbar-bg); color: var(--text); font-weight: 600; }
+.lp-body { flex: 1; min-height: 0; display: flex; gap: 7px; padding: 9px; }
+
 .lp-hero {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px;
+  padding: 7px;
   background: var(--hero-bg);
-  border-radius: 3px;
+  border-radius: 2px;
+  color: var(--hero-text);
 }
-.lp-hero--wide { flex-direction: row; gap: 8px; }
+.lp-kicker { font-size: 6.5px; color: var(--hero-muted); }
+.lp-format { font-size: 10px; font-weight: 700; }
+.lp-select {
+  padding: 2px 4px;
+  background: var(--hero-input);
+  border: 1px solid var(--hero-input-border);
+  border-radius: 1px;
+  color: var(--hero-muted);
+  font-size: 6.5px;
+}
+.lp-team { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; }
+.lp-team span { aspect-ratio: 1; background: var(--hero-team-bg); border-radius: 1px; }
+.lp-battle {
+  padding: 4px 0;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+.lp-quiet { color: var(--hero-text); font-size: 6.5px; text-align: center; }
+
+.lp-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.lp-head { flex: none; padding: 2px 5px; background: var(--bg-selected); border-bottom: 1px solid var(--border); font-weight: 600; }
+.lp-line { flex: none; width: 82%; height: 3px; margin: 5px 5px 0; background: var(--border-strong); border-radius: 1px; }
+.lp-line--short { width: 50%; }
+.lp-item { flex: none; padding: 2px 5px; border-bottom: 1px solid var(--border); font-size: 7px; font-weight: 600; }
+.lp-item--friend::before, .lp-item--away::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-right: 3px;
+  border-radius: 50%;
+  background: var(--ok);
+  vertical-align: 1px;
+}
+.lp-item--away { color: var(--text-2); font-weight: 400; }
+.lp-item--away::before { background: none; border: 1px solid var(--text-3); width: 2px; height: 2px; }
+.lp-pair { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.lp-pair--split { grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); }
+
+/* Classic: the battle panel runs down the left with the tiles under it. */
+.lp-left { flex: 0 0 37%; display: flex; flex-direction: column; gap: 4px; }
+/* Spread down the full height, as the real panel is. */
+.lp-left .lp-hero { flex: 1; justify-content: space-between; padding: 9px 8px; }
+.lp-group { display: flex; flex-direction: column; gap: 4px; }
+.lp-right { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.lp-tiles { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+.lp-tiles span {
+  padding: 4px 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-size: 6px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Revamped: one centered column, a wide battle panel, then news and chat rooms 70/30. */
+.lp-column { flex: 1; display: flex; flex-direction: column; gap: 6px; margin: 0 10%; }
+.lp-hero--wide { flex: none; flex-direction: row; gap: 7px; }
 .lp-hero-main { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.lp-hero-side { flex: 0 0 34%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; align-content: start; }
-.lp-hero-side span { height: 9px; background: var(--hero-input); border-radius: 1px; }
-.lp-line { width: 70%; height: 5px; background: var(--hero-muted); border-radius: 1px; opacity: 0.8; }
-.lp-line--short { width: 45%; opacity: 0.5; }
-.lp-team { height: 12px; margin-top: 3px; background: repeating-linear-gradient(90deg, var(--hero-team-bg) 0 14%, transparent 14% 17%); }
-.lp-battle { height: 12px; margin-top: 3px; background: var(--primary); border-radius: 2px; }
-.lp-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
-.lp-tiles span { height: 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 2px; }
-.lp-panel { min-height: 18px; background: var(--bg-panel); border: 1px solid var(--border); border-top: 5px solid var(--bg-selected); border-radius: 2px; }
-.lp-panel--grow, .lp-row--grow { flex: 1; }
-.lp-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.lp-row--split { grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); }
+.lp-selects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+.lp-actions { display: flex; align-items: center; gap: 4px; }
+.lp-actions .lp-battle { flex: 1; }
+.lp-actions .lp-quiet { flex: none; }
+.lp-links { flex: 0 0 34%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; align-content: start; }
+.lp-links span {
+  padding: 4px 0;
+  background: var(--hero-input);
+  border: 1px solid var(--hero-input-border);
+  border-radius: 1px;
+  color: var(--hero-text);
+  font-size: 5.5px;
+  font-weight: 600;
+  text-align: center;
+}
 @media (max-width: 700px) {
   .welcome-options { grid-template-columns: minmax(0, 1fr); }
 }

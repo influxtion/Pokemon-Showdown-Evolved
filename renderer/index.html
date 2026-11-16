@@ -183,16 +183,29 @@
   <p id="welcome-desc">Choose how your Home screen looks. You can always switch between them later in Settings.</p>
   <div class="welcome-options">
     <button class="welcome-option" type="button" data-layout="classic">
+      <!-- A small, labelled copy of each layout, in its real proportions. -->
       <span class="layout-preview layout-preview--classic" aria-hidden="true">
         <span class="lp-rail"></span>
-        <span class="lp-body">
-          <span class="lp-col">
-            <span class="lp-hero"><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-team"></span><span class="lp-battle"></span></span>
-            <span class="lp-tiles"><span></span><span></span><span></span></span>
-          </span>
-          <span class="lp-col">
-            <span class="lp-panel lp-panel--grow"></span>
-            <span class="lp-row lp-row--grow"><span class="lp-panel"></span><span class="lp-panel"></span></span>
+        <span class="lp-app">
+          <span class="lp-strip"><span class="lp-tab lp-tab--on">Home</span><span class="lp-tab">Community</span><span class="lp-tab">Lobby</span></span>
+          <span class="lp-body">
+            <span class="lp-left">
+              <span class="lp-hero">
+                <span class="lp-group"><span class="lp-kicker">Ready to battle</span><span class="lp-format">[Gen 9] OU</span></span>
+                <span class="lp-select">Format</span>
+                <span class="lp-select">Team</span>
+                <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="lp-group"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge a user</span></span>
+              </span>
+              <span class="lp-tiles"><span>Tournaments</span><span>Ladder</span><span>Spectate</span></span>
+            </span>
+            <span class="lp-right">
+              <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span><span class="lp-line lp-line--short"></span></span>
+              <span class="lp-pair">
+                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span><span class="lp-item">Tournaments</span></span>
+                <span class="lp-panel"><span class="lp-head">Friends</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--away">Offline</span></span>
+              </span>
+            </span>
           </span>
         </span>
       </span>
@@ -203,10 +216,25 @@
     <button class="welcome-option" type="button" data-layout="modern">
       <span class="layout-preview layout-preview--modern" aria-hidden="true">
         <span class="lp-rail"></span>
-        <span class="lp-body">
-          <span class="lp-center">
-            <span class="lp-hero lp-hero--wide"><span class="lp-hero-main"><span class="lp-line"></span><span class="lp-team"></span><span class="lp-battle"></span></span><span class="lp-hero-side"><span></span><span></span><span></span><span></span></span></span>
-            <span class="lp-row lp-row--grow lp-row--split"><span class="lp-panel"></span><span class="lp-panel"></span></span>
+        <span class="lp-app">
+          <span class="lp-strip"><span class="lp-tab lp-tab--on">Home</span><span class="lp-tab">Community</span><span class="lp-tab">Lobby</span></span>
+          <span class="lp-body">
+            <span class="lp-column">
+              <span class="lp-hero lp-hero--wide">
+                <span class="lp-hero-main">
+                  <span class="lp-kicker">Ready to battle</span>
+                  <span class="lp-format">[Gen 9] OU</span>
+                  <span class="lp-selects"><span class="lp-select">Format</span><span class="lp-select">Team</span></span>
+                  <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+                  <span class="lp-actions"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge</span></span>
+                </span>
+                <span class="lp-links"><span>Teambuilder</span><span>Ladder</span><span>Watch</span><span>Your stats</span></span>
+              </span>
+              <span class="lp-pair lp-pair--split">
+                <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span></span>
+                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span></span>
+              </span>
+            </span>
           </span>
         </span>
       </span>
