@@ -18,8 +18,6 @@ const els = {
   teamGrid: $('team-grid'),
   teamName: $('team-name'),
   heroRecord: $('hero-record'),
-  tileTeams: $('tile-teams'),
-  tileBattles: $('tile-battles'),
   news: $('news'),
   rooms: $('rooms'),
   friends: $('friends'),
@@ -76,7 +74,7 @@ openFriends.type = 'button';
 openFriends.addEventListener('click', () => {
   if (sessionReady && sessionConnected) act('friends');
 });
-$('friends-head').querySelector('.window-toggle').before(openFriends);
+$('friends-head').append(openFriends);
 
 function num(n) {
   return n === null || n === undefined ? '–' : n.toLocaleString('en-US');
@@ -262,22 +260,129 @@ function renderNews() {
   }));
 }
 
+// Chat room shortcuts. Until the player edits them they follow the busiest rooms; the
+// first edit pins that list, and from then on it is theirs (a convenience, kept locally).
+const MAX_PINNED_ROOMS = 12;
+const ROOM_ID = /^[a-z0-9-]{1,80}$/;
+let editingRooms = false;
+let roomsKey = '';
+
+function roomIdFor(name) {
+  return name.toLowerCase().replace(/[^a-z0-9-]+/g, '').slice(0, 80);
+}
+
+function pinnedRooms() {
+  let raw = null;
+  try {
+    raw = JSON.parse(prefs.get('hub.rooms'));
+  } catch {}
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((r) => r && typeof r.id === 'string' && ROOM_ID.test(r.id) && typeof r.title === 'string')
+    .slice(0, MAX_PINNED_ROOMS)
+    .map((r) => ({ id: r.id, title: r.title.slice(0, 40) || r.id }));
+}
+
+function liveRoom(id) {
+  return (state.rooms || []).find((r) => roomIdFor(r.title) === id) || null;
+}
+
+function shownRooms() {
+  return pinnedRooms() || [...(state.rooms || [])]
+    .sort((a, b) => (b.users || 0) - (a.users || 0)).slice(0, 5)
+    .map((r) => ({ id: roomIdFor(r.title), title: r.title }))
+    .filter((r) => ROOM_ID.test(r.id));
+}
+
 function renderRooms() {
-  const rooms = [...state.rooms].sort((a, b) => (b.users || 0) - (a.users || 0)).slice(0, 5);
+  const rooms = shownRooms();
+  const live = rooms.map((r) => liveRoom(r.id));
+  const key = JSON.stringify([editingRooms, state.ready, rooms, live.map((r) => r && [r.users, r.desc])]);
+  if (key === roomsKey) return;
+  roomsKey = key;
+
+  const toggle = $('rooms-edit');
+  toggle.textContent = editingRooms ? 'Done' : 'Edit';
+  toggle.setAttribute('aria-pressed', String(editingRooms));
+  toggle.setAttribute('aria-label', editingRooms ? 'Done editing chat rooms' : 'Edit chat rooms');
+  $('rooms-add').hidden = !editingRooms;
+  $('rooms-all').hidden = editingRooms;
+
   if (!rooms.length) {
-    els.rooms.replaceChildren(el('div', 'empty', 'Room list not loaded yet.'));
+    const text = editingRooms ? 'No rooms yet. Add one below.'
+      : pinnedRooms() ? 'No rooms pinned. Choose Edit to add some.'
+        : state.ready ? 'Room list not loaded yet.' : 'Loading rooms…';
+    els.rooms.replaceChildren(el('div', 'empty', text));
     return;
   }
-  els.rooms.replaceChildren(...rooms.map((r) => {
+  els.rooms.replaceChildren(...rooms.map((r, i) => {
+    const info = live[i];
+    if (editingRooms) {
+      const row = el('div', 'room-row room-row--edit');
+      const remove = el('button', 'room-remove');
+      remove.type = 'button';
+      remove.dataset.remove = r.id;
+      remove.setAttribute('aria-label', `Remove ${r.title}`);
+      remove.title = 'Remove';
+      row.append(el('span', 'room-row-title', r.title), remove);
+      return row;
+    }
     const link = el('a', 'room-row');
     link.href = '#';
-    link.dataset.room = r.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    link.dataset.room = r.id;
     const head = el('span', 'room-row-head');
-    head.append(el('span', 'room-row-title', r.title), el('span', 'room-row-users num', `${num(r.users)} users`));
-    link.append(head, el('span', 'room-row-desc', r.desc));
+    head.append(el('span', 'room-row-title', r.title));
+    if (info) head.append(el('span', 'room-row-users num', `${num(info.users)} users`));
+    link.append(head);
+    if (info && info.desc) link.append(el('span', 'room-row-desc', info.desc));
     return link;
   }));
 }
+
+function savePinnedRooms(list) {
+  prefs.set('hub.rooms', JSON.stringify(list));
+  roomsKey = '';
+  renderRooms();
+}
+
+$('rooms-edit').addEventListener('click', () => {
+  // The first edit turns the suggested list into the player's own.
+  if (!editingRooms && !pinnedRooms()) prefs.set('hub.rooms', JSON.stringify(shownRooms()));
+  editingRooms = !editingRooms;
+  roomsKey = '';
+  renderRooms();
+  if (editingRooms) $('rooms-add-name').focus();
+});
+
+els.rooms.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove]');
+  if (!button) return;
+  const rooms = pinnedRooms() || [];
+  const index = rooms.findIndex((r) => r.id === button.dataset.remove);
+  if (index < 0) return;
+  rooms.splice(index, 1);
+  savePinnedRooms(rooms);
+  // Keep the keyboard where it was: the next remove button, else the add field.
+  const next = els.rooms.querySelectorAll('[data-remove]')[Math.min(index, rooms.length - 1)];
+  (next || $('rooms-add-name')).focus();
+});
+
+$('rooms-add').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const input = $('rooms-add-name');
+  const name = input.value.trim();
+  const id = roomIdFor(name);
+  const rooms = pinnedRooms() || [];
+  if (!ROOM_ID.test(id) || rooms.length >= MAX_PINNED_ROOMS) {
+    input.select();
+    return;
+  }
+  if (!rooms.some((r) => r.id === id)) {
+    rooms.push({ id, title: (liveRoom(id) && liveRoom(id).title) || name });
+    savePinnedRooms(rooms);
+  }
+  input.value = '';
+  input.focus();
+});
 
 function renderAccount() {
   if (!sessionReady) {
@@ -366,8 +471,6 @@ function render() {
   renderFormats();
   renderTeams();
   renderHero();
-  els.tileTeams.textContent = state.teams.length ? `${state.teams.length} team${state.teams.length === 1 ? '' : 's'}` : 'Build and import teams';
-  els.tileBattles.textContent = state.counts.battles !== null ? `${num(state.counts.battles)} live now` : 'Live battles';
   renderNews();
   renderRooms();
   renderFriends();
@@ -492,44 +595,45 @@ $('live-battle-return').addEventListener('click', () => {
   if (liveBattle) act('join', { room: liveBattle.id });
 });
 
-// Minimize buttons on the Home windows. The choice is remembered as a convenience only.
-function setWindow(button, open) {
-  const name = button.closest('.window').querySelector('h2').textContent;
-  button.closest('.window').classList.toggle('is-collapsed', !open);
-  button.setAttribute('aria-expanded', String(open));
-  button.setAttribute('aria-label', `${open ? 'Minimize' : 'Expand'} ${name}`);
-  button.title = open ? 'Minimize' : 'Expand';
-}
-for (const button of document.querySelectorAll('.window-toggle')) {
-  setWindow(button, prefs.get(`hub.window.${button.dataset.window}`) !== 'closed');
-  button.addEventListener('click', () => {
-    const open = button.getAttribute('aria-expanded') !== 'true';
-    setWindow(button, open);
-    prefs.set(`hub.window.${button.dataset.window}`, open ? 'open' : 'closed');
-  });
+// Home layout. The choice lives in launcher settings (homeLayout): 'classic' or 'modern'.
+// While none has been made, the welcome asks once; after that it never shows again unless
+// the launcher is reset. The hub stays hidden until a layout is applied, so it never flashes.
+const LAYOUTS = new Set(['classic', 'modern']);
+const welcome = $('welcome');
+
+function applyLayout(layout) {
+  const hub = $('hub');
+  hub.classList.toggle('hub--classic', layout === 'classic');
+  hub.classList.toggle('hub--modern', layout !== 'classic');
 }
 
-refresh();
+// Older Chromium may still let Escape close the dialog; there is nothing to fall back to.
+welcome.addEventListener('cancel', (event) => event.preventDefault());
 
-async function loadRecentReplays() {
+welcome.addEventListener('click', async (event) => {
+  const option = event.target.closest('[data-layout]');
+  if (!option || !LAYOUTS.has(option.dataset.layout)) return;
+  const options = welcome.querySelectorAll('[data-layout]');
+  for (const button of options) button.disabled = true;
   try {
-    const result = await window.desktop.getReplayNotes();
-    if (!result.ok || !result.notes.length) return;
-    const recent = [...result.notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
-    $('recent-replays').replaceChildren(...recent.map((note) => {
-      const link = el('a', 'note-item');
-      link.href = `replays.html?id=${encodeURIComponent(note.id)}`;
-      link.append(el('div', 'note-item-title', note.title));
-      const meta = el('div', 'note-item-meta');
-      meta.append(el('span', 'tag', note.format), el('span', 'num', new Date(note.updatedAt).toLocaleDateString()));
-      link.append(meta);
-      return link;
-    }));
-    $('recent-replays-section').hidden = false;
-    $('recent-replays-empty').hidden = true;
-    $('count-notes').hidden = false;
-    $('count-notes').textContent = result.notes.length;
+    await window.desktop.setSetting('homeLayout', option.dataset.layout);
   } catch {}
+  // Applied even if saving failed; the welcome then simply returns on the next launch.
+  applyLayout(option.dataset.layout);
+  welcome.close();
+});
+
+async function loadLayout() {
+  let settings = null;
+  try {
+    const result = await window.desktop.getSettings();
+    if (result && result.ok) settings = result.settings;
+  } catch {}
+  const chosen = settings && LAYOUTS.has(settings.homeLayout) ? settings.homeLayout : null;
+  applyLayout(chosen || 'modern');
+  // Unreadable settings could not keep the answer, so only ask when they loaded.
+  if (settings && !chosen && !welcome.open) welcome.showModal();
 }
 
-loadRecentReplays();
+loadLayout();
+refresh();

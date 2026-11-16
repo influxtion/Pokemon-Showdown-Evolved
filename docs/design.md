@@ -37,7 +37,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 ### Showdown overhaul
 - **Icon bar and room tabs:** a slim icon bar on the left for Home, Stats, Replay notes, Practice and Settings, with the account at the foot. Showdown rooms are tabs across the top, with close buttons and **Join a room**.
 - **Battles persist** across page changes. A new battle takes focus; Home shows **Return to battle**; an ended battle offers **Save replay note**, **Close battle**, **Battle again**.
-- **Home:** format and team pickers, **Battle**, **Cancel**, **Challenge a user**, the format's rating, win rate, record and GXE, plus news, replay notes, friends and chat rooms.
+- **Home:** format and team pickers, **Battle**, **Cancel**, **Challenge a user**, the format's rating, win rate, record and GXE, plus news and editable chat room shortcuts. Two layouts, **Classic** and **Revamped**, chosen once in a first-launch welcome and switched in Settings.
 - **Stats:** ladder totals and a sortable per-format table; **Play** preselects a format, never starts a search.
 - **Restyled rooms:** Ladder, Teambuilder, Community, chat, battle and tournament rooms restyled by CSS only (`app/client-*.css`). All rules are scoped to `sd-launcher-shell`, so the stock client returns if the bridge stops.
 - **Format picker:** the client's own picker shown as a centered modal.
@@ -90,7 +90,7 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - Practice and online games stay loaded side by side; the online account is never used.
 
 ### Settings
-- Appearance, start page, close protection for battles and searches, client reload, open logs, bot location (hosted or local, once installed).
+- Appearance, Home layout, start page, close protection for battles and searches, client reload, open logs, bot location (hosted or local, once installed).
 - **Sign out** clears the Showdown partition, local teams included. **Reset launcher** clears settings and replay notes but keeps the session. Both confirm first.
 - Window size, position and maximized state are remembered.
 
@@ -164,7 +164,11 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 - **Persistence:** the client stays loaded across page changes, so navigating never loses a battle. A newly started battle switches to the Showdown view and takes priority. Home shows **Return to battle** while one runs. An ended battle shows a result bar: **Save replay note**, **Close battle**, **Battle again**.
 - **Home hero:** format and team pickers (with the team's sprites), **Battle**, **Cancel** and **Challenge a user**. Search runs in the background with an animated state. Choices are remembered per format as a convenience only.
 - **Home hero record:** the selected format's rating, win rate, win–loss record and GXE, from the public profile endpoint (cached 2 minutes), with user and battle counts and **Edit teams** (opens the selected team).
-- **Home layout:** modelled on Showdown's main menu. The hero is a launcher column on the left with Teambuilder, Ladder, Watch a battle and Your stats rows beneath it. Beside it sit titled windows: **Latest news** and **Replay notes** in the middle, **Friends** and **Chat rooms** on the right.
+- **Home layouts:** two layouts on one page, for two kinds of player. Either one shows the same hero, news and chat rooms; only the arrangement differs.
+  - **Classic** (Showdown's main menu, modernised, for existing players): the hero as a column on the left with **Tournaments**, **Ladder** and **Spectate** tiles beneath it. On the right, **Latest news** over **Chat rooms** and **Friends** side by side, ending level with the tiles.
+  - **Revamped** (for new players): one centred column, 820px at most. A wide hero with the record and **Teambuilder**, **Ladder**, **Watch** and **Your stats** shortcuts inside it, then **Latest news** and **Chat rooms** split 70/30. No friends window.
+- **First-launch welcome:** while no layout is chosen (`homeLayout` is null), Home opens a modal with a schematic preview of each layout and says either can be changed in Settings. It cannot be dismissed without choosing. The choice is saved to launcher settings, so it is asked exactly once; only **Reset launcher** clears it. If settings cannot be read, Home shows Revamped and does not ask, since the answer could not be kept.
+- **Chat room shortcuts:** until edited, the five busiest rooms. **Edit** pins that list and lets the player remove rooms or add one by name (up to 12, duplicates ignored); from then on the list is theirs. Kept in the launcher page's local storage as a convenience.
 - **Stats page:** a rail page with ladder totals (battles, win rate, highest rating, most played) and a sortable, filterable per-format table of rating, win rate, wins, losses, battles and GXE. **Play** on a row preselects that format on Home; it never starts a search.
 - **Restyled client rooms:** the Ladder, Teambuilder, Community view, chat room list, live battle list, chat rooms, battle rooms and tournaments are the client's own pages restyled in place by `app/client-ladder.css`, `client-teambuilder.css`, `client-community.css`, `client-rooms.css`, `client-chat.css` (chat and battle rooms) and `client-tournament.css` (the tournament bar, bracket, tools, notices and bracket pop-out). They change surfaces, type and layout only; the client's markup and controls are untouched, and every rule is scoped to `sd-launcher-shell` so the client's own look returns if the bridge stops driving it.
 - **Friends panel:** structured presence (online, idle, busy, offline as reported), refreshed at most every 30 s. **Open friends list** is the fallback. No battle state or avatars are inferred.
@@ -216,7 +220,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Settings
 
-- **Options:** Appearance (system, light, dark), start page, close protection for battles and searches, explicit client reload, open logs.
+- **Options:** Appearance (system, light, dark), Home layout (Classic, Revamped), start page, close protection for battles and searches, explicit client reload, open logs.
 - **Sign out** clears the Showdown partition, including local teams (export them first). **Reset launcher** clears settings, preferences and replay notes but keeps the Showdown session. Both confirm first.
 - **Window:** size, position and maximized state are remembered. A saved window is repositioned if its monitor is gone.
 

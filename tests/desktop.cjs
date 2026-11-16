@@ -55,7 +55,31 @@ app.whenReady().then(async () => {
     await win.loadFile(path.join(__dirname, '..', 'renderer', file));
     await pause(200);
   };
+  const captures = path.join(__dirname, '..', 'out', 'desktop-smoke');
+  fs.mkdirSync(captures, { recursive: true });
+  const savedSettings = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+
+  // First launch: no layout chosen yet, so Home asks once with previews of both.
   await load('index.html');
+  await until(() => run("document.getElementById('welcome').open"), 'welcome on first launch');
+  assert.deepEqual(await run("[...document.querySelectorAll('#welcome [data-layout]')].map((b) => b.dataset.layout)"), ['classic', 'modern']);
+  assert.match(await run("document.getElementById('welcome').textContent"), /switch between them later in Settings/);
+  assert.equal(await run("document.querySelectorAll('#welcome .layout-preview').length"), 2);
+  win.showInactive();
+  for (const theme of ['light', 'dark']) {
+    await run(`window.desktop.setTheme('${theme}')`);
+    await pause(250);
+    fs.writeFileSync(path.join(captures, `welcome-${theme}.png`), (await renderer.capturePage()).toPNG());
+  }
+  await run("document.querySelector('#welcome [data-layout=modern]').click(); 0");
+  await until(() => run("!document.getElementById('welcome').open && document.getElementById('hub').classList.contains('hub--modern')"), 'welcome choice applied');
+  await until(() => { try { return savedSettings().homeLayout === 'modern'; } catch { return false; } }, 'welcome choice saved');
+  // Never asked again: later launches go straight to the chosen layout.
+  await load('index.html');
+  await until(() => run("document.getElementById('hub').classList.contains('hub--modern')"), 'chosen layout on the next launch');
+  await pause(300);
+  assert.equal(await run("document.getElementById('welcome').open"), false, 'welcome not shown again');
+
   await until(() => run("!document.getElementById('battle').disabled"), 'Home ready');
   await until(() => run("document.getElementById('friends').textContent.includes('Busy Friend')"), 'friends rendered');
   assert.doesNotMatch(await run("document.getElementById('friends').textContent"), /Battling/);
@@ -70,6 +94,29 @@ app.whenReady().then(async () => {
   await run("document.getElementById('format').value = 'gen9ou'; document.getElementById('format').dispatchEvent(new Event('change')); document.getElementById('edit-team').click(); 0");
   await until(() => renderer.getURL().endsWith('/play.html'), 'selected team shortcut');
   assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: 1, name: 'Selected team', format: 'gen9ou' } });
+
+  // Chat room shortcuts: suggested from the busiest rooms until edited, then the player's own.
+  snapshot.rooms = [
+    { title: 'Lobby', desc: 'Chat', users: 600 }, { title: 'Help', desc: 'Questions', users: 120 },
+    { title: 'Over Used', desc: 'OU talk', users: 200 },
+  ];
+  await load('index.html');
+  await until(() => run("document.querySelectorAll('#rooms [data-room]').length === 3"), 'suggested rooms');
+  assert.deepEqual(await run("[...document.querySelectorAll('#rooms [data-room]')].map((a) => a.dataset.room)"), ['lobby', 'overused', 'help']);
+  await run("document.getElementById('rooms-edit').click(); 0");
+  assert.equal(await run("document.getElementById('rooms-add').hidden"), false);
+  await run("document.querySelector('[data-remove=lobby]').click(); 0");
+  await run("document.getElementById('rooms-add-name').value = 'Tournaments'; document.getElementById('rooms-add').requestSubmit(); 0");
+  await run("document.getElementById('rooms-add-name').value = 'help'; document.getElementById('rooms-add').requestSubmit(); 0");
+  await run("document.getElementById('rooms-edit').click(); 0");
+  assert.deepEqual(await run("[...document.querySelectorAll('#rooms [data-room]')].map((a) => a.dataset.room)"), ['overused', 'help', 'tournaments'], 'removed, added and de-duplicated');
+  await load('index.html');
+  await until(() => run("document.querySelectorAll('#rooms [data-room]').length === 3"), 'pinned rooms after reload');
+  assert.deepEqual(await run("[...document.querySelectorAll('#rooms [data-room]')].map((a) => a.dataset.room)"), ['overused', 'help', 'tournaments']);
+  await run("document.querySelector('#rooms [data-room=tournaments]').click(); 0");
+  await until(() => actions.some((a) => a.action === 'join'), 'pinned room opens');
+  assert.deepEqual(actions.pop(), { action: 'join', args: { room: 'tournaments' } });
+
   await load('index.html');
   current = { ...current, connected: false };
   await until(() => run("document.getElementById('battle').disabled"), 'disconnect disables search');
@@ -207,14 +254,41 @@ app.whenReady().then(async () => {
   fs.writeFileSync(path.join(__dirname, '..', 'out', 'desktop-smoke', 'challenge-home-1024.png'), (await renderer.capturePage()).toPNG());
   current = { ...current, messages: [] };
   await until(() => run("document.querySelector('.challenge-bars').hidden"), 'bar hides when the challenge is gone');
-  const captures = path.join(__dirname, '..', 'out', 'desktop-smoke');
-  fs.mkdirSync(captures, { recursive: true });
+  // Both layouts at the minimum width and at a common laptop size, in both themes. Switching
+  // in Settings is the same setting the welcome writes.
   win.showInactive();
-  for (const theme of ['light', 'dark']) {
-    await run(`window.desktop.setTheme('${theme}')`);
-    await pause(250);
-    fs.writeFileSync(path.join(captures, `home-${theme}.png`), (await renderer.capturePage()).toPNG());
+  for (const layout of ['classic', 'modern']) {
+    assert.equal((await run(`window.desktop.setSetting('homeLayout', '${layout}')`)).ok, true);
+    for (const [width, height] of [[1024, 640], [1366, 768]]) {
+      win.setSize(width, height);
+      await load('index.html');
+      await until(() => run(`document.getElementById('hub').classList.contains('hub--${layout}')`), `${layout} layout applied`);
+      await until(() => run("!document.getElementById('battle').disabled"), `${layout} Home ready`);
+      assert.equal(await run("document.getElementById('welcome').open"), false);
+      assert.equal(await run('document.documentElement.scrollWidth <= innerWidth'), true, `${layout} ${width} horizontal overflow`);
+      assert.equal(await run("document.getElementById('hub').scrollWidth <= document.getElementById('hub').clientWidth"), true, `${layout} ${width} hub overflow`);
+      const visible = await run("['.hub-tiles', '.hero-links', '.hub-friends', '.hub-rooms', '.hub-news'].map((s) => getComputedStyle(document.querySelector(s)).display !== 'none')");
+      assert.deepEqual(visible, layout === 'classic' ? [true, false, true, true, true] : [false, true, false, true, true], `${layout} panels`);
+      if (layout === 'classic') {
+        const [tiles, news, rooms, friends] = await run("['.hub-tiles', '.hub-news', '.hub-rooms', '.hub-friends'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.top, r.bottom])");
+        assert.ok(Math.abs(rooms[1] - tiles[1]) <= 1 && Math.abs(friends[1] - tiles[1]) <= 1, 'chat rooms and friends end level with the tiles');
+        assert.ok(news[0] < rooms[0] && rooms[0] - news[1] < 30, 'news sits over the lower pair');
+      } else {
+        const [hero, news, rooms] = await run("['.hero', '.hub-news', '.hub-rooms'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.left, r.right, r.width])");
+        // Centered inside the hub's content area, which excludes any vertical scrollbar.
+        const hubCenter = await run("(() => { const h = document.getElementById('hub'); return h.getBoundingClientRect().left + h.clientWidth / 2; })()");
+        assert.ok(Math.abs((hero[0] + hero[1]) / 2 - hubCenter) <= 2, 'battle panel centered');
+        assert.ok(Math.abs(news[2] / (news[2] + rooms[2]) - 0.7) < 0.03, 'news and chat rooms split 70/30');
+        assert.equal(await run("[...document.querySelectorAll('.hero-team-grid > *')].every((n) => Math.abs(n.getBoundingClientRect().width - n.getBoundingClientRect().height) < 1)"), true, 'square team slots');
+      }
+      for (const theme of ['light', 'dark']) {
+        await run(`window.desktop.setTheme('${theme}')`);
+        await pause(250);
+        fs.writeFileSync(path.join(captures, `home-${layout}-${width}-${theme}.png`), (await renderer.capturePage()).toPNG());
+      }
+    }
   }
+  win.setSize(1024, 640);
 
   // Ctrl+Tab and Ctrl+Shift+Tab step through the tab strip from real key presses, whether
   // the focus is in the launcher page or in the Showdown client view.
@@ -298,7 +372,7 @@ app.whenReady().then(async () => {
   await middle('[data-nav=rooms] .nav-room:not([aria-current])');
   await until(() => actions.some((a) => a.action === 'leave-room'), 'a middle click closes a room tab');
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'battle-test-2' } }]);
-  console.log('PASS desktop smoke: connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab, Ctrl+W, Ctrl+1-9, middle-click close');
+  console.log('PASS desktop smoke: first-launch welcome (asked once), both Home layouts, editable chat rooms, connection, view bounds/survival, themes, spectating, delayed battle identity, launcher rail rooms, room top bar, result bar, challenge bar and conversations, minimum width, Ctrl+Tab, Ctrl+W, Ctrl+1-9, middle-click close');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

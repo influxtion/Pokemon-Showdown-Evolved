@@ -36,8 +36,10 @@ test('defaults, validation and all settings persist across restarts', (t) => {
   assert.equal(settings.set('startPage', 'replays'), true);
   assert.equal(settings.set('confirmOnClose', false), true);
   assert.equal(settings.set('showdexEnabled', true), true);
-  assert.deepEqual(new Settings(dir).snapshot(), { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true });
-  assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true });
+  assert.equal(settings.set('homeLayout', 'classic'), true);
+  const expected = { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true, homeLayout: 'classic' };
+  assert.deepEqual(new Settings(dir).snapshot(), expected);
+  assert.deepEqual(disk(dir), expected);
   const snapshot = settings.snapshot();
   snapshot.theme = 'light';
   assert.equal(settings.get('theme'), 'dark');
@@ -47,9 +49,31 @@ test('legacy theme-only settings gain new defaults and reset persists defaults',
   const dir = fixture(t);
   fs.writeFileSync(path.join(dir, 'settings.json'), '{"theme":"light"}');
   const settings = new Settings(dir);
-  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
+  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null });
   assert.deepEqual(settings.reset(), DEFAULTS);
   assert.deepEqual(disk(dir), DEFAULTS);
+});
+
+test('home layout starts unchosen, keeps a choice across restarts and cannot be unset', (t) => {
+  const dir = fixture(t);
+  const settings = new Settings(dir);
+  assert.equal(settings.get('homeLayout'), null, 'a new install has not chosen, so Home asks once');
+  for (const bad of [null, undefined, '', 'Classic', 'battle', true, 1]) {
+    assert.equal(settings.set('homeLayout', bad), false, `${String(bad)} rejected`);
+  }
+  assert.equal(fs.existsSync(path.join(dir, 'settings.json')), false);
+  assert.equal(settings.set('homeLayout', 'modern'), true);
+  assert.equal(new Settings(dir).get('homeLayout'), 'modern', 'the first choice stays the default');
+  assert.equal(settings.set('homeLayout', 'classic'), true);
+  assert.equal(new Settings(dir).get('homeLayout'), 'classic', 'switching in Settings persists');
+
+  // A saved null (written by reset) is valid and means "ask again"; anything else is not.
+  fs.writeFileSync(path.join(dir, 'settings.json'), '{"homeLayout":null}');
+  assert.equal(new Settings(dir).get('homeLayout'), null);
+  fs.writeFileSync(path.join(dir, 'settings.json'), '{"homeLayout":"battle"}');
+  const invalid = new Settings(dir);
+  assert.equal(invalid.get('homeLayout'), null);
+  assert.ok(fs.readdirSync(dir).some((file) => file.startsWith('settings.json.corrupt-')));
 });
 
 test('invalid settings are preserved before a new file is saved', (t) => {
@@ -81,7 +105,7 @@ test('failed write or rename preserves previous settings on disk and in memory',
     const settings = new Settings(dir, fileSystem);
     assert.throws(() => settings.set('theme', 'light'), /failed/);
     assert.equal(settings.get('theme'), 'dark');
-    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
+    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null });
     assert.equal(fs.readdirSync(dir).some((file) => file.includes('.tmp-')), false);
   }
 });
