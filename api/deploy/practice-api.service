@@ -1,0 +1,28 @@
+# systemd unit for running the API without Docker. Adjust paths, then:
+#   sudo cp deploy/practice-api.service /etc/systemd/system/ && sudo systemctl enable --now practice-api
+# Put a TLS reverse proxy (Caddy, nginx) in front and keep TRUST_PROXY=1 only behind it.
+[Unit]
+Description=Showdown Desktop practice API (Foul Play inference)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=practice-api
+WorkingDirectory=/opt/showdown-desktop/api
+ExecStart=/usr/bin/node server.js
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+Environment=TRUST_PROXY=1
+Environment=MAX_SESSIONS=4
+Environment=MAX_THREADS=2
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/showdown-desktop
+
+[Install]
+WantedBy=multi-user.target

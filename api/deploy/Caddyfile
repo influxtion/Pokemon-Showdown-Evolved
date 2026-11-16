@@ -1,0 +1,4 @@
+{$API_DOMAIN} {
+	# No access log: session IDs in request paths are capabilities.
+	reverse_proxy api:8787
+}

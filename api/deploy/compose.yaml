@@ -1,0 +1,42 @@
+# Practice API behind Caddy (automatic HTTPS). From api/deploy:
+#   API_DOMAIN=practice.example.org docker compose up -d --build
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      TRUST_PROXY: '1'
+      MAX_SESSIONS: ${MAX_SESSIONS:-4}
+      MAX_THREADS: ${MAX_THREADS:-2}
+      MAX_SESSIONS_PER_CLIENT: ${MAX_SESSIONS_PER_CLIENT:-1}
+      SESSIONS_PER_HOUR: ${SESSIONS_PER_HOUR:-30}
+      SESSION_BURST: ${SESSION_BURST:-6}
+      API_KEY: ${API_KEY:-}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+    cpus: ${API_CPUS:-4}
+    mem_limit: ${API_MEMORY:-4g}
+    pids_limit: 256
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [api]
+  proxy:
+    image: caddy:2.10
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN to the public host name}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks: [api]
+networks:
+  api:
+volumes:
+  caddy_data:
+  caddy_config:
