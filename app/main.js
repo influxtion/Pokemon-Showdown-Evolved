@@ -390,6 +390,8 @@ ipcMain.handle('practice:start', (event, options) => {
 ipcMain.handle('practice:install-local', event => {
   if (!isPracticeFrame(event)) return { ok: false };
   if (localEngine.installing) return { ok: true };
+  // Installing replaces the runtime and restarts the local API, which would end a local battle.
+  if (practice.engine === 'local' && ['starting', 'ready'].includes(practice.state)) return { ok: false, error: 'Stop the practice battle first.' };
   localEngine.install().then(result => logger.write(result.ok ? 'foulplay-installed' : result.cancelled ? 'foulplay-install-cancelled' : 'foulplay-install-failed'));
   return { ok: true };
 });
