@@ -23,21 +23,12 @@ function fixture() {
   return { runtime, children };
 }
 
-test('opponent selection stays allowlisted and Foul Play uses its own runner and readiness contract', async () => {
+test('the harness runs only Laplace; Foul Play goes through the inference API', async () => {
   const { runtime, children } = fixture();
   assert.equal((await runtime.start({ opponent: 'foulplay', preset: 'balanced' })).ok, false);
-  runtime.foulPlay = { python: '/foul/python', runner: '/foul/runner.py', source: '/foul/source' };
   assert.equal((await runtime.start({ opponent: '../runner', preset: 'balanced' })).ok, false);
-  assert.equal((await runtime.start({ opponent: 'foulplay', preset: 'balanced' })).ok, true);
-  children[0].line({ type: 'ready', port: 41000 });
-  assert.equal(children[1].exe, '/foul/python');
-  assert(children[1].args.includes('/foul/source'));
-  assert.equal(runtime.connection.bot, 'FoulPlay');
-  children[1].line({ type: 'ready', protocol: 1, opponent: 'foulplay', bot: 'FoulPlay', human: 'Player',
-    format: 'gen9randombattle', threads: 2, searchMs: 100 });
-  assert.equal(runtime.state, 'ready');
-  assert.equal(runtime.status().opponent, 'foulplay');
-  runtime.stop();
+  assert.equal(children.length, 0);
+  assert.deepEqual(runtime.status().opponents.map(bot => bot.id), ['laplace']);
 });
 
 test('practice starts server before bot and only signals ready after authenticated bot readiness', async () => {

@@ -1,7 +1,10 @@
 'use strict';
 process.env.SHOWDOWN_DESKTOP_BACKGROUND = '1';
 
-// Real staged Practice runtime in a disposable Electron profile.
+// Real Practice battles against Foul Play in a disposable Electron profile: the local simulator,
+// the bridge, and the inference API either on this computer (BOT_TEST_ENGINE=local, default) or
+// as a separate "cloud" server (BOT_TEST_ENGINE=cloud). Needs a Foul Play install from
+// `npm run api:setup` (api/runtime) or BOT_TEST_FOULPLAY_DIR.
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
@@ -18,9 +21,9 @@ const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const deadline = Date.now() + 240000;
 const children = [];
 const diagnose = process.argv.includes('--diagnose-practice');
-const opponent = process.env.BOT_TEST_OPPONENT || 'laplace';
-const hosted = process.env.BOT_TEST_HOSTED === '1';
-const selection = { opponent, preset: 'balanced' };
+const engine = process.env.BOT_TEST_ENGINE || 'local';
+const foulPlayDir = path.resolve(process.env.BOT_TEST_FOULPLAY_DIR || path.join(root, 'api', 'runtime'));
+const selection = { opponent: 'foulplay', preset: 'balanced', engine };
 let service;
 let statusRequests = 0;
 
@@ -43,22 +46,24 @@ async function recordPracticeLifecycle() {
   const originalHandle = ipcMain.handle;
   childProcess.spawn = (executable, args, options) => {
     const child = originalSpawn(executable, args, options);
-    const name = args.find(arg => typeof arg === 'string' && /[\\/]scripts[\\/](laplace[\\/](server\.cjs|runner\.py)|bots[\\/]foulplay\.py)$/.test(arg));
+    const name = args.find(arg => typeof arg === 'string' && /[\\/](scripts[\\/]laplace[\\/]server\.cjs|api[\\/]worker[\\/]foulplay_worker\.py)$/.test(arg));
     if (name) children.push(child);
     return child;
   };
   ipcMain.handle = (channel, listener) => originalHandle.call(ipcMain, channel,
     channel === 'practice:status' ? (...args) => { statusRequests++; return listener(...args); } : listener);
   try {
-    if (hosted) {
-      const { createService } = require('../scripts/bots/service.cjs');
-      const { PracticeRuntime } = require('../app/practice-runtime');
-      const { readBotConfig, runtimeOptions } = require('../app/bot-config');
-      const config = readBotConfig(path.join(root, 'out/bots/config.json'));
+    const { inspect } = require('../api/install');
+    if (!inspect(foulPlayDir).installed) throw new Error(`Foul Play is not installed in ${foulPlayDir}. Run npm run api:setup first.`);
+    if (engine === 'cloud') {
+      // The same server a remote host runs, here on loopback with an API key.
+      const { createApiServer } = require('../api/server');
       const key = require('node:crypto').randomBytes(32).toString('hex');
-      service = createService({ createRuntime: () => new PracticeRuntime(runtimeOptions(config, root)), clientRoot: path.join(config.root, 'client'), key });
-      process.env.SHOWDOWN_BOT_SERVICE_URL = await service.listen();
-      process.env.SHOWDOWN_BOT_SERVICE_KEY = key;
+      service = createApiServer({ runtime: inspect(foulPlayDir), apiKey: key, maxThreads: 2 });
+      process.env.SHOWDOWN_PRACTICE_API_URL = await service.listen();
+      process.env.SHOWDOWN_PRACTICE_API_KEY = key;
+    } else {
+      process.env.SHOWDOWN_FOULPLAY_DIR = foulPlayDir;
     }
     require('../app/main');
   } finally {
@@ -89,7 +94,7 @@ async function capture(contents, name) {
     try {
       const screenshot = await contents.capturePage();
       if (!screenshot.isEmpty()) {
-        fs.writeFileSync(path.join(captures, `${opponent}-${hosted ? 'hosted-' : ''}${name}.png`), screenshot.toPNG());
+        fs.writeFileSync(path.join(captures, `foulplay-${engine}-${name}.png`), screenshot.toPNG());
         return;
       }
     } catch (error) {
@@ -147,22 +152,23 @@ async function smoke() {
   assert.equal((await call('startPractice', 'balanced')).ok, false, 'Home cannot start Practice');
 
   await load('practice.html');
-  await until(async () => (await status()).installed, 'bot catalog ready');
+  await until(async () => (await status()).installed, 'practice runtime ready');
   assert.equal((await status()).state, 'idle');
   fs.mkdirSync(captures, { recursive: true });
-  await until(() => run("!document.getElementById('practice-start').disabled"), 'opponent picker ready');
-  await capture(renderer, 'opponent-picker');
-  await run(`document.getElementById('practice-opponent').value = ${JSON.stringify(opponent)}; 0`);
+  await run(`document.getElementById('practice-engine-${engine}').click(); 0`);
+  await until(() => run("!document.getElementById('practice-start').disabled"), 'engine picker ready');
+  assert.equal((await status()).engines.selected, engine, 'engine choice saved');
+  await capture(renderer, 'engine-picker');
   assert.equal((await call('startPractice', selection)).ok, true);
   await until(async () => {
     const state = await status();
     if (state.error || state.clientError) throw new Error(state.error || state.clientError);
     return state.state === 'ready' && practice();
-  }, 'local runtime ready', 47000);
+  }, 'practice session ready', 47000);
   const view = practice();
   const player = view.webContents;
   const playerId = player.id;
-  await until(() => !player.isLoading() && player.getURL().startsWith(hosted ? 'http:' : 'file:'), 'battle client document');
+  await until(() => !player.isLoading() && player.getURL().startsWith('file:'), 'battle client document');
   assert.equal(new URL(player.getURL()).pathname.endsWith('/practice-client.html'), true);
   assert.notEqual(player.session, live.webContents.session);
   const preferences = player.getLastWebPreferences();
@@ -186,7 +192,7 @@ async function smoke() {
     const browserRoom = await battleEval(player, "return control('chooseMove') ? room.id : null;");
     return state.battle?.room === browserRoom && view.getVisible() ? browserRoom : null;
   }, 'real local battle with a move request', 18000);
-  assert.equal(children.length, 2, 'local server and Laplace runner started');
+  assert.equal(children.length, 2, 'local simulator and Foul Play worker started');
 
   const firstMove = await battleEval(player, `
     const move = control('chooseMove');
@@ -208,7 +214,7 @@ async function smoke() {
   `), 'server processed the human move').catch(async error => {
     if (diagnose) {
       const state = await status();
-      console.error('Laplace state', { turn: state.battle?.turn, elapsed: state.battle?.elapsedMs });
+      console.error('Foul Play state', { turn: state.battle?.turn, elapsed: state.battle?.elapsedMs });
       console.error('Browser battle state', await battleEval(player, `
         return { turn: room.battle.turn, rqid: room.request.rqid, type: room.request.requestType,
           choice: room.choice, position: room.battle.currentStep, queued: room.battle.stepQueue.length };
@@ -222,7 +228,7 @@ async function smoke() {
         .some(line => line.startsWith('|-terastallize|' + room.side + 'a:'));
     `), 'server reported the human Terastallization');
   }
-  await until(async () => (await status()).battle?.elapsedMs > 0, 'Laplace submitted a searched move');
+  await until(async () => (await status()).battle?.elapsedMs > 0, 'Foul Play submitted a searched move');
 
   const firstSwitch = await until(() => battleEval(player, `
     const button = control('chooseSwitch');
@@ -419,7 +425,7 @@ async function smoke() {
   assert.ok(win.isVisible() && renderer.getURL().endsWith('/index.html'), 'Home stayed visible');
   assert.equal(live.webContents.id, liveId);
   assert.equal(live.webContents.isDestroyed(), false);
-  console.log(`PASS Practice desktop: real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup`);
+  console.log(`PASS Practice desktop (Foul Play, ${engine}): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup`);
 }
 
 app.whenReady().then(smoke).then(async () => { await service?.close(); app.exit(0); }, async error => {

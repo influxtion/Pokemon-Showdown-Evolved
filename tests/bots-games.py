@@ -1,4 +1,6 @@
-"""Complete two private games per bot, including a rematch on the same worker."""
+"""Complete two private games against Laplace, including a rematch on the same worker.
+
+Foul Play is covered through the inference API by tests/practice-api-live.cjs."""
 import asyncio
 from contextlib import AsyncExitStack
 import importlib.util
@@ -20,14 +22,13 @@ async def main():
     from websockets.asyncio.client import connect
     config = json.loads((ROOT / "out/bots/config.json").read_text())
     results = []
-    for opponent, bot in (("foulplay", "FoulPlay"), ("laplace", "Laplace")):
+    for opponent, bot in (("laplace", "Laplace"),):
         async with AsyncExitStack() as stack:
             token = secrets.token_hex(32)
             server = await stack.enter_async_context(local.child("node", str(ROOT / "scripts/laplace/server.cjs"),
                 "--server-root", str(Path(config["root"]) / "server"), "--port", "0", "--token", token))
             port = (await local.event(server, "ready"))["port"]
-            command = ([config["foulPlayPython"], "-I", "-B", str(ROOT / "scripts/bots/foulplay.py"), "--source", config["foulPlaySource"]]
-                       if opponent == "foulplay" else [config["laplacePython"], "-I", "-B", str(ROOT / "scripts/laplace/runner.py")])
+            command = [config["laplacePython"], "-I", "-B", str(ROOT / "scripts/laplace/runner.py")]
             process = await stack.enter_async_context(local.child(*command, "--port", str(port), "--token", token,
                 "--bot", bot, "--human", "Player", "--threads", "2", stop=True))
             await local.event(process, "ready")

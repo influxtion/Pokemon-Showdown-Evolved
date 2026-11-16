@@ -10,7 +10,7 @@ function readBotConfig(filename) {
   if (!fs.existsSync(filename)) return null;
   const config = JSON.parse(fs.readFileSync(filename, 'utf8'));
   if (config.version !== 1) throw new Error('Unsupported bot configuration');
-  for (const name of ['root', 'laplacePython', 'foulPlayPython', 'foulPlaySource', 'integrityFile']) {
+  for (const name of ['root', 'laplacePython', 'integrityFile']) {
     if (typeof config[name] !== 'string' || !path.isAbsolute(config[name]) || !fs.existsSync(config[name])) {
       throw new Error(`Missing bot configuration input: ${name}`);
     }
@@ -31,8 +31,6 @@ function runtimeOptions(config, workspace) {
         promise: (async () => ({ ok: (!base || (await base.promise).ok) &&
           await verifyInventory(config.integrityFile, controller.signal) }))() };
     },
-    foulPlay: { python: config.foulPlayPython, source: config.foulPlaySource,
-      runner: path.join(workspace, 'scripts/bots/foulplay.py') },
   };
 }
 

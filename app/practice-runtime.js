@@ -31,13 +31,12 @@ function childEnvironment(node = false) {
 }
 
 class PracticeRuntime extends EventEmitter {
-  constructor({ root, scripts, node = process.execPath, spawnChild = spawn, verify = verifyInWorker, timeoutMs = 120000, foulPlay = null, python = null, installed = null }) {
+  constructor({ root, scripts, node = process.execPath, spawnChild = spawn, verify = verifyInWorker, timeoutMs = 120000, python = null, installed = null }) {
     super();
     this.root = root;
     this.scripts = scripts;
     this.node = node;
     this.python = python || path.join(root, 'python/python.exe');
-    this.foulPlay = foulPlay;
     this.inspectInstalled = installed;
     this.opponent = 'laplace';
     this.spawnChild = spawnChild;
@@ -64,7 +63,6 @@ class PracticeRuntime extends EventEmitter {
     return { installed: this.installed(), state: this.state, opponent: this.opponent,
       opponents: [
         { id: 'laplace', name: 'Laplace', available: this.installed(), description: 'Search guided by a trained value model.' },
-        { id: 'foulplay', name: 'Foul Play', available: this.installed() && Boolean(this.foulPlay), description: 'Monte Carlo search over possible opposing teams.' },
       ],
       error: this.error || (inspection.code === 'invalid' ? 'Practice runtime needs repair. Rebuild or reinstall it.' : ''),
       preset: this.preset, battle: this.battle };
@@ -75,9 +73,8 @@ class PracticeRuntime extends EventEmitter {
   async start(preset) {
     const opponent = typeof preset === 'object' && preset !== null ? preset.opponent : 'laplace';
     preset = typeof preset === 'object' && preset !== null ? preset.preset : preset;
-    if (!['laplace', 'foulplay'].includes(opponent) || (opponent === 'foulplay' && !this.foulPlay)) {
-      return { ok: false, error: 'This opponent is not installed on the battle server.' };
-    }
+    // Foul Play runs through the practice inference API (api/), not this harness.
+    if (opponent !== 'laplace') return { ok: false, error: 'This harness only runs Laplace.' };
     if (!Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
     if (this.children.size || this.state === 'starting' || this.state === 'ready') {
       return { ok: false, error: 'Stop the current practice session before starting another.' };
@@ -89,7 +86,7 @@ class PracticeRuntime extends EventEmitter {
     this.state = 'starting';
     this.error = '';
     this.battle = null;
-    this.connection = { token: crypto.randomBytes(32).toString('hex'), human: 'Player', bot: opponent === 'laplace' ? 'Laplace' : 'FoulPlay', port: null };
+    this.connection = { token: crypto.randomBytes(32).toString('hex'), human: 'Player', bot: 'Laplace', port: null };
     this.changed();
     this.timer = setTimeout(() => this.fail('timeout', generation), this.timeoutMs);
     this.timer.unref?.();
@@ -110,9 +107,7 @@ class PracticeRuntime extends EventEmitter {
       if (event.type !== 'ready' || this.connection.port !== null) return;
       if (!Number.isInteger(event.port) || event.port < 1024 || event.port > 65535) return this.fail('start', generation);
       this.connection.port = event.port;
-      const spec = opponent === 'foulplay' ? this.foulPlay : null;
-      const bot = this.launch(spec?.python || this.python, ['-I', '-B', spec?.runner || path.join(this.scripts, 'runner.py'),
-        ...(spec ? ['--source', spec.source] : []),
+      const bot = this.launch(this.python, ['-I', '-B', path.join(this.scripts, 'runner.py'),
         '--port', String(event.port), '--token', this.connection.token,
         '--bot', this.connection.bot, '--human', this.connection.human,
         '--threads', String(PRESETS[preset])], false, generation);
@@ -162,8 +157,7 @@ class PracticeRuntime extends EventEmitter {
     if (event.type === 'ready' && this.state === 'starting') {
       if (event.protocol !== 1 || event.bot !== this.connection.bot || event.human !== this.connection.human ||
           event.format !== 'gen9randombattle' || event.threads !== PRESETS[this.preset] ||
-          (this.opponent === 'laplace' && (event.determinizations !== 8 || event.searchMs !== 150)) ||
-          (this.opponent === 'foulplay' && (event.opponent !== 'foulplay' || event.searchMs !== 100))) return this.fail('start', generation);
+          event.determinizations !== 8 || event.searchMs !== 150) return this.fail('start', generation);
       clearTimeout(this.timer);
       this.state = 'ready';
       this.changed();
