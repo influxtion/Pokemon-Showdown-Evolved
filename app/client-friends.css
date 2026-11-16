@@ -58,6 +58,12 @@ html.sd-launcher-shell [id^="room-view-friends"] {
     color: var(--sd-accent) !important;
   }
 
+  /* Shown by the launcher for the moment between opening the list and the server's page. */
+  .sd-page-loading {
+    margin: 0 !important;
+    color: var(--sd-text-2) !important;
+  }
+
   /* ----- Tab bar: All Friends / Spectate / Sent / Received / Help / Settings ----- */
 
   /* font-size: 0 drops the " / " separators; the links and labels set their own size. */

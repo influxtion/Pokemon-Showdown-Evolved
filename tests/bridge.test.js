@@ -210,9 +210,61 @@ test('only allowlisted actions with valid arguments reach the client', async () 
   assert.equal(await bridge.act('leave-room', { room: 'rooms' }), false);
   assert.equal(contents.codes.length, 0);
   assert.equal(await bridge.act('challenge', { user: 'Rival', format: 'gen9ou' }), true);
-  assert.match(contents.codes[0], /\("Rival", "gen9ou"\)$/);
+  assert.match(contents.codes[0], /\("Rival", "gen9ou"\);\n\}\)\(\)$/);
   assert.equal(await bridge.act('search', { format: 'gen9ou', team: null }), true);
   assert.match(contents.codes[1], /\("gen9ou", null\)$/);
+});
+
+test('Open list opens the friends page at once instead of waiting on the main menu', async () => {
+  const focused = [];
+  const joined = [];
+  const sent = [];
+  const html = [];
+  const app = {
+    rooms: { '': {}, lobby: {} },
+    focusRoom: (id) => focused.push(id),
+    send: (text) => sent.push(text),
+    // The client creates and focuses the page room itself, and asks the server for it.
+    joinRoom: (id) => { joined.push(id); app.rooms[id] = { $el: { html: (value) => html.push(value) } }; focused.push(id); },
+  };
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('friends', {}), true);
+  assert.deepEqual(joined, ['view-friends-all']);
+  assert.deepEqual(focused, ['view-friends-all'], 'never the main menu');
+  assert.deepEqual(sent, []);
+  assert.match(html[0], /Loading/, 'a loading line instead of "Page unavailable"');
+
+  // A friends page already open (any of its tabs) is focused, not opened twice.
+  delete app.rooms['view-friends-all'];
+  app.rooms['view-friends-settings'] = {};
+  focused.length = 0;
+  assert.equal(await bridge.act('friends', {}), true);
+  assert.deepEqual(focused, ['view-friends-settings']);
+  assert.deepEqual(joined, ['view-friends-all']);
+});
+
+test('Challenge a user opens that conversation, not the bare main menu', async () => {
+  const challenged = [];
+  const focused = [];
+  const classes = new Set(['sd-menu-community']);
+  const pm = { addClass() { pm.active = true; return pm; }, show: () => pm, data: () => false,
+    find: () => ({ removeClass() {}, scrollTop() {}, height: () => 0 }) };
+  const menu = {
+    challenge: (name, format) => { challenged.push([name, format]); menu.open = true; },
+    $pmBox: { find: (selector) => {
+      if (selector === '.pm-window-rival' && menu.open) return Object.assign([pm], { length: 1, ...pm });
+      return { length: 0, removeClass() {} };
+    } },
+  };
+  const app = { rooms: { '': menu }, focusRoom: (id) => focused.push(id) };
+  const document = { documentElement: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } } };
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app, document }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('challenge', { user: 'Rival', format: 'gen9ou' }), true);
+  assert.deepEqual(challenged, [['Rival', 'gen9ou']]);
+  assert.ok(classes.has('sd-menu-pm') && !classes.has('sd-menu-community'), 'the conversation view');
+  assert.equal(pm.active, true);
 });
 
 test('team shortcut opens the selected team and preserves existing edits or stale selections', async () => {

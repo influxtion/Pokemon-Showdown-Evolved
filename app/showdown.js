@@ -326,9 +326,12 @@ function cancelSearch() {
   return true;
 }
 
+// The client opens the user's message window with the challenge form in it; show that
+// conversation full size rather than the bare main menu, which the launcher hands to Home.
 function challenge(name, format) {
-  app.focusRoom('');
   app.rooms[''].challenge(name, format);
+  const userid = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!openPM(userid)) app.focusRoom('');
   return true;
 }
 
@@ -386,9 +389,19 @@ function login() {
   return true;
 }
 
+// Opens the friends pages straight away. Joining the page room creates and focuses it at once
+// (the client asks the server for its content), instead of showing the main menu until the
+// server's reply to /friends arrives. An already open friends page is simply focused.
 function friends() {
-  app.focusRoom('');
-  app.send('/friends');
+  const open = Object.keys(app.rooms).find((id) => /^view-friends(-|$)/.test(id));
+  if (open) {
+    app.focusRoom(open);
+    return true;
+  }
+  app.joinRoom('view-friends-all');
+  const room = app.rooms['view-friends-all'];
+  // The client shows "Page unavailable" until the page arrives, which replaces this.
+  if (room && room.$el) room.$el.html('<div class="pad"><p class="sd-page-loading">Loading…</p></div>');
   return true;
 }
 
@@ -1593,7 +1606,7 @@ class ShowdownBridge {
       case 'challenge': {
         const name = str(args.user, 18).trim();
         if (!name || /[\u0000-\u001f]/.test(name) || !isId(args.format)) return false;
-        code = call(challenge, name, args.format);
+        code = callWith([pmWindow, openPM], challenge, name, args.format);
         break;
       }
       case 'join':
