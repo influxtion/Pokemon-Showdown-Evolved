@@ -4,7 +4,8 @@
 // a real simulator, the real bridge (PracticeSession) and a real local API server and worker.
 // A scripted player challenges, plays "/choose default" every turn, and rematches once.
 //
-//   node tests/practice-api-live.cjs --runtime <foul play install dir>
+//   node tests/practice-api-live.cjs --runtime <foul play install dir>     (API on this computer)
+//   node tests/practice-api-live.cjs --url https://host [--key KEY]       (a deployed API)
 // The simulator comes from out/bots/config.json (npm run bots:setup) or vendor/laplace/dist.
 
 const assert = require('node:assert/strict');
@@ -12,12 +13,14 @@ const path = require('node:path');
 const { parseArgs } = require('node:util');
 const { WebSocket } = require('ws');
 const { PracticeSession } = require('../app/practice-session');
-const { LocalEngine } = require('../app/practice-engines');
+const { LocalEngine, CloudEngine } = require('../app/practice-engines');
 const { readBotConfig } = require('../app/bot-config');
 
 const root = path.join(__dirname, '..');
-const { values } = parseArgs({ options: { runtime: { type: 'string' }, preset: { type: 'string', default: 'quiet' } } });
-if (!values.runtime) throw new Error('Pass --runtime <dir> (a Foul Play install from api/install.js).');
+const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
+  preset: { type: 'string', default: 'quiet' } } });
+if (!values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
+const engine = values.url ? 'cloud' : 'local';
 const config = readBotConfig(path.join(root, 'out/bots/config.json'));
 const simulatorRoot = config?.root || path.join(root, 'vendor/laplace/dist');
 
@@ -57,23 +60,27 @@ async function finished(session) {
 }
 
 async function main() {
-  const local = new LocalEngine({ dir: path.resolve(values.runtime) });
-  assert.equal(local.status().installed, true, 'Foul Play is not installed in --runtime');
+  const local = values.runtime ? new LocalEngine({ dir: path.resolve(values.runtime) }) : null;
+  if (local) assert.equal(local.status().installed, true, 'Foul Play is not installed in --runtime');
+  const cloud = values.url ? new CloudEngine({ url: values.url, key: values.key || null }) : null;
   const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/laplace'),
-    engines: engine => { assert.equal(engine, 'local'); return local.target(); },
+    engines: requested => { assert.equal(requested, engine); return (local || cloud).target(); },
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }), installed: () => true });
   const decisions = [];
+  let thinking = false;
   session.on('change', status => {
-    if (status.battle?.elapsedMs !== undefined && !status.battle.thinking) decisions.push(status.battle.elapsedMs);
+    // One decision is one thinking -> chosen transition (a battle ending mid-search does not count).
+    const now = Boolean(status.battle?.thinking);
+    if (thinking && !now && !status.battle?.finished) decisions.push(status.battle.elapsedMs);
+    thinking = now;
   });
   const timeout = setTimeout(() => { console.error('Timed out', session.status()); process.exit(1); }, 600000);
   const ready = new Promise(resolve => session.once('ready', resolve));
-  const started = await session.start({ opponent: 'foulplay', preset: values.preset, engine: 'local' });
+  const started = await session.start({ opponent: 'foulplay', preset: values.preset, engine });
   assert.equal(started.ok, true, started.error);
   const connection = await ready;
   assert.equal(session.status().state, 'ready');
-  assert.equal(session.status().threads, 1);
-  console.log('Practice ready; playing two battles against Foul Play.');
+  console.log(`Practice ready (${engine}, ${session.status().threads} search thread(s)); playing two battles against Foul Play.`);
 
   const human = player(connection);
   const first = await human.battle();
@@ -94,7 +101,7 @@ async function main() {
 
   session.stop();
   human.socket.close();
-  await local.dispose();
+  await local?.dispose();
   clearTimeout(timeout);
   assert.equal(session.status().state, 'idle');
   console.log('OK');
