@@ -292,14 +292,16 @@ function createWindow() {
     openExternal(url);
     return { action: 'deny' };
   });
-  contents.on('will-navigate', (event, url) => {
-    if (!launcherUrl(url, RENDERER_DIR)) {
-      event.preventDefault();
-      openExternal(url);
-    }
-  });
+  // will-frame-navigate fires first, for every frame; cancelling it there means will-navigate
+  // never fires, so an outside link (Home's news, for one) is handed to the browser here.
   contents.on('will-frame-navigate', event => {
-    if (!event.isMainFrame || !launcherUrl(event.url, RENDERER_DIR)) event.preventDefault();
+    if (event.isMainFrame && launcherUrl(event.url, RENDERER_DIR)) return;
+    event.preventDefault();
+    if (event.isMainFrame) openExternal(event.url);
+  });
+  // Kept as a second guard; it only blocks, so a link can never open twice.
+  contents.on('will-navigate', (event, url) => {
+    if (!launcherUrl(url, RENDERER_DIR)) event.preventDefault();
   });
   contents.on('will-redirect', event => event.preventDefault());
   // Every launcher page change hides the client; play.html shows it again with fresh bounds.

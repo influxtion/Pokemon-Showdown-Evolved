@@ -6,7 +6,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
+// Links leave for the system browser; record them instead of opening anything.
+const openedExternally = [];
+shell.openExternal = async (url) => { openedExternally.push(url); };
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'showdown-desktop-test-'));
 app.setPath('userData', profile);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -100,6 +103,19 @@ app.whenReady().then(async () => {
   await run("document.getElementById('format').value = 'gen9ou'; document.getElementById('format').dispatchEvent(new Event('change')); document.getElementById('edit-team').click(); 0");
   await until(() => renderer.getURL().endsWith('/play.html'), 'selected team shortcut');
   assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: 1, name: 'Selected team', format: 'gen9ou' } });
+
+  // News: a post and All news open in the system browser, and Home stays put.
+  snapshot.news = [{ id: '123', date: 1763251200, title: 'Test post', text: 'Body', author: 'Staff' }];
+  await load('index.html');
+  await until(() => run("!!document.querySelector('#news a.post')"), 'news rendered');
+  await run("document.querySelector('#news a.post').click(); 0");
+  await until(() => openedExternally.length === 1, 'news post opens in the browser');
+  assert.deepEqual(openedExternally, ['https://pokemonshowdown.com/news/123']);
+  await run("document.querySelector('a[href=\"https://pokemonshowdown.com/news\"]').click(); 0");
+  await until(() => openedExternally.length === 2, 'All news opens in the browser');
+  assert.equal(openedExternally[1], 'https://pokemonshowdown.com/news');
+  assert.match(renderer.getURL(), /index\.html$/, 'Home stays open');
+  snapshot.news = [];
 
   // Chat room shortcuts: suggested from the busiest rooms until edited, then the player's own.
   snapshot.rooms = [
