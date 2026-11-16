@@ -361,6 +361,12 @@ test('the Community tab is always shown, opens its menu view and marks it curren
   assert.equal(list.tab('Community').getAttribute('aria-current'), 'page', 'the room list belongs to Community');
 });
 
+test('every friends page is one tab titled Friends', async () => {
+  const h = harness([session([chat('view-friends-sent', '[Friends] Sent', { kind: 'other' }), chat('view-friendsish', 'Not friends', { kind: 'other' })])]);
+  await h.settle();
+  assert.deepEqual(h.rows().map((r) => h.title(r)), ['Friends', 'Not friends']);
+});
+
 test('rooms follow Community in the client order', async () => {
   const h = harness([session([
     chat('lobby', 'Lobby'), chat('ladder', 'Ladder', { kind: 'ladder' }), chat('battles', 'Battles', { kind: 'battles' }),

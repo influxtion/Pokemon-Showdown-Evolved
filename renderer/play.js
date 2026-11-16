@@ -45,6 +45,10 @@ function renderRoom(session) {
     title = window.showdownNav ? window.showdownNav.matchup(room, me) : room.title;
     format = room.formatId || '';
     status = room.ended ? 'Finished' : Number.isInteger(room.turn) ? `Turn ${room.turn}` : '';
+  } else if (room && /^view-friends(-|$)/.test(room.id)) {
+    // The server titles each page "[Friends] Sent" and so on: one place, its page beside it.
+    title = 'Friends';
+    status = String(room.title || '').replace(/^\[Friends(?: List)?\]\s*/, '');
   } else if (room) {
     title = room.title;
   }

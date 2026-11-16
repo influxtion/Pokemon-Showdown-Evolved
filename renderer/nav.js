@@ -408,8 +408,11 @@
     const tabRow = (tab, isCurrent, unread) => ({
       title: TABS[tab].title, kind: TABS[tab].kind, tab, unread, current: onPlay && isCurrent,
     });
+    // The friends pages are one place however the server titles them ("[Friends] Sent").
+    const friendsPage = (r) => /^view-friends(-|$)/.test(r.id);
     const roomRow = (r) => ({
-      title: r.battle ? matchup(r, me) : r.title, sub: roomSub(r), kind: r.battle ? 'battle' : r.kind,
+      title: r.battle ? matchup(r, me) : friendsPage(r) ? 'Friends' : r.title, sub: roomSub(r),
+      kind: r.battle ? 'battle' : friendsPage(r) ? 'community' : r.kind,
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
