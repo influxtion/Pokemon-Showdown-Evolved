@@ -45,16 +45,17 @@ function pythonExecutable(pythonRoot, platform = process.platform) {
   return platform === 'win32' ? path.join(pythonRoot, 'python.exe') : path.join(pythonRoot, 'bin', 'python3');
 }
 
-function paths(dir) {
+function paths(dir, worker = WORKER) {
   const current = path.join(dir, 'current');
   return { current, staging: path.join(dir, 'staging'), toolchain: path.join(dir, 'toolchain'),
     python: pythonExecutable(path.join(current, 'python')), source: path.join(current, 'foul-play'),
-    manifest: path.join(current, 'install.json'), worker: WORKER };
+    manifest: path.join(current, 'install.json'), worker };
 }
 
-// What is installed under `dir`, without running anything.
-function inspect(dir) {
-  const where = paths(dir);
+// What is installed under `dir`, without running anything. `worker` overrides where the worker
+// script is read from (a packaged app keeps it outside its archive).
+function inspect(dir, worker = WORKER) {
+  const where = paths(dir, worker);
   let manifest = null;
   try { manifest = JSON.parse(fs.readFileSync(where.manifest, 'utf8')); } catch { /* Not installed. */ }
   const installed = Boolean(manifest && manifest.version === 1 && fs.existsSync(where.python) &&
@@ -181,7 +182,7 @@ async function toolchain(where, key, { signal, onFraction, onLog }) {
   return { env, private: true };
 }
 
-async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, keepToolchain = false } = {}) {
+async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, keepToolchain = false, worker = WORKER } = {}) {
   if (!dir) throw new Error('Choose an install directory.');
   dir = path.resolve(dir);
   const key = platformKey();
@@ -241,7 +242,7 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   await download(lock.randomSetsLicense, path.join(cache, 'randbats-LICENSE'), { signal });
 
   next('verify');
-  await run(python, ['-I', '-B', WORKER, '--check', '--source', path.join(where.staging, 'foul-play')], { env, signal, onLine: log });
+  await run(python, ['-I', '-B', worker, '--check', '--source', path.join(where.staging, 'foul-play')], { env, signal, onLine: log });
 
   next('finish');
   await fsp.rm(downloads, { recursive: true, force: true });
@@ -254,7 +255,7 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   await fsp.rm(old, { recursive: true, force: true });
   if (rust.private && !keepToolchain) await fsp.rm(where.toolchain, { recursive: true, force: true });
   report(1, 'Done');
-  return inspect(dir);
+  return inspect(dir, worker);
 }
 
 async function remove(dir) {

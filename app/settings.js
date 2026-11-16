@@ -6,7 +6,8 @@ const { randomUUID } = require('node:crypto');
 
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
-const DEFAULTS = Object.freeze({ theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
+const PRACTICE_ENGINES = new Set(['cloud', 'local']);
+const DEFAULTS = Object.freeze({ theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, practiceEngine: 'cloud' });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
 function valid(key, value) {
@@ -15,6 +16,7 @@ function valid(key, value) {
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';
+  if (key === 'practiceEngine') return PRACTICE_ENGINES.has(value);
   return false;
 }
 

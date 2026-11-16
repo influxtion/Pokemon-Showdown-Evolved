@@ -10,8 +10,8 @@ const { ShowdownBridge } = require('./showdown');
 const { Replays } = require('./replays');
 const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
-const { PracticeRuntime } = require('./practice-runtime');
-const { HostedPractice } = require('./hosted-practice');
+const { PracticeSession } = require('./practice-session');
+const { CloudEngine, LocalEngine } = require('./practice-engines');
 const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
 const { Logger } = require('./logging');
@@ -48,6 +48,9 @@ let replayImports = null;
 let replayReview = null;
 let practice = null;
 let practiceView = null;
+// Where Foul Play's moves are computed. Both live for the whole app, independent of windows.
+let cloudEngine = null;
+let localEngine = null;
 let choosingReplayImport = false;
 let undoingReplayImport = false;
 let replayDirty = false;
@@ -249,23 +252,27 @@ function createWindow() {
     : path.join(__dirname, '..', 'vendor', 'laplace', 'dist');
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
     : path.join(__dirname, '..', 'scripts', 'laplace');
+  // The simulator always runs here; only the bot's moves come from the cloud or local engine.
+  const engines = engine => (engine === 'local' ? localEngine : cloudEngine).target();
   try {
-    const service = process.env.SHOWDOWN_BOT_SERVICE_URL;
-    const botConfig = !service && !app.isPackaged ? readBotConfig(process.env.SHOWDOWN_BOT_CONFIG || path.join(__dirname, '../out/bots/config.json')) : null;
+    const botConfig = !app.isPackaged ? readBotConfig(process.env.SHOWDOWN_BOT_CONFIG || path.join(__dirname, '../out/bots/config.json')) : null;
     if (botConfig) practiceRoot = botConfig.root;
-    practice = service
-      ? new HostedPractice({ url: service, key: process.env.SHOWDOWN_BOT_SERVICE_KEY })
-      : new PracticeRuntime(botConfig ? runtimeOptions(botConfig, path.join(__dirname, '..')) : { root: practiceRoot, scripts: practiceScripts });
+    const checks = botConfig ? runtimeOptions(botConfig, path.join(__dirname, '..')) : {};
+    practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, engines,
+      ...(checks.verify ? { verify: checks.verify } : {}), ...(checks.installed ? { installed: checks.installed } : {}) });
   } catch {
-    practice = new PracticeRuntime({ root: practiceRoot, scripts: practiceScripts });
-    practice.installed = () => false;
+    practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, engines, installed: () => false });
     practice.state = 'failed';
-    practice.error = 'Battle configuration could not load. Check the server address and runtime setup.';
+    practice.error = 'Battle configuration could not load. Check the practice runtime setup.';
   }
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
     background: background(), onFailure: token => practice?.clientFailed(token) });
   practice.on('ready', connection => { logger.write('practice-ready'); practiceView?.open(connection); });
-  practice.on('failure', code => logger.write('practice-failed', { start: 1, exited: 2, timeout: 3, client: 4, integrity: 5 }[code] || 0));
+  practice.on('failure', code => {
+    logger.write('practice-failed', { start: 1, exited: 2, timeout: 3, client: 4, integrity: 5, engine: 6 }[code] || 0);
+    // Show the cloud server's real state right away instead of at the next periodic check.
+    if (code === 'engine' && practice?.engine === 'cloud') cloudEngine?.refresh();
+  });
   practice.on('change', state => { if (state.state === 'failed' || state.state === 'idle') practiceView?.close(); });
   let windowSaveTimer;
   const persistWindow = () => {
@@ -322,6 +329,11 @@ function createWindow() {
     (async () => {
       if (maintenance) return;
       if (replayDirty && !(await confirmDiscardReplay())) return;
+      if (localEngine?.installing) {
+        const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep installing', 'Cancel install and close'],
+          defaultId: 0, cancelId: 0, message: 'Foul Play is still installing.', detail: 'Closing cancels the install. You can start it again later.' });
+        if (result.response !== 1) return;
+      }
       if (settings.get('confirmOnClose') && practice?.battle && !practice.battle.finished) {
         const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep playing', 'Close app'],
           defaultId: 0, cancelId: 0, message: 'Close during practice?', detail: 'The practice battle will end.' });
@@ -345,8 +357,7 @@ function createWindow() {
     if (client && !client.webContents.isDestroyed()) client.webContents.close();
     replayReview?.close();
     replayReview = null;
-    if (practice?.dispose) practice.dispose();
-    else practice?.stop();
+    practice?.stop();
     practiceView?.close();
     practice = null;
     practiceView = null;
@@ -367,11 +378,32 @@ function isPracticeFrame(event) {
 ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
   const clientState = await practiceView.status();
-  return { ...practice.status(), clientState: clientState.state, clientError: clientState.error };
+  return { ...practice.status(), clientState: clientState.state, clientError: clientState.error,
+    engines: { selected: settings.get('practiceEngine'), cloud: cloudEngine.status(), local: localEngine.status() } };
 });
-ipcMain.handle('practice:start', (event, preset) => {
+ipcMain.handle('practice:start', (event, options) => {
+  if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
+  const { opponent, preset, engine } = options;
+  return practice.start({ opponent, preset, engine });
+});
+// Installing runs for minutes; the page follows progress through practice:status.
+ipcMain.handle('practice:install-local', event => {
   if (!isPracticeFrame(event)) return { ok: false };
-  return practice.start(preset);
+  if (localEngine.installing) return { ok: true };
+  localEngine.install().then(result => logger.write(result.ok ? 'foulplay-installed' : result.cancelled ? 'foulplay-install-cancelled' : 'foulplay-install-failed'));
+  return { ok: true };
+});
+ipcMain.handle('practice:cancel-install', event => {
+  if (!isPracticeFrame(event)) return { ok: false };
+  return localEngine.cancel();
+});
+ipcMain.handle('practice:remove-local', async event => {
+  if (!isPracticeFrame(event)) return { ok: false };
+  if (practice.engine === 'local' && ['starting', 'ready'].includes(practice.state)) return { ok: false, error: 'Stop the practice battle first.' };
+  const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep', 'Remove'], defaultId: 0, cancelId: 0,
+    message: 'Remove Foul Play from this computer?', detail: 'You can still play on the cloud server, or install it again later.' });
+  if (result.response !== 1) return { ok: false, cancelled: true };
+  try { return await localEngine.remove(); } catch { return { ok: false, error: 'Foul Play could not be removed. Close other apps using it and try again.' }; }
 });
 ipcMain.handle('practice:stop', async event => {
   if (!isPracticeFrame(event)) return { ok: false };
@@ -802,6 +834,9 @@ app.whenReady().then(async () => {
   windowState = new WindowState(app.getPath('userData'));
   replays = new Replays(app.getPath('userData'));
   replayImports = new ReplayImports(replays);
+  cloudEngine = new CloudEngine();
+  localEngine = new LocalEngine({ dir: process.env.SHOWDOWN_FOULPLAY_DIR || path.join(app.getPath('userData'), 'foulplay') });
+  app.on('will-quit', () => { localEngine?.dispose(); });
   try {
     showdexBundle = await showdex.registerAssets(electronSession.fromPartition(CLIENT_PARTITION));
   } catch {
