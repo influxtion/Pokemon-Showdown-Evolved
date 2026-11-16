@@ -34,7 +34,7 @@ function readClient() {
   // Showdown's 2D sprites (the gen 5 style, as its "BW sprites" option shows them), not the
   // 3D Pokémon HOME renders the Teambuilder uses for recent generations. Asking for them
   // through a gen 5 dex gives sprites/gen5 for every Pokémon, including newer ones.
-  const dex2d = Dex.forGen ? Dex.forGen(5) : undefined;
+  const dex2d = typeof Dex !== 'undefined' && Dex && typeof Dex.forGen === 'function' ? Dex.forGen(5) : undefined;
   const sprite = (set) => {
     try {
       const d = Dex.getTeambuilderSpriteData(set, dex2d);
