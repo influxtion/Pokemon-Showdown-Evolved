@@ -3,6 +3,9 @@ productName: Showdown Desktop
 directories:
   output: out/windows
 asar: true
+# Python reads the Foul Play worker directly, so it cannot live inside app.asar.
+asarUnpack:
+  - api/worker/**/*
 beforePack: scripts/verify-practice-package.js
 afterPack: scripts/verify-practice-package-after.js
 extraResources:
@@ -18,6 +21,9 @@ extraResources:
 files:
   - app/**/*
   - renderer/**/*
+  - api/*.js
+  - api/lock.json
+  - api/worker/**/*
   - vendor/showdex/LICENSE
   - vendor/showdex/SOURCE.md
   - vendor/showdex/manifest.json
