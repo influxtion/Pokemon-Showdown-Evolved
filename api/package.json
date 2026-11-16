@@ -1,0 +1,20 @@
+{
+  "name": "showdown-practice-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Practice bot inference API for Showdown Desktop. Computes Foul Play's moves for battles run by the client.",
+  "license": "MIT",
+  "main": "server.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "setup": "node install.js",
+    "status": "node install.js --status",
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
+  }
+}
