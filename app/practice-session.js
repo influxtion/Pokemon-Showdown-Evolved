@@ -50,7 +50,7 @@ class PracticeSession extends EventEmitter {
     this.generation = 0;
     this.state = 'idle';
     this.error = '';
-    this.preset = 'balanced';
+    this.preset = 'full';
     this.engine = 'cloud';
     this.connection = null;
     this.battle = null;
