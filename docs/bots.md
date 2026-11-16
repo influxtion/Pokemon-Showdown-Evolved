@@ -15,7 +15,7 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
-Both bots play Gen 9 Random Battle (`gen9randombattle`) as real Showdown players: they log in to a private simulator, accept the player's challenge, read the standard battle protocol and send standard `/choose` commands. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
+Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **Foul Play is the practice opponent**: its moves come from the practice API (`api/`), in the cloud or on the player's computer. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
 
 | | Foul Play | Laplace |
 | --- | --- | --- |
@@ -31,125 +31,132 @@ Both bots play Gen 9 Random Battle (`gen9randombattle`) as real Showdown players
 | Tera | Like any move | Only as the top pick |
 | Learned model | None | 368-feature MLP for near-ties |
 | Rejected choice | Session ends | Counted; server default used and surfaced |
-| Adapter | `scripts/bots/foulplay.py` | `scripts/laplace/runner.py` |
+| Adapter | `api/worker/foulplay_worker.py` (through the practice API) | `scripts/laplace/runner.py` (harness) |
 
-Presets set the engine's search threads and nothing else: **Quiet** 1, **Balanced** 2, **Full** 8 (default). They are CPU budgets, not difficulty levels.
+Presets set the engine's search threads and nothing else: **Quiet** 1, **Balanced** 2, **Full** 8 (default; a cloud server may cap it with `MAX_THREADS`). They are CPU budgets, not difficulty levels.
 
 ## 2. Where the bots run
 
-Players reach the bots only through the private **hosted battle service** (`scripts/bots/service.cjs`, deployed from `deploy/bots/`). Bots never run on a player's computer.
+The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`). The API runs in one of two places, and both use the same code, protocol and validation:
 
-For every session the service creates one `PracticeRuntime` (`app/practice-runtime.js`), which starts two child processes on the server:
+- **Cloud server** (default): a host deployed from `api/` ([api/README.md](../api/README.md)).
+- **This computer**: the launcher installs Foul Play into its profile with `api/install.js` and serves the same API on `127.0.0.1`, with a random key generated at each launch.
 
-- a **simulator**: the pinned Showdown server (`scripts/laplace/server.cjs`), bound to `127.0.0.1` on an OS-chosen port and protected by a fresh 256-bit token;
-- a **bot**: `python -I -B runner.py` (Laplace) or `foulplay.py --source <checkout>` (Foul Play), told the port, token, both names and the thread count.
+For every session the launcher's `PracticeSession` (`app/practice-session.js`):
 
-The same `PracticeRuntime` can also run inside the desktop app. That path is kept for testing and for future self-hosting work, not as a player feature ([section 8](#development-and-self-hosting-harness)).
+1. starts the **simulator**, the pinned Showdown server (`scripts/laplace/server.cjs`), bound to `127.0.0.1` on an OS-chosen port and protected by a fresh 256-bit token;
+2. creates an **API session**, for which the server starts one Foul Play **worker** process (`api/worker/foulplay_worker.py`), and opens its socket;
+3. connects a **bridge** to the simulator as `FoulPlay`. The bridge accepts the player's challenge, forwards that battle room's frames to the API and sends back the choices it returns.
 
 ```mermaid
 sequenceDiagram
   participant V as Practice view (player)
-  participant M as Launcher main process
-  participant G as Battle service
-  participant S as Simulator (server loopback)
-  participant B as Bot process
-  M->>G: POST /v1/sessions {opponent, preset} (Bearer key)
-  G->>S: spawn server.cjs --port 0 --token T
-  S-->>G: {"type":"ready","port":P}
-  G->>B: spawn bot --port P --token T --human Player --bot NAME --threads N
-  B->>S: WebSocket /showdown/websocket?token=T
-  S-->>B: |challstr|…
-  B->>S: |/trn NAME,0,
-  S-->>B: |updateuser| NAME|1|…
-  B-->>G: {"type":"ready",…} on stdout (checked against the request)
-  M->>G: GET /v1/sessions/:id (polled every second)
-  M->>V: load /s/:id/practice-client.html
-  V->>G: WebSocket /s/:id/websocket
-  G->>S: proxied to ws://127.0.0.1:P/showdown/websocket?token=T
-  V->>S: |/trn Player,0,  then |/utm null and |/challenge NAME, gen9randombattle
-  S-->>B: |pm| Player| NAME|/challenge gen9randombattle|gen9randombattle…
-  B->>S: |/utm null  and  |/accept Player
+  participant M as Launcher main process (bridge)
+  participant S as Simulator (player's loopback)
+  participant A as Practice API (cloud or 127.0.0.1)
+  participant W as Foul Play worker
+  M->>S: spawn server.cjs --port 0 --token T
+  S-->>M: {"type":"ready","port":P}
+  M->>A: POST /v1/sessions {bot: foulplay, preset}
+  A->>W: spawn foulplay_worker.py --threads N
+  W-->>A: {"type":"ready",…}
+  M->>A: WS /v1/sessions/:id/socket
+  A-->>M: {"type":"ready",…}
+  M->>S: |/trn FoulPlay,0,
+  M->>V: load practice-client.html?port=P&token=T
+  V->>S: |/trn Player,0,  then |/challenge FoulPlay, gen9randombattle
+  S-->>M: |pm| Player| FoulPlay|/challenge gen9randombattle|…
+  M->>S: |/utm null and |/accept Player
   loop each decision
-    S-->>B: >battle-gen9randombattle-N  |request|{…}
-    B-->>G: {"type":"thinking",…}
-    B->>S: battle-gen9randombattle-N|/choose …
-    B-->>G: {"type":"turn",…}
+    S-->>M: >battle-gen9randombattle-N |request|{…}
+    M->>A: {"type":"frame","data":">battle-…"}
+    A->>W: frame on stdin
+    W-->>A: {"type":"choice","choice":"/choose move …","rqid":"3"}
+    A-->>M: {"type":"choice",…}
+    M->>S: battle-gen9randombattle-N|/choose move …|3
   end
-  S-->>B: |win|… or |tie
-  B-->>G: {"type":"end","result":…}
+  S-->>M: |win|… or |tie
 ```
+
+The Laplace harness (`app/practice-runtime.js`) still starts the simulator and the Laplace runner as two child processes on one machine. It is used by development tests only ([section 8](#8-running-and-hosting)).
 
 ## 3. Protocols
 
-Four layers sit between the player and a decision. Only the first crosses the internet.
+Four layers sit between the player and a decision. With the cloud server, only the first crosses the internet.
 
-### 3.1 Launcher ↔ battle service (HTTPS)
+### 3.1 Launcher ↔ practice API (HTTPS + WebSocket)
 
 | Route | Purpose |
 | --- | --- |
 | `GET /healthz` | Process health only |
-| `GET /v1/bots` | Available opponents |
-| `POST /v1/sessions` | Body `{"opponent": "laplace" \| "foulplay", "preset": "quiet" \| "balanced" \| "full"}` → session ID (random 256-bit hex) |
-| `GET /v1/sessions/:id` | Startup, failure, turn and result status |
-| `DELETE /v1/sessions/:id` | Stop and clean up |
-| `GET /s/:id/practice-client.html` | The patched classic client and its assets; the session ID is the capability |
-| `WS /s/:id/websocket` | One player socket, proxied to that session's simulator |
+| `GET /v1/info` | Bots, presets after the server's thread cap, limits and capacity |
+| `POST /v1/sessions` | Body `{"bot": "foulplay", "preset": "quiet" \| "balanced" \| "full"}` → session ID (random 256-bit hex) and thread count |
+| `GET /v1/sessions/:id` | State, battles and decisions |
+| `DELETE /v1/sessions/:id` | Stop the worker and clean up |
+| `WS /v1/sessions/:id/socket` | Frames in (`{"type":"frame","data":…}`), `ready`, `battle`, `thinking`, `choice`, `end` and `error` out |
 
-- `/v1` calls need `Authorization: Bearer <operator key>`; the key stays in the launcher's main process. No CORS; `Host` and `Origin` must match the configured origin. Unknown body keys or query strings are rejected.
-- The gateway forwards text frames only. A binary frame or more than 40 messages per second closes the socket (code 1008). Simulator frames are capped at 1 MiB.
-- Sessions end after 1 hour total, 5 minutes idle, 2 minutes without a client, or 10 s after the client disconnects. Excess sessions get HTTP 429.
+- Anonymous by default; an `API_KEY` makes every `/v1` call and socket need `Authorization: Bearer <key>`. The local server always uses a per-launch key.
+- Only frames for a `battle-gen9randombattle-N` room are accepted, up to 256 KiB each. Bursts of 200 frames, then 40 per second. Requests with an `Origin` header (browsers) cannot open a socket.
+- A choice must be `/choose move <id>`, optionally followed by ` terastallize`, or `/switch <1-6>`. The server and the launcher both check this before anything reaches the simulator.
+- Per client network: 1 concurrent session, and session creation in bursts of 6 refilling at 30 per hour. Server-wide: `MAX_SESSIONS` and `MAX_THREADS`. Sessions end after 2 hours, 15 minutes idle, 1 minute without a socket, 5,000 decisions, or when the socket closes. Full details are in [api/README.md](../api/README.md#rate-limits).
 
-### 3.2 Showdown WebSocket protocol (player and bot ↔ simulator)
+### 3.2 Showdown WebSocket protocol (player and bridge ↔ simulator)
 
-Both the player's client and the bot speak the standard [Pokémon Showdown protocol](https://github.com/smogon/pokemon-showdown/blob/master/PROTOCOL.md) to the same simulator. Client → server frames are `ROOMID|TEXT` (empty room for global commands). Server → client frames are newline-separated `|TYPE|…` lines, prefixed with `>ROOMID` when they belong to a room.
+Both the player's client and the bridge speak the standard [Pokémon Showdown protocol](https://github.com/smogon/pokemon-showdown/blob/master/PROTOCOL.md) to the same simulator. Client → server frames are `ROOMID|TEXT` (empty room for global commands). Server → client frames are newline-separated `|TYPE|…` lines, prefixed with `>ROOMID` when they belong to a room.
 
 The simulator accepts a WebSocket only from `127.0.0.1`, with the exact `Host` header and the exact path `/showdown/websocket?token=<session token>`; every other HTTP request gets 404. There is no login server: unregistered names are accepted.
 
 | Step | Direction | Messages |
 | --- | --- | --- |
 | Log in | server → bot | `\|challstr\|…` |
-| | bot → server | `\|/trn Laplace,0,` or `\|/trn FoulPlay,0,` |
-| | server → bot | `\|updateuser\| Laplace\|1\|…` (the `1` means named); the bot is now ready |
-| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` and `\|/challenge Laplace, gen9randombattle` (sent by `vendor/laplace/client-bootstrap.js`) |
-| | server → bot | `\|pm\| Player\| Laplace\|/challenge gen9randombattle\|gen9randombattle\|…` |
+| | bot → server | `\|/trn FoulPlay,0,` (bridge) or `\|/trn Laplace,0,` (harness) |
+| | server → bot | `\|updateuser\| FoulPlay\|1\|…` (the `1` means named); the bot is now ready |
+| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` and `\|/challenge FoulPlay, gen9randombattle` (sent by `vendor/laplace/client-bootstrap.js`) |
+| | server → bot | `\|pm\| Player\| FoulPlay\|/challenge gen9randombattle\|gen9randombattle\|…` |
 | | bot → server | `\|/utm null` then `\|/accept Player` |
-| Battle start | server → both | `>battle-gen9randombattle-N`, `\|init\|battle`, `\|title\|Player vs. Laplace`, team and `\|request\|{JSON}` |
+| Battle start | server → both | `>battle-gen9randombattle-N`, `\|init\|battle`, `\|title\|Player vs. FoulPlay`, team and `\|request\|{JSON}` |
 | Decision | server → bot | `\|request\|{JSON}` with the legal options and request ID (`rqid`); `"wait": true` means no decision is due |
-| | bot → server | Laplace (poke-env): `battle-…\|/choose move <moveid>[ terastallize]` or `\|/choose switch <species>` · Foul Play: `battle-…\|/choose move <moveid>[ terastallize]\|<rqid>` or `\|/switch <slot>\|<rqid>` |
+| | bot → server | Foul Play: `battle-…\|/choose move <moveid>[ terastallize]\|<rqid>` or `\|/switch <slot>\|<rqid>` · Laplace (poke-env): `battle-…\|/choose move <moveid>[ terastallize]` or `\|/choose switch <species>` |
 | Rejection | server → bot | `\|error\|[Invalid choice] …` or `\|error\|[Unavailable choice] …` |
 | Turn | server → both | Event lines (`\|move\|`, `\|switch\|`, `\|-damage\|`, `\|-terastallize\|` …) then `\|turn\|N` |
 | End | server → both | `\|win\|<name>` or `\|tie`, then the room closes (`\|deinit`) |
 
-Both adapters accept a challenge only if every field matches: sender `Player`, recipient the bot's own name, format `gen9randombattle`. Laplace additionally requires the battle room to appear within 15 s of accepting and its `|title|` to name exactly those two players. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped, so the battle timer stays off.
+The bridge accepts a challenge only if every field matches: sender `Player`, recipient `FoulPlay`, format `gen9randombattle`, and no battle in progress. It adopts only the battle room that opens after it accepts, and stops forwarding at `|win|` or `|tie`. Laplace additionally requires the battle room to appear within 15 s of accepting and its `|title|` to name exactly those two players. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped by the worker, so the battle timer stays off.
 
 ### 3.3 Bot process ↔ supervisor (stdio)
 
-The supervisor (`PracticeRuntime`) starts each bot with command-line arguments and reads **one JSON object per line** from its stdout. stderr carries upstream logs and is never parsed. Writing `stop` to stdin, or closing stdin, ends the process; Laplace also stops on SIGINT/SIGTERM.
+Each bot process writes **one JSON object per line** to stdout. stderr carries upstream logs and is never parsed or logged.
 
-| Argument | Laplace | Foul Play |
-| --- | --- | --- |
-| `--port` | 1024–65535 | 1024–65535 |
-| `--token` | 32–128 hex chars | exactly 64 hex chars |
-| `--bot` / `--human` | `Laplace` / `Player` (optional 10-hex suffix) | `FoulPlay` / `Player` |
-| `--threads` | 1, 2, 4 or 8 | 1, 2 or 8 |
-| other | `--check` verifies the runtime and exits | `--source <absolute path to checkout>` |
+**Foul Play worker** (supervised by the API server). Arguments: `--source <absolute Foul Play path> --threads <1-16>`, or `--check` to verify the runtime and exit. stdin carries `{"type":"frame","data":…}` lines; `{"type":"stop"}` or closing stdin ends it.
 
 | Event | Fields | Meaning |
 | --- | --- | --- |
-| `ready` | Laplace: `protocol: 1, bot, human, format, threads, determinizations: 8, searchMs: 150` · Foul Play: `protocol: 1, opponent: "foulplay", bot, human, format, threads, searchMs: 100` | Logged in. The supervisor fails the session unless every field matches what it requested. |
+| `ready` | `protocol: 1, bot: "foulplay", format, threads, searchMs: 100` | Loaded. The server ends the session unless protocol, bot and threads match |
+| `battle` | `room` | `\|init\|battle` seen; Foul Play is playing this room |
+| `thinking` | `room, turn` | A decision is due |
+| `choice` | `room, turn, choice, rqid, elapsedMs` | Foul Play's move, already checked against the choice grammar |
+| `end` | `room, result` | `win`, `loss` or `tie`, from the bot's side |
+| `checked` | `protocol, engine` | `--check` only |
+| `error` | `code: "engine-failed"` | Fatal, including a rejected choice |
+
+**Laplace runner** (supervised by `PracticeRuntime`, harness only). Arguments: `--port` 1024–65535, `--token` 32–128 hex characters, `--bot Laplace`, `--human Player` (optional 10-hex suffix), `--threads` 1, 2, 4 or 8, and `--check` to verify the runtime. Writing `stop` to stdin, closing stdin, SIGINT or SIGTERM ends it.
+
+| Event | Fields | Meaning |
+| --- | --- | --- |
+| `ready` | `protocol: 1, bot, human, format, threads, determinizations: 8, searchMs: 150` | Logged in. The supervisor fails the session unless every field matches what it requested. |
 | `battle` | `room` | Challenge accepted, battle room opened |
 | `thinking` | `room, turn` | A decision is due |
-| `turn` | `room, turn, elapsedMs`; Laplace adds `visits, worlds, fallback` | A choice was sent |
-| `recovery` | `room, kind` (`rejected-choice` or `default-choice`), `rejectedChoices, defaultChoices` | Laplace only: the server rejected a choice or poke-env sent `/choose default` |
+| `turn` | `room, turn, elapsedMs, visits, worlds, fallback` | A choice was sent |
+| `recovery` | `room, kind` (`rejected-choice` or `default-choice`), `rejectedChoices, defaultChoices` | The server rejected a choice or poke-env sent `/choose default` |
 | `end` | `room, result` (`win`, `loss` or `tie`, from the **player's** side) | Battle finished |
-| `checked` | `protocol, runtime` | Laplace `--check` only |
-| `error` | `code` | Fatal. Laplace codes: `runtime-invalid`, `connection-failed`, `session-failed`, `invalid-message`, `login-rejected`, `login-lost`, `battle-lost`, `disconnected`. Foul Play: `foulplay-session-failed`. |
+| `checked` | `protocol, runtime` | `--check` only |
+| `error` | `code` | Fatal: `runtime-invalid`, `connection-failed`, `session-failed`, `invalid-message`, `login-rejected`, `login-lost`, `battle-lost`, `disconnected` |
 
-The supervisor ignores events whose `room` is not `battle-gen9randombattle-<digits>`, clamps numbers to sane ranges, and discards late events from an earlier session with a generation counter. The simulator speaks the same framing: its only event is `{"type":"ready","port":P}`.
+Supervisors ignore events whose `room` is not `battle-gen9randombattle-<digits>` and clamp numbers to sane ranges. The simulator speaks the same framing: its only event is `{"type":"ready","port":P}`.
 
 ### 3.4 Network confinement
 
-Both adapters install a Python audit hook (`local_socket_only` in `runner.py`, reused by `foulplay.py`) that raises on any socket bind, connect, send or DNS lookup whose address is not `127.0.0.1`. They open a raw TCP socket to the simulator first and hand it to the WebSocket library, so no proxy setting or redirect can dial elsewhere. The simulator itself replaces outbound `Socket.connect` and `fetch` with functions that throw.
+The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The Laplace runner installs the same kind of hook (`local_socket_only` in `runner.py`) and opens a raw TCP socket to the simulator first, so no proxy setting or redirect can dial elsewhere. The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
 
 ## 4. The shared search engine: poke-engine MCTS
 
@@ -194,14 +201,14 @@ P(a) = \sum_{w=1}^{N} \frac{1}{N}\cdot\frac{\mathrm{visits}_w(a)}{\mathrm{total\
 \text{candidates} = \{\, a : P(a) \ge 0.75 \max P \,\}
 $$
 
-### Adapter (`scripts/bots/foulplay.py`)
+### Worker (`api/worker/foulplay_worker.py`)
 
-- **Configuration:** `gen9randombattle`; search time 100 ms (team preview too); parallelism 1; threads 1 / 2 / 8 by preset; no Smogon stats download, no log file, no saved replays.
-- **No orphaned processes.** Upstream searches worlds in a `ProcessPoolExecutor`; the adapter substitutes a `ThreadPoolExecutor`, so all search runs inside the one owned Python process.
-- **Connection and challenges.** Loopback-only, logs in as `FoulPlay`, accepts only the matching challenge from `Player`, then runs upstream `pokemon_battle` to completion (section 3.2). `hf`, `gg` and `/timer on` are dropped.
-- **Never silently weakened.** `[Invalid choice]` or `[Unavailable choice]` ends the session instead of falling back to random play. A second battle in one session is an error.
-- **Telemetry and shutdown.** `thinking` on a non-wait `|request|`, `turn` with elapsed ms when a choice is sent (section 3.3); `stop` on stdin or a closed pipe exits immediately.
-- Pinned Python packages are recorded in `scripts/bots/lock.json`. No claim is made about upstream ladder strength at this budget.
+- **Configuration:** `gen9randombattle`; search time 100 ms (team preview too); parallelism 1; threads from the preset, capped by the server's `MAX_THREADS` (Quiet 1, Balanced 2, Full 8 on this computer); no Smogon stats download, no log file, no saved replays.
+- **No orphaned processes.** Upstream searches worlds in a `ProcessPoolExecutor`; the worker substitutes a `ThreadPoolExecutor`, so all search runs inside the one owned Python process.
+- **Connection.** Foul Play's websocket client is replaced by a stdio link. Upstream `pokemon_battle` runs unchanged, starting at the first `|init|battle` frame it receives. Rematches reuse the same worker. `hf`, `gg` and `/timer on` are dropped; only choices matching the grammar are emitted.
+- **Never silently weakened.** `[Invalid choice]` or `[Unavailable choice]` ends the session instead of falling back to random play.
+- **Telemetry and shutdown.** `thinking` on a non-wait `|request|`, and `choice` with elapsed ms (section 3.3). `stop` on stdin or a closed pipe exits immediately.
+- Pins (source tarball, packages, engine, set data, Python, Rust) are recorded in `api/lock.json`. No claim is made about upstream ladder strength at this budget.
 
 ## 6. Laplace
 
@@ -286,7 +293,7 @@ The runner refuses to start if versions or the model hash differ.
 - **Measured build:** Python 3.12.16 Windows x64; poke-engine 0.0.47 for `x86_64-pc-windows-gnu` (Rust 1.96.0, GCC 13.2.0); runtime manifest SHA-256 `e83e0864…`, engine binary `55da8bd3…`, value model `502a47a5…`.
 - **Cold start:** 3.19 s median to a loaded agent, 2.22 s of it Torch and feature imports. The first decision then takes 1.41 s median.
 - **Value re-rank:** skipped by all 180 warm decisions (no near-tie). Forced on a three-way tie, it costs 16–31 ms over 45–87 successor states; the net's forward pass is under 0.4 ms of that.
-- **What it means for hosting.** Search is time-limited, so fewer CPUs give similar wall times but shallower search: Full collects 46% fewer visits on 4 CPUs and 68% fewer on 2. The service's initial cap of 4 CPUs per container therefore limits Full. Size the real service VM by measurement.
+- **What it means for hosting.** Search is time-limited, so fewer CPUs give similar wall times but shallower search: Full collects 46% fewer visits on 4 CPUs and 68% fewer on 2. A server's CPU cap therefore limits Full, which is one reason the practice API caps threads (`MAX_THREADS`). Size the API host by measurement.
 - **What it does not mean.** Timings and visits measure compute cost only. Playing strength needs controlled matches with paired seeds and uncertainty intervals; none have been completed.
 
 Reproduce with the staged runtime and the pinned Laplace checkout (writes ignored `out/laplace/benchmark.json`; `--repeats 1` for a short run):
@@ -301,68 +308,53 @@ Reproduce with the staged runtime and the pinned Laplace checkout (writes ignore
 
 | Component | Pin |
 | --- | --- |
-| Laplace | `8b4173d`, MIT; model SHA-256 `502a47a5…`; poke-env 0.15.0, NumPy 2.4.6, Torch 2.12.0+cpu |
+| Foul Play | `8f541f8`, GPL-3.0, source tarball SHA-256 in `api/lock.json`; poke-engine 0.0.48 built with Terastallization; packages in `api/lock.json` |
+| Foul Play runtime | Standalone Python 3.12.16 (`python-build-standalone` 20261026, per platform, SHA-256 pinned); Rust 1.96.0 via rustup 1.29.3 if no `cargo` is found |
+| Random-battle data (Foul Play) | `pkmn/randbats` `684abfa`, SHA-256 in `api/lock.json` |
+| Laplace (harness) | `8b4173d`, MIT; model SHA-256 `502a47a5…`; poke-env 0.15.0, NumPy 2.4.6, Torch 2.12.0+cpu |
 | poke-engine (Laplace) | 0.0.47 from hashed sdist, Rust 1.96.0, Gen 9 Tera feature |
-| Foul Play | `8f541f8`, GPL-3.0; poke-engine 0.0.48; separate Python environment (`scripts/bots/lock.json`) |
-| Random-battle data (Foul Play) | `pkmn/randbats` `684abfa`, SHA-256 in `scripts/bots/lock.json` |
 | Showdown simulator | `smogon/pokemon-showdown` `a9caa4c`, MIT |
 | Classic client (practice view) | `smogon/pokemon-showdown-client` `49b5420`, AGPL-3.0, recorded patches |
-| Python | 3.12.16 (Windows standalone for the harness; `python:3.12.16-slim-bookworm` in the service image) |
 
-Source, license and build records: [`vendor/laplace/SOURCE.md`](../vendor/laplace/SOURCE.md). Manifests detect corruption; they are not publisher signatures.
+Source, license and build records: [`vendor/laplace/SOURCE.md`](../vendor/laplace/SOURCE.md) and [`api/lock.json`](../api/lock.json). Hashes detect corruption; they are not publisher signatures.
+
+### Practice API
+
+Server setup, configuration, rate limits, deployment (Docker Compose with Caddy, or systemd) and the full protocol are in [api/README.md](../api/README.md). In short:
+
+```sh
+cd api && npm ci --omit=dev && npm run setup && npm start
+```
+
+`npm run setup` installs Foul Play into `api/runtime` with the same installer as the app's **Install Foul Play** button: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
+
+To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, which is empty until a server is deployed; the Practice page then says the cloud is not set up and offers **This computer**. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
 
 ### Development setup
 
-Players never run these steps. Prerequisites: Node 24, Python 3.12, Git, a Rust toolchain, and on Windows the compiler listed in `vendor/laplace/SOURCE.md`.
+The practice simulator and client come from the Laplace runtime build. Prerequisites: Node 24, Python 3.12, Git, a Rust toolchain, and on Windows the compiler listed in `vendor/laplace/SOURCE.md`.
 
 ```powershell
 npm ci
-npm run build:practice      # Laplace runtime under ignored vendor/laplace/dist/
+npm run build:practice      # Laplace runtime (simulator, client, Laplace) under ignored vendor/laplace/dist/
 npm run bots:setup -- --runtime "$PWD\vendor\laplace\dist"
+npm run api:setup           # Foul Play into ignored api/runtime/
 ```
 
-`bots:setup` clones pinned Foul Play, builds its engine in its own Python environment, downloads hash-checked set data, checks both engines, and writes `out/bots/config.json` and `integrity.json` (override with `SHOWDOWN_BOT_CONFIG`). Do not run it while sessions are active. Generated files stay out of Git.
-
-### Development and self-hosting harness
-
-The desktop app can start a `PracticeRuntime` itself, with simulator and bot on the developer's machine. This path is **not a player feature**. It is kept to prove the bots work end to end and as the base for hosting the service ourselves. It uses the protocols in section 3 without the HTTPS layer. A development launcher uses it whenever `SHOWDOWN_BOT_SERVICE_URL` and `SHOWDOWN_BOT_SERVICE_KEY` are unset.
-
-To exercise the real service path instead, run the service and point the launcher at it:
-
-```powershell
-# Terminal 1
-$env:BOT_SERVICE_KEY = '<random secret, at least 32 characters>'
-npm run bots:serve                     # listens on 127.0.0.1:8787
-# Terminal 2
-$env:SHOWDOWN_BOT_SERVICE_URL = 'http://127.0.0.1:8787'
-$env:SHOWDOWN_BOT_SERVICE_KEY = '<the same secret>'
-npm start
-```
+On Linux, `npm run bots:setup -- --build-linux --python python3` builds the simulator, client and Laplace environment under `out/bots/`. `bots:setup` writes `out/bots/config.json` and `integrity.json` (override with `SHOWDOWN_BOT_CONFIG`); a development launcher uses that runtime's simulator. Generated files stay out of Git.
 
 | Command | Covers |
 | --- | --- |
-| `npm run test:practice` | A real Laplace battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup |
-| `npm run test:bots` | Real Electron games for both bots, direct and through the service, both themes and window sizes |
-| `tests/bots-games.py` (run with the runtime's Python) | Two complete games per bot against a heuristic player; result agreement and pipe shutdown |
-| `npm run smoke:practice-packaged` | A harness game inside an unpacked package, including a relocated copy |
+| `npm test` | Includes the bridge (`tests/practice-session.test.js`) and the API server and client with a fake worker (`api/test/`) |
+| `npm run test:practice:api` | Two real games against Foul Play through a local API server, without Electron. `node tests/practice-api-live.cjs --url <server> [--key …]` runs the same games against a deployed server |
+| `npm run test:practice` | A real Foul Play battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup (`BOT_TEST_ENGINE=local` or `cloud`) |
+| `npm run test:bots` | The desktop suite with the engine on this computer and through a separate API server |
+| `tests/bots-games.py` (run with the Laplace runtime's Python) | Two complete Laplace harness games against a heuristic player; result agreement and pipe shutdown |
+| `npm run smoke:practice-packaged` | A Laplace harness game inside an unpacked package, including a relocated copy |
 
 All of these use disposable profiles and private servers, never the player's account or the public server. They are integration checks, not strength benchmarks. Test windows run with `SHOWDOWN_DESKTOP_BACKGROUND=1` (non-focusing, transparent, ignores the mouse).
 
-### Deploying the service
+### Not yet verified
 
-`deploy/bots/Dockerfile` builds a Linux x64 image (both engines compiled in it); `deploy/bots/compose.yaml` runs one service behind Caddy HTTPS.
-
-```sh
-export BOT_DOMAIN=bots.example.org
-export BOT_SERVICE_KEY='<new long random secret>'
-export BOT_MAX_SESSIONS=1
-docker compose -f deploy/bots/compose.yaml build
-docker compose -f deploy/bots/compose.yaml up -d
-```
-
-- Point DNS at the host and open only TCP 80 and 443. Keep 8787 and simulator ports private. `BOT_SERVICE_ORIGIN` is the exact external HTTPS origin, and the proxy must preserve `Host` (the supplied Caddyfile does, and supports WebSocket upgrades).
-- Caddy has no access log because session URLs are capability tokens.
-- Testers set `SHOWDOWN_BOT_SERVICE_URL=https://bots.example.org` and the shared key. Never put the key in a public build.
-- Initial caps: 1 session, 4 CPUs, 4 GiB, 128 processes. These are starting limits, not measured recommendations (see section 7).
-- One replica only: sessions live in memory, so a restart ends every battle. There is no persistence, resume, queue, horizontal routing, per-user credentials or quotas yet.
-- **Not yet verified:** the Linux image build, Caddy certificate issuance, cloud firewall rules and Linux native-library portability. Do this before inviting anyone.
+- The Docker image build and Caddy certificate issuance (`api/deploy/`), and the in-app install on Windows and macOS. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
+- Server sizing: a decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.

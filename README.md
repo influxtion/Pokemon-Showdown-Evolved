@@ -13,7 +13,7 @@ Showdown Desktop is a fan project. It is not made by or affiliated with Pokémon
 - **Stats.** Your ladder record across every format: rating, win rate, wins, losses and GXE.
 - **Replay notes.** Save replays, write notes on them, rewatch them in the app, and back them up to a file.
 - **Showdex.** Optionally turn on the [Showdex](https://github.com/doshidak/showdex) damage calculator inside battles.
-- **Practice bots.** Play Gen 9 Random Battles against two bots, Laplace and Foul Play. The bots run on a separate private server and never touch your Showdown account or the public ladder. This isn't open to players yet because that server hasn't gone live.
+- **Practice bot.** Play Gen 9 Random Battles against Foul Play on a private battle server inside the app. It never touches your Showdown account or the public ladder. Foul Play's moves come from a cloud server by default, or you can install it on your computer with one click and play offline. The cloud server hasn't gone live yet.
 - **Light and dark themes.** Pick one in Settings or let the app follow Windows.
 
 The app never searches for battles, challenges anyone or plays on your account by itself.
@@ -21,7 +21,8 @@ The app never searches for battles, challenges anyone or plays on your account b
 ## For developers
 
 - [docs/design.md](docs/design.md) covers how the app is built, how to run it from source, testing and packaging.
-- [docs/bots.md](docs/bots.md) explains how the practice bots work and how to run and host them.
+- [docs/bots.md](docs/bots.md) explains how the practice bots work.
+- [api/README.md](api/README.md) covers the practice API: running it, rate limits, protocol and deployment.
 
 ## License
 
