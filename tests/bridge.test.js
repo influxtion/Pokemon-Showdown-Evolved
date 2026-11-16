@@ -72,6 +72,38 @@ test('snapshot bounds untrusted client data and rejects malformed fields', async
   assert.equal(state.rooms[1].desc.length, 200);
 });
 
+test('team sprites are worked out once per team, not on every Home read', async () => {
+  const unpacked = [];
+  const window = {};
+  const Storage = {
+    teams: [{ name: 'A', format: 'gen9ou', team: 'packed-a' }, { name: 'B', format: 'gen9ou', team: 'packed-b' }],
+    unpackTeam: (packed) => { unpacked.push(packed); return [{ species: packed }]; },
+  };
+  Object.assign(window, {
+    app: { rooms: { '': { curFormat: 'gen9ou' } }, roomsData: {}, user: { get: () => '' } },
+    BattleFormats: {}, Storage,
+  });
+  const context = vm.createContext({
+    window, app: window.app, BattleFormats: {}, Storage,
+    Dex: { getTeambuilderSpriteData: (set) => ({ spriteDir: 'sprites/gen5', spriteid: set.species }) },
+    document: { querySelectorAll: () => [] },
+  });
+  const contents = { isLoading: () => false, executeJavaScript: async (code) => vm.runInContext(code, context) };
+  const bridge = new ShowdownBridge(() => contents);
+  const sprites = (state) => state.teams.map((t) => t.sprites[0]);
+  assert.deepEqual(sprites(await bridge.snapshot()), [
+    'https://play.pokemonshowdown.com/sprites/gen5/packed-a.png', 'https://play.pokemonshowdown.com/sprites/gen5/packed-b.png',
+  ]);
+  await bridge.snapshot();
+  await bridge.snapshot();
+  assert.deepEqual(unpacked, ['packed-a', 'packed-b'], 'later reads reuse them');
+  // An edited team is unpacked again; a deleted one is forgotten.
+  Storage.teams = [{ name: 'A', format: 'gen9ou', team: 'packed-a2' }];
+  assert.deepEqual(sprites(await bridge.snapshot()), ['https://play.pokemonshowdown.com/sprites/gen5/packed-a2.png']);
+  assert.deepEqual(unpacked, ['packed-a', 'packed-b', 'packed-a2']);
+  assert.deepEqual([...window.__sdTeamSprites.keys()], ['packed-a2']);
+});
+
 test('snapshot and session survive malformed client results', async () => {
   const contents = fakeContents(null);
   const bridge = new ShowdownBridge(() => contents);

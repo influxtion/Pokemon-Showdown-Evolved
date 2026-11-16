@@ -18,6 +18,10 @@ const RATINGS_TTL = 2 * 60 * 1000;
 const FRIENDS_TTL = 30 * 1000;
 const FRIENDS_FAILURE_TTL = 5 * 1000;
 const FRIENDS_TIMEOUT = 4500;
+// Home's snapshot waits at most this long for ratings and friends. A slower answer (a stale
+// cache, a slow profile fetch, a friends query the server never answers) finishes in the
+// background and reaches Home on its next read; until then Home shows the last known values.
+const SNAPSHOT_NETWORK_WAIT = 150;
 
 const isId = (value) => typeof value === 'string' && ID.test(value);
 
@@ -35,13 +39,25 @@ function readClient() {
       return null;
     }
   };
+  // Unpacking every team for its sprites is the costly part of this read, and it runs in the
+  // page that also runs battles. Sprites depend only on a team's packed text, so they are
+  // remembered by it; only new or edited teams are unpacked, and removed teams are dropped.
+  const known = window.__sdTeamSprites instanceof Map ? window.__sdTeamSprites : new Map();
+  const seen = new Map();
   const teams = (Storage.teams || []).map((t, index) => {
-    let sets = [];
-    try {
-      sets = Storage.unpackTeam(t.team) || [];
-    } catch (e) {}
-    return { index, name: t.name, format: t.format, sprites: sets.slice(0, 6).map(sprite) };
+    const key = typeof t.team === 'string' ? t.team : '';
+    let sprites = known.get(key) || seen.get(key);
+    if (!sprites) {
+      let sets = [];
+      try {
+        sets = Storage.unpackTeam(t.team) || [];
+      } catch (e) {}
+      sprites = sets.slice(0, 6).map(sprite);
+    }
+    seen.set(key, sprites);
+    return { index, name: t.name, format: t.format, sprites: sprites.slice() };
   });
+  window.__sdTeamSprites = seen;
   const rd = app.roomsData || {};
   const news = [...document.querySelectorAll('.newsentry')].slice(0, 3).map((n) => {
     const paras = [...n.querySelectorAll('p')];
@@ -1390,6 +1406,14 @@ function sanitizeFriends(raw) {
   return { available: raw.length === 0 || items.length > 0, items };
 }
 
+// A promise's value if it settles within the snapshot's network budget, else the fallback.
+// The promise keeps running and fills its cache for the next read.
+function within(promise, fallback) {
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), SNAPSHOT_NETWORK_WAIT); });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
 function copyFriends(value) {
   return { available: value.available, items: value.items.map((item) => ({ ...item })) };
 }
@@ -1398,6 +1422,7 @@ class ShowdownBridge {
   constructor(getContents) {
     this.getContents = getContents;
     this.ratings = new Map();
+    this.ratingsInFlight = new Map();
     this.friendsCache = new Map();
     this.friendsInFlight = new Map();
     this.friendsRequest = null;
@@ -1458,13 +1483,21 @@ class ShowdownBridge {
     state.friends = { available: false, items: [] };
     if (state.user.registered && state.user.userid) {
       const userid = state.user.userid;
+      // Last known values, however old, so a slow refresh never blanks what Home shows.
+      const knownRatings = this.ratings.get(userid);
+      const knownFriends = this.friendsCache.get(userid);
+      const unavailable = { available: false, items: [] };
       const [ratings, friends] = await Promise.all([
-        this.fetchRatings(userid),
-        state.connected ? this.fetchFriends(userid) : Promise.resolve({ available: false, items: [] }),
+        within(this.fetchRatings(userid), knownRatings ? knownRatings.value : null),
+        state.connected
+          ? within(this.fetchFriends(userid), knownFriends ? copyFriends(knownFriends.value) : null)
+          : Promise.resolve(unavailable),
       ]);
-      state.ratings = ratings;
+      state.ratings = ratings || {};
       state.stats = (this.ratings.get(userid) || {}).stats || {};
-      state.friends = friends;
+      state.friends = friends || { ...unavailable, loading: true };
+      // Something is still on its way: Home asks again soon rather than at its idle pace.
+      state.pending = !ratings || !friends;
     }
     return state;
   }
@@ -1507,10 +1540,19 @@ class ShowdownBridge {
     }
   }
 
-  // Public profile endpoint; no credentials are sent.
-  async fetchRatings(userid) {
+  // Public profile endpoint; no credentials are sent. Overlapping reads share one fetch.
+  fetchRatings(userid) {
     const cached = this.ratings.get(userid);
-    if (cached && Date.now() - cached.at < RATINGS_TTL) return cached.value;
+    if (cached && Date.now() - cached.at < RATINGS_TTL) return Promise.resolve(cached.value);
+    let pending = this.ratingsInFlight.get(userid);
+    if (!pending) {
+      pending = this.loadRatings(userid).finally(() => this.ratingsInFlight.delete(userid));
+      this.ratingsInFlight.set(userid, pending);
+    }
+    return pending;
+  }
+
+  async loadRatings(userid) {
     const value = {};
     const stats = {};
     try {

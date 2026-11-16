@@ -405,7 +405,7 @@ function renderFriends() {
   openFriends.disabled = !sessionReady || !sessionConnected;
   const friends = state.friends;
   const disconnected = !state.connected || (sessionReady && !sessionConnected);
-  const key = JSON.stringify([state.user.registered, disconnected, friends?.available, friends?.items]);
+  const key = JSON.stringify([state.user.registered, disconnected, friends?.available, friends?.loading, friends?.items]);
   if (friendsKey !== key) {
     friendsKey = key;
     const children = [];
@@ -419,6 +419,8 @@ function renderFriends() {
       children.push(box);
     } else if (disconnected) {
       children.push(el('div', 'friends-note', 'Friends are unavailable while Showdown reconnects.'));
+    } else if (friends?.loading) {
+      children.push(el('div', 'friends-note', 'Loading friends…'));
     } else if (!friends?.available) {
       children.push(el('div', 'friends-note', 'Friends are unavailable here. Open the list in Showdown.'));
     } else if (!friends.items.length) {
@@ -483,7 +485,8 @@ async function refresh() {
     state = { ready: false };
   }
   render();
-  setTimeout(refresh, state.ready ? 10000 : 2000);
+  // Ratings or friends still loading in the background: look again shortly.
+  setTimeout(refresh, !state.ready ? 2000 : state.pending ? 1000 : 10000);
 }
 
 els.format.addEventListener('change', () => {

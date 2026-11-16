@@ -361,6 +361,20 @@ test('the Community tab is always shown, opens its menu view and marks it curren
   assert.equal(list.tab('Community').getAttribute('aria-current'), 'page', 'the room list belongs to Community');
 });
 
+test('a new page draws the strip from the last session at once, then from the live read', async () => {
+  const first = harness([session([chat('lobby', 'Lobby')])]);
+  await first.settle();
+  // The next page in the same window: its strip is there before its first read returns.
+  const next = harness([session([chat('lobby', 'Lobby'), chat('help', 'Help')])], { saved: first.saved });
+  assert.deepEqual(next.rows().map((r) => next.title(r)), ['Lobby'], 'drawn synchronously from the last read');
+  await next.settle();
+  assert.deepEqual(next.rows().map((r) => next.title(r)), ['Lobby', 'Help'], 'then replaced by the live read');
+  // A read from before the client was ready is not kept, and stale data never navigates.
+  const cold = harness([{ ready: false, rooms: [] }], { saved: new Map([['nav.lastSession', '{"ready":false,"rooms":[]}']]) });
+  assert.equal(cold.rows().length, 0);
+  assert.equal(cold.location.href, 'index.html');
+});
+
 test('every friends page is one tab titled Friends', async () => {
   const h = harness([session([chat('view-friends-sent', '[Friends] Sent', { kind: 'other' }), chat('view-friendsish', 'Not friends', { kind: 'other' })])]);
   await h.settle();

@@ -511,6 +511,7 @@
   let known = null;
   let knownMe = '';
   const knownKey = 'showdown.knownRooms';
+  const lastSessionKey = 'nav.lastSession';
 
   function savedRooms(me) {
     try {
@@ -572,6 +573,9 @@
     }
     if (!session || !Array.isArray(session.rooms)) session = { ready: false, rooms: [] };
     render(session);
+    if (session.ready) {
+      try { sessionStorage.setItem(lastSessionKey, JSON.stringify(session)); } catch {}
+    }
     if (session.ready && battleStarted(session) && !onPlay) {
       location.href = 'play.html';
       return session;
@@ -644,5 +648,12 @@
   if (typeof desktop.onTabShortcut === 'function') desktop.onTabShortcut(tabShortcut);
 
   window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut };
+  // Every launcher page is a fresh document. Draw the tab strip from the last session read in
+  // this window straight away, so it never flashes empty while the first read is on its way;
+  // that read then replaces it. Only the strip is drawn: nothing navigates on stale data.
+  try {
+    const last = JSON.parse(sessionStorage.getItem(lastSessionKey));
+    if (last && last.ready && Array.isArray(last.rooms)) render(last);
+  } catch {}
   pollNow();
 })();
