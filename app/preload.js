@@ -47,4 +47,8 @@ contextBridge.exposeInMainWorld('desktop', {
   onTabShortcut: (handler) => {
     ipcRenderer.on('nav:shortcut', (_event, shortcut) => handler(shortcut));
   },
+  // The client opened or switched rooms; no data, just a cue to read the session now.
+  onClientChange: (handler) => {
+    ipcRenderer.on('client:changed', () => handler());
+  },
 });

@@ -7,12 +7,19 @@ const { randomUUID } = require('node:crypto');
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
 const PRACTICE_ENGINES = new Set(['cloud', 'local']);
-const DEFAULTS = Object.freeze({ theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, practiceEngine: 'cloud' });
+// Home layouts: 'classic' is Showdown's main menu modernised, 'modern' the focused redesign.
+// null means the player has not chosen yet, so Home asks once with a welcome.
+const HOME_LAYOUTS = new Set(['classic', 'modern']);
+const DEFAULTS = Object.freeze({
+  theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, practiceEngine: 'cloud',
+});
 const KEYS = new Set(Object.keys(DEFAULTS));
 
+// Values a saved file may hold. A renderer can only set a real choice (see set()).
 function valid(key, value) {
   if (key === 'theme') return THEMES.has(value);
   if (key === 'startPage') return START_PAGES.has(value);
+  if (key === 'homeLayout') return value === null || HOME_LAYOUTS.has(value);
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';
@@ -83,7 +90,7 @@ class Settings {
   }
 
   set(key, value) {
-    if (!KEYS.has(key) || !valid(key, value)) return false;
+    if (!KEYS.has(key) || !valid(key, value) || value === null) return false;
     this.write({ ...this.values, [key]: value });
     return true;
   }
@@ -94,4 +101,4 @@ class Settings {
   }
 }
 
-module.exports = { Settings, THEMES, START_PAGES, DEFAULTS };
+module.exports = { Settings, THEMES, START_PAGES, HOME_LAYOUTS, DEFAULTS };

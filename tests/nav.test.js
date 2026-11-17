@@ -92,9 +92,11 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const storage = { getItem: (key) => saved.get(key) || null, setItem: (key, value) => saved.set(key, value) };
   let last = states[states.length - 1];
   const cycleHandlers = [];
+  const changeHandlers = [];
   const window = {
     desktop: {
       onTabShortcut: (handler) => cycleHandlers.push(handler),
+      onClientChange: (handler) => changeHandlers.push(handler),
       getSession: async () => (states.length ? (last = states.shift()) : last),
       showdown: async (action, args) => { calls.push({ action, args: JSON.parse(JSON.stringify(args)) }); return act(action, args); },
     },
@@ -115,6 +117,8 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     // What the main process sends for Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+W and Ctrl+1 to Ctrl+9.
     shortcut: (value) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](value); },
     cycle(direction) { return this.shortcut({ type: 'cycle', direction }); },
+    // What main sends when the client opens or switches rooms itself.
+    clientChange: () => { assert.equal(changeHandlers.length, 1); changeHandlers[0](); },
     jump(index) { return this.shortcut({ type: 'jump', index }); },
     closeOpen() { return this.shortcut({ type: 'close' }); },
     middleClick: (node, button = 1) => {
@@ -144,7 +148,6 @@ test('clicking the current launcher page prevents a reload', async () => {
 
 test('clicking the selected client tab leaves its view alone', async () => {
   for (const [title, state] of [
-    ['Battle', session([])],
     ['Community', session([], { menuTab: 'community' })],
   ]) {
     const h = harness([state], { onPlay: true });
@@ -261,38 +264,54 @@ test('only the current room is marked on play, and none elsewhere', async () => 
   assert.deepEqual(other.rows().map((r) => r.getAttribute('aria-current')), [null, null]);
 });
 
-test('the Battle tab is always shown, marks the main menu and carries its unread dot', async () => {
+test('there is no Battle tab: Home, Community and the open rooms make up the strip', async () => {
   const rooms = [chat('lobby', 'Lobby')];
-  const menu = harness([session(rooms, { current: '' })], { onPlay: true });
-  await menu.settle();
-  assert.equal(menu.tab('Battle').getAttribute('aria-current'), 'page');
-  assert.equal(menu.tab('Battle').children.length, 1, 'tabs cannot be closed');
-  assert.equal(menu.row(0).getAttribute('aria-current'), null);
-
-  const inRoom = harness([session(rooms, { current: 'lobby' })], { onPlay: true });
-  await inRoom.settle();
-  assert.equal(inRoom.tab('Battle').getAttribute('aria-current'), null);
-
-  const offPlay = harness([session(rooms, { current: '' })]);
-  await offPlay.settle();
-  assert.equal(offPlay.tab('Battle').getAttribute('aria-current'), null, 'nothing is current off play');
+  const h = harness([session(rooms, { menuUnread: true })]);
+  await h.settle();
+  assert.equal(h.tab('Battle'), undefined);
+  assert.deepEqual(h.nav.rooms.children.map((r) => h.title(r)), ['Home', 'Community', 'Lobby']);
+  assert.deepEqual(h.tabs().map((t) => h.title(t)), ['Community'], 'Community is the only fixed tab');
 
   const notReady = harness([{ ready: false, rooms: [] }]);
   await notReady.settle();
-  assert.ok(notReady.tab('Battle'), 'shown before the client is ready');
-
-  const unread = harness([session(rooms, { current: 'lobby', menuUnread: true })]);
-  await unread.settle();
-  assert.ok(unread.main(unread.tab('Battle')).children.some((c) => c.has('nav-unread')));
+  assert.deepEqual(notReady.tabs().map((t) => notReady.title(t)), ['Community'], 'shown before the client is ready');
 });
 
-test('the Battle tab focuses the main menu and opens play', async () => {
-  const h = harness([session([])]);
+test('the client main menu has no tab, so the Showdown screen hands it back to Home', async () => {
+  const rooms = [chat('lobby', 'Lobby')];
+  const menu = session(rooms, { current: '', menuTab: 'battle' });
+  const h = harness([menu], { onPlay: true });
   await h.settle();
-  h.main(h.tab('Battle')).click();
-  await h.settle();
-  assert.deepEqual(h.calls, [{ action: 'show-menu', args: { tab: 'battle' } }]);
-  assert.equal(h.location.href, 'play.html');
+  assert.equal(h.nav.rooms.children.some((c) => c.getAttribute('aria-current') === 'page'), false, 'nothing is marked');
+  assert.equal(h.location.href, 'play.html', 'one read is not enough');
+  await h.poll();
+  assert.equal(h.location.href, 'index.html', 'a second read agrees, so Home takes over');
+
+  // A room that is still opening reads as the main menu once; it must not bounce.
+  const opening = harness([menu, session(rooms, { current: 'lobby' })], { onPlay: true });
+  await opening.settle();
+  await opening.poll();
+  await opening.poll();
+  assert.equal(opening.location.href, 'play.html');
+
+  // A client popup, such as a forfeit prompt, stays on screen.
+  const popup = harness([session(rooms, { current: '', menuTab: 'battle', popups: 1 })], { onPlay: true });
+  await popup.settle();
+  await popup.poll();
+  assert.equal(popup.location.href, 'play.html');
+
+  // Community and conversations are not the main menu, and other pages are left alone.
+  for (const extra of [{ menuTab: 'community' }, { menuTab: 'pm', pmOpen: 'misty', messages: [convo('misty')] }]) {
+    const other = harness([session(rooms, { current: '', ...extra })], { onPlay: true });
+    await other.settle();
+    await other.poll();
+    assert.equal(other.location.href, 'play.html', extra.menuTab);
+  }
+  const off = harness([menu]);
+  await off.settle();
+  await off.poll();
+  assert.equal(off.location.href, 'index.html');
+  assert.deepEqual(off.calls, []);
 });
 
 test('Teambuilder opens from the icon bar as a small page tab that follows its room', async () => {
@@ -314,7 +333,7 @@ test('Teambuilder opens from the icon bar as a small page tab that follows its r
   assert.deepEqual(pageTabs(open).map((t) => t.getAttribute('aria-current')), [null, null, 'page']);
   assert.equal(open.nav.teambuilder.getAttribute('aria-current'), 'page');
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html', 'teambuilder']);
-  assert.equal(open.tab('Battle').getAttribute('aria-current'), null);
+  assert.equal(open.tab('Community').getAttribute('aria-current'), null);
   assert.equal(open.rows().length, 0);
   // Clicking the open Teambuilder does nothing; closing it leaves the room.
   open.nav.teambuilder.click();
@@ -340,22 +359,60 @@ test('the Community tab is always shown, opens its menu view and marks it curren
   const menu = harness([session([], { menuTab: 'community' })], { onPlay: true });
   await menu.settle();
   assert.equal(menu.tab('Community').getAttribute('aria-current'), 'page');
-  assert.equal(menu.tab('Battle').getAttribute('aria-current'), null);
 
   const list = harness([session([], { current: 'rooms' })], { onPlay: true });
   await list.settle();
   assert.equal(list.tab('Community').getAttribute('aria-current'), 'page', 'the room list belongs to Community');
-  assert.equal(list.tab('Battle').getAttribute('aria-current'), null);
 });
 
-test('tabs keep their order and open rooms nest under the tab they belong to', async () => {
+test('a room opened inside the client shows in the strip at once, not at the next poll', async () => {
+  const rooms = [chat('lobby', 'Lobby')];
+  const h = harness([
+    session([], { current: '', menuTab: 'community' }),
+    session(rooms, { current: 'lobby' }),
+  ], { onPlay: true });
+  await h.settle();
+  assert.equal(h.tab('Community').getAttribute('aria-current'), 'page');
+  const pollsBefore = h.timers.length;
+  // Joining Lobby from Community's room list: the client's address changes and main says so.
+  h.clientChange();
+  h.clientChange();
+  await h.settle();
+  assert.equal(h.row(0).getAttribute('aria-current'), 'page', 'Lobby is the open tab without waiting');
+  assert.equal(h.tab('Community').getAttribute('aria-current'), null);
+  // One regular poll, plus a single follow-up read for the room's title from the server.
+  assert.equal(h.timers.length, pollsBefore + 1, 'the regular poll is rescheduled, not doubled');
+  assert.deepEqual(h.timers.map((t) => t.delay).sort(), [1000, 350]);
+});
+
+test('a new page draws the strip from the last session at once, then from the live read', async () => {
+  const first = harness([session([chat('lobby', 'Lobby')])]);
+  await first.settle();
+  // The next page in the same window: its strip is there before its first read returns.
+  const next = harness([session([chat('lobby', 'Lobby'), chat('help', 'Help')])], { saved: first.saved });
+  assert.deepEqual(next.rows().map((r) => next.title(r)), ['Lobby'], 'drawn synchronously from the last read');
+  await next.settle();
+  assert.deepEqual(next.rows().map((r) => next.title(r)), ['Lobby', 'Help'], 'then replaced by the live read');
+  // A read from before the client was ready is not kept, and stale data never navigates.
+  const cold = harness([{ ready: false, rooms: [] }], { saved: new Map([['nav.lastSession', '{"ready":false,"rooms":[]}']]) });
+  assert.equal(cold.rows().length, 0);
+  assert.equal(cold.location.href, 'index.html');
+});
+
+test('every friends page is one tab titled Friends', async () => {
+  const h = harness([session([chat('view-friends-sent', '[Friends] Sent', { kind: 'other' }), chat('view-friendsish', 'Not friends', { kind: 'other' })])]);
+  await h.settle();
+  assert.deepEqual(h.rows().map((r) => h.title(r)), ['Friends', 'Not friends']);
+});
+
+test('rooms follow Community in the client order', async () => {
   const h = harness([session([
     chat('lobby', 'Lobby'), chat('ladder', 'Ladder', { kind: 'ladder' }), chat('battles', 'Battles', { kind: 'battles' }),
     chat('tournaments', 'Tournaments'), room('battle-gen9ou-8', ['Alice', 'Bob']), chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' }),
   ])]);
   await h.settle();
   assert.deepEqual(h.nav.rooms.children.map((r) => h.title(r)),
-    ['Home', 'Teambuilder', 'Battle', 'Ladder', 'Battles', 'Tournaments', 'Alice vs. Bob', 'Community', 'Lobby']);
+    ['Home', 'Teambuilder', 'Community', 'Lobby', 'Ladder', 'Battles', 'Tournaments', 'Alice vs. Bob']);
 });
 
 test('clicking a row or Join a room focuses and opens play', async () => {
@@ -427,6 +484,16 @@ test('close answered true re-polls and leaves play only when no rooms remain', a
   assert.equal(left.location.href, 'play.html');
   assert.equal(left.title(left.row(0)), 'Help');
 
+  // Rooms remain, but the client fell back to its main menu, which has no tab.
+  const menu = harness([
+    session([chat('lobby', 'Lobby'), chat('help', 'Help')], { current: 'lobby' }),
+    session([chat('help', 'Help')], { current: '', menuTab: 'battle' }),
+  ], { onPlay: true });
+  await menu.settle();
+  menu.close(menu.row(0)).click();
+  await menu.settle();
+  assert.equal(menu.location.href, 'index.html');
+
   const elsewhere = harness([session([chat('lobby', 'Lobby')]), session([])]);
   await elsewhere.settle();
   elsewhere.close(elsewhere.row(0)).click();
@@ -461,12 +528,12 @@ test('conversations are listed under Messages; a challenge is marked and opens i
   assert.equal(none.nav.rooms.children.some((c) => c.has('rail-section--messages')), false);
 });
 
-test('the open conversation is marked current instead of the Battle tab, and close sends close-pm', async () => {
+test('the open conversation is marked current, and close sends close-pm', async () => {
   const h = harness([session([], { menuTab: 'pm', pmOpen: 'misty', messages: [convo('misty')] })], { onPlay: true });
   await h.settle();
   const row = h.nav.rooms.children[h.nav.rooms.children.length - 1];
   assert.equal(row.getAttribute('aria-current'), 'page');
-  assert.equal(h.tab('Battle').getAttribute('aria-current'), null);
+  assert.equal(h.tab('Community').getAttribute('aria-current'), null);
   const event = h.close(row).click();
   await h.settle();
   assert.equal(event.stopped, true);
@@ -573,7 +640,7 @@ test('Home is the first small tab, and opened launcher pages follow it until clo
 test('Ctrl+Tab steps through page tabs, client tabs, rooms and conversations, wrapping at the ends', async () => {
   const saved = new Map([['nav.pages', '["stats.html"]']]);
   const state = session([chat('lobby', 'Lobby')], { messages: [convo('misty')] });
-  // Strip order: Home, Stats, Battle, Community, Lobby, misty.
+  // Strip order: Home, Stats, Community, Lobby, misty.
   const home = harness([state], { saved });
   await home.settle();
   await home.cycle(1);
@@ -586,10 +653,10 @@ test('Ctrl+Tab steps through page tabs, client tabs, rooms and conversations, wr
   assert.deepEqual(back.calls, [{ action: 'open-pm', args: { user: 'misty' } }], 'backwards from the first tab wraps to the last');
   assert.equal(back.location.href, 'play.html');
 
-  const battle = harness([session([chat('lobby', 'Lobby')])], { onPlay: true, saved });
-  await battle.settle();
-  await battle.cycle(-1);
-  assert.equal(battle.location.href, 'stats.html', 'the Battle tab steps back to the last page tab');
+  const community = harness([session([chat('lobby', 'Lobby')], { menuTab: 'community' })], { onPlay: true, saved });
+  await community.settle();
+  await community.cycle(-1);
+  assert.equal(community.location.href, 'stats.html', 'Community steps back to the last page tab');
 
   const last = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' })], { onPlay: true });
   await last.settle();
@@ -599,23 +666,23 @@ test('Ctrl+Tab steps through page tabs, client tabs, rooms and conversations, wr
 
 test('Ctrl+Tab on the Showdown screen focuses rooms through the client and queues repeated presses', async () => {
   const rooms = [chat('lobby', 'Lobby'), chat('help', 'Help')];
-  // Strip order: Home, Battle, Community, Lobby, Help.
+  // Strip order: Home, Community, Lobby, Help.
   const h = harness([
-    session(rooms, { current: '' }),
+    session(rooms, { current: '', menuTab: 'community' }),
     // Each step reads the session twice: once after the switch and once more to be sure.
-    session(rooms, { current: '', menuTab: 'community' }),
-    session(rooms, { current: '', menuTab: 'community' }),
     session(rooms, { current: 'lobby' }),
+    session(rooms, { current: 'lobby' }),
+    session(rooms, { current: 'help' }),
   ], { onPlay: true });
   await h.settle();
   h.cycle(1);
   await h.cycle(1);
   assert.deepEqual(h.calls, [
-    { action: 'show-menu', args: { tab: 'community' } },
     { action: 'focus-room', args: { room: 'lobby' } },
+    { action: 'focus-room', args: { room: 'help' } },
   ], 'the second press steps from where the first one landed');
   assert.equal(h.location.href, 'play.html');
-  assert.equal(h.row(0).getAttribute('aria-current'), 'page');
+  assert.equal(h.row(1).getAttribute('aria-current'), 'page');
 
   const tb = chat('teambuilder', 'Teambuilder', { kind: 'teambuilder' });
   const team = harness([session([tb])]);
@@ -634,8 +701,8 @@ test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', as
   assert.equal(home.location.href, 'index.html');
   assert.equal(home.nav.rooms.children.filter((c) => c.has('nav-page')).length, 2);
 
-  // Battle and Community cannot close, including Community showing the room list.
-  for (const extra of [{ current: '' }, { current: '', menuTab: 'community' }, { current: 'rooms' }]) {
+  // Community cannot close, including while it shows the room list.
+  for (const extra of [{ current: '', menuTab: 'community' }, { current: 'rooms' }]) {
     const fixed = harness([session([chat('lobby', 'Lobby')], extra)], { onPlay: true });
     await fixed.settle();
     fixed.location.href = 'unchanged';
@@ -689,7 +756,6 @@ test('a middle click closes a closable tab and leaves the fixed tabs alone', asy
   await h.settle();
   const pageTabs = () => h.nav.rooms.children.filter((c) => c.has('nav-page'));
   assert.equal(pageTabs()[0].listeners.auxclick, undefined, 'Home has no middle-click close');
-  assert.equal(h.tab('Battle').listeners.auxclick, undefined);
   assert.equal(h.tab('Community').listeners.auxclick, undefined);
 
   // Other mouse buttons do nothing.
@@ -715,7 +781,7 @@ test('a middle click closes a closable tab and leaves the fixed tabs alone', asy
 test('Ctrl+1 to Ctrl+8 open that tab from the left and Ctrl+9 opens the last one', async () => {
   const saved = () => new Map([['nav.pages', '["stats.html"]']]);
   const state = session([chat('lobby', 'Lobby')], { messages: [convo('misty')] });
-  // Strip order: Home, Stats, Battle, Community, Lobby, misty.
+  // Strip order: Home, Stats, Community, Lobby, misty.
   const page = harness([state], { saved: saved() });
   await page.settle();
   await page.jump(1);
@@ -727,12 +793,12 @@ test('Ctrl+1 to Ctrl+8 open that tab from the left and Ctrl+9 opens the last one
   const menu = harness([state], { saved: saved() });
   await menu.settle();
   await menu.jump(3);
-  assert.deepEqual(menu.calls, [{ action: 'show-menu', args: { tab: 'battle' } }]);
+  assert.deepEqual(menu.calls, [{ action: 'show-menu', args: { tab: 'community' } }]);
   assert.equal(menu.location.href, 'play.html');
 
   const roomTab = harness([state], { saved: saved() });
   await roomTab.settle();
-  await roomTab.jump(5);
+  await roomTab.jump(4);
   assert.deepEqual(roomTab.calls, [{ action: 'focus-room', args: { room: 'lobby' } }]);
 
   const last = harness([state], { saved: saved() });

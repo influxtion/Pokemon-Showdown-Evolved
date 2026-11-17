@@ -1,0 +1,398 @@
+/* Friends pages: the server's own /friends HTML (view-friends-all, -spectate, -sent,
+   -received, -help, -settings), restyled in place to match the launcher. Every button,
+   link and form keeps working because nothing is moved or replaced.
+
+   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell.
+   The markup comes from the server's friends plugin, sanitised by the client: each page is
+   <div class="pad"> holding a tab bar (<div style="line-height:25px"> with icon + link
+   pairs separated by " / ", and a Refresh button), an <hr>, then the page. <username>
+   arrives as <strong style="color:..."> and online status as <strong> in the server's
+   status colours, which are matched by value below. */
+html.sd-launcher-shell [id^="room-view-friends"] {
+  --sdf-on-accent: #ffffff;
+  --sdf-online: #2e8a55;
+  --sdf-idle: #b7791f;
+  --sdf-busy: #c93434;
+  background: var(--sd-app) !important;
+  color: var(--sd-text) !important;
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif !important;
+
+  @media (prefers-color-scheme: dark) {
+    --sdf-on-accent: #0f1b33;
+    --sdf-online: #5ccb8b;
+    --sdf-idle: #f2b84b;
+    --sdf-busy: #ff7878;
+  }
+
+  > .pad {
+    box-sizing: border-box !important;
+    max-width: 880px !important;
+    margin: 0 auto !important;
+    padding: 28px 32px 56px !important;
+    color: var(--sd-text-2) !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+  /* One title for every friends page, as Community has. */
+  > .pad::before {
+    content: "Friends";
+    display: block;
+    margin-bottom: 14px;
+    color: var(--sd-text);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .button,
+  button,
+  input {
+    font-family: inherit !important;
+    font-size: 13px !important;
+  }
+  .button {
+    height: 30px !important;
+    padding: 0 12px !important;
+    cursor: pointer !important;
+  }
+  a:not(.button):not(.blocklink) {
+    color: var(--sd-accent) !important;
+  }
+
+  /* Shown by the launcher for the moment between opening the list and the server's page. */
+  .sd-page-loading {
+    margin: 0 !important;
+    color: var(--sd-text-2) !important;
+  }
+
+  /* ----- Tab bar: All Friends / Spectate / Sent / Received / Help / Settings ----- */
+
+  /* font-size: 0 drops the " / " separators; the links and labels set their own size. */
+  > .pad > div[style*="line-height"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: stretch !important;
+    margin: 0 0 22px !important;
+    border-bottom: 1px solid var(--sd-border) !important;
+    font-size: 0 !important;
+    line-height: normal !important;
+  }
+  > .pad > div[style*="line-height"] > .fa {
+    display: none !important;
+  }
+  > .pad > div[style*="line-height"] > a,
+  > .pad > div[style*="line-height"] > strong {
+    margin-bottom: -1px !important;
+    padding: 9px 14px 8px !important;
+    border-bottom: 2px solid transparent !important;
+    color: var(--sd-text-2) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+  }
+  > .pad > div[style*="line-height"] > a:hover {
+    border-bottom-color: var(--sd-border-strong) !important;
+    color: var(--sd-text) !important;
+  }
+  /* The open page is the bold label rather than a link. */
+  > .pad > div[style*="line-height"] > strong {
+    border-bottom-color: var(--sd-accent) !important;
+    color: var(--sd-text) !important;
+  }
+  > .pad > div[style*="line-height"] > .button {
+    float: none !important;
+    align-self: center !important;
+    margin: 0 0 6px auto !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+  > .pad > hr {
+    display: none !important;
+  }
+
+  /* ----- Headings and text ----- */
+
+  h3 {
+    margin: 0 0 14px !important;
+    color: var(--sd-text) !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+  }
+  h3 small {
+    margin-left: 4px !important;
+    color: var(--sd-text-2) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+  }
+  h4 {
+    grid-column: 1 / -1 !important;
+    margin: 12px 0 0 !important;
+    color: var(--sd-text-2) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
+  }
+  strong {
+    color: var(--sd-text);
+    font-weight: 600 !important;
+  }
+  em {
+    color: var(--sd-text-2) !important;
+  }
+  /* Empty list: the server spaces it with three line breaks; one gap is enough. */
+  > .pad > h3 + em {
+    display: block !important;
+    margin: -8px 0 12px !important;
+  }
+  > .pad > h3 + em ~ br {
+    display: none !important;
+  }
+  code {
+    padding: 1px 5px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 3px !important;
+    background: var(--sd-subtle) !important;
+    color: var(--sd-text) !important;
+    font-family: "Cascadia Mono", Consolas, "SF Mono", monospace !important;
+    font-size: 12px !important;
+  }
+  ul {
+    margin: 8px 0 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 4px !important;
+    background: var(--sd-panel) !important;
+  }
+  li {
+    padding: 9px 14px !important;
+    border-top: 1px solid var(--sd-border) !important;
+  }
+  li:first-child {
+    border-top: 0 !important;
+  }
+
+  /* ----- Friend cards (All Friends) ----- */
+
+  .infobox {
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 4px !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text-2) !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+  }
+  .infobox .username {
+    cursor: pointer !important;
+  }
+  /* Usernames keep the colours the client gives them; only the weight changes. */
+  .infobox .username strong,
+  .infobox > i:first-child {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+  }
+  .infobox > i:first-child {
+    color: var(--sd-text) !important;
+    font-style: normal !important;
+  }
+  .infobox i {
+    font-style: normal !important;
+  }
+  /* "(◉ Online)": the brackets go (font-size 0) and the status becomes a chip in the
+     app's status colours. Offline friends have no chip; their group heading says so. */
+  .infobox > span:not(.username) > small {
+    font-size: 0 !important;
+  }
+  .infobox > span:not(.username) > small > strong {
+    display: inline-block !important;
+    margin-left: 8px !important;
+    padding: 0 8px !important;
+    border-radius: 10px !important;
+    font-size: 11px !important;
+    line-height: 18px !important;
+    vertical-align: 1px !important;
+  }
+  .infobox strong[style*="#009900"] {
+    background: color-mix(in srgb, var(--sdf-online) 16%, transparent) !important;
+    color: var(--sdf-online) !important;
+  }
+  .infobox strong[style*="#ff7000"] {
+    background: color-mix(in srgb, var(--sdf-idle) 18%, transparent) !important;
+    color: var(--sdf-idle) !important;
+  }
+  .infobox strong[style*="#cc3838"] {
+    background: color-mix(in srgb, var(--sdf-busy) 16%, transparent) !important;
+    color: var(--sdf-busy) !important;
+  }
+  .infobox > small {
+    display: none !important;
+  }
+  .infobox time {
+    color: var(--sd-text) !important;
+  }
+
+  /* Cards sit in a grid once there are friends; headings and the add form span it. The
+     empty state is plain text, so it keeps normal flow. */
+  &[id="room-view-friends-all"] > .pad:has(> .pad) {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 10px !important;
+    align-items: start !important;
+  }
+  &[id="room-view-friends-all"] > .pad:has(> .pad)::before,
+  &[id="room-view-friends-all"] > .pad > :not(.pad) {
+    grid-column: 1 / -1 !important;
+  }
+  &[id="room-view-friends-all"] > .pad > .pad {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  &[id="room-view-friends-all"] > .pad > .pad > div {
+    height: 100% !important;
+  }
+  &[id="room-view-friends-all"] > .pad > div[style*="line-height"] {
+    margin-bottom: 12px !important;
+  }
+  &[id="room-view-friends-all"] h3 {
+    margin: 0 !important;
+  }
+
+  /* ----- Add friend ----- */
+
+  form[data-submitsend] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin: 0 0 4px !important;
+    padding: 12px 14px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 4px !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+    font-weight: 600 !important;
+  }
+  form[data-submitsend] br {
+    display: none !important;
+  }
+  form[data-submitsend] .textbox {
+    flex: 0 1 260px !important;
+    min-width: 0 !important;
+    height: 30px !important;
+    box-sizing: border-box !important;
+    padding: 0 10px !important;
+    font-weight: 400 !important;
+  }
+  form[data-submitsend] .textbox:focus {
+    border-color: var(--sd-accent) !important;
+    outline: 2px solid color-mix(in srgb, var(--sd-accent) 35%, transparent) !important;
+    outline-offset: 0 !important;
+  }
+  form[data-submitsend] .button,
+  .infobox .button[value^="/friends accept"] {
+    border-color: var(--sd-accent) !important;
+    background: var(--sd-accent) !important;
+    color: var(--sdf-on-accent) !important;
+    font-weight: 600 !important;
+  }
+  form[data-submitsend] .button:hover,
+  .infobox .button[value^="/friends accept"]:hover {
+    background: color-mix(in srgb, var(--sd-accent) 85%, var(--sd-text)) !important;
+  }
+  form[data-submitsend] .button .fa {
+    display: none !important;
+  }
+
+  /* ----- Sent and Received: one row per request ----- */
+
+  /* font-size: 0 drops the " | " between Accept and Deny. */
+  > .pad > .infobox {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 0 8px !important;
+    font-size: 0 !important;
+  }
+  > .pad > .infobox > strong {
+    flex: 1 !important;
+    font-size: 14px !important;
+  }
+  > .pad > .infobox > .button {
+    font-size: 13px !important;
+  }
+  > .pad > br:has(+ .infobox) {
+    display: none !important;
+  }
+  > .pad > .infobox .fa {
+    margin-right: 4px !important;
+  }
+
+  /* ----- Spectate: one card per battle ----- */
+
+  .blocklink {
+    display: block !important;
+    margin: 0 0 8px !important;
+    padding: 10px 14px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 4px !important;
+    color: var(--sd-text) !important;
+    font-size: 13px !important;
+    text-decoration: none !important;
+  }
+  .blocklink:hover {
+    border-color: var(--sd-accent) !important;
+  }
+  .blocklink small {
+    color: var(--sd-text-2) !important;
+    font-size: 11px !important;
+  }
+  /* The cards space themselves; the line breaks between them would add a blank line. */
+  > .pad > .blocklink + br {
+    display: none !important;
+  }
+
+  /* ----- Settings: a label, then the two choices as a segmented control ----- */
+
+  /* Showdown marks the current choice by disabling its button, so the disabled one is
+     drawn as selected rather than greyed out. */
+  &[id="room-view-friends-settings"] > .pad {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    align-items: center !important;
+    row-gap: 6px !important;
+  }
+  &[id="room-view-friends-settings"] > .pad::before,
+  &[id="room-view-friends-settings"] > .pad > div,
+  &[id="room-view-friends-settings"] > .pad > h3 {
+    grid-column: 1 / -1 !important;
+  }
+  &[id="room-view-friends-settings"] > .pad > br {
+    display: none !important;
+  }
+  &[id="room-view-friends-settings"] > .pad > strong {
+    grid-column: 1 !important;
+    padding: 8px 16px 8px 0 !important;
+    color: var(--sd-text) !important;
+    font-size: 13px !important;
+  }
+  &[id="room-view-friends-settings"] > .pad > .button {
+    min-width: 76px !important;
+    margin: 0 !important;
+    border-radius: 0 3px 3px 0 !important;
+    opacity: 1 !important;
+  }
+  &[id="room-view-friends-settings"] > .pad > strong + .button {
+    margin-right: -1px !important;
+    border-radius: 3px 0 0 3px !important;
+  }
+  &[id="room-view-friends-settings"] > .pad > .button.disabled {
+    position: relative !important;
+    border-color: var(--sd-accent) !important;
+    background: var(--sd-accent) !important;
+    color: var(--sdf-on-accent) !important;
+    font-weight: 600 !important;
+    cursor: default !important;
+  }
+}

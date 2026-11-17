@@ -18,6 +18,10 @@ const RATINGS_TTL = 2 * 60 * 1000;
 const FRIENDS_TTL = 30 * 1000;
 const FRIENDS_FAILURE_TTL = 5 * 1000;
 const FRIENDS_TIMEOUT = 4500;
+// Home's snapshot waits at most this long for ratings and friends. A slower answer (a stale
+// cache, a slow profile fetch, a friends query the server never answers) finishes in the
+// background and reaches Home on its next read; until then Home shows the last known values.
+const SNAPSHOT_NETWORK_WAIT = 150;
 
 const isId = (value) => typeof value === 'string' && ID.test(value);
 
@@ -27,22 +31,53 @@ function readClient() {
     return { ready: false };
   }
   const text = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+  // Showdown's 2D sprites (the gen 5 style, as its "BW sprites" option shows them), not the
+  // 3D Pokémon HOME renders the Teambuilder uses for recent generations. Asking for them
+  // through a gen 5 dex gives sprites/gen5 for every Pokémon, including newer ones.
+  const dex2d = typeof Dex !== 'undefined' && Dex && typeof Dex.forGen === 'function' ? Dex.forGen(5) : undefined;
   const sprite = (set) => {
     try {
-      const d = Dex.getTeambuilderSpriteData(set);
+      const d = Dex.getTeambuilderSpriteData(set, dex2d);
       return d.spriteDir + '/' + d.spriteid;
     } catch (e) {
       return null;
     }
   };
+  // Unpacking every team for its sprites is the costly part of this read, and it runs in the
+  // page that also runs battles. Sprites depend only on a team's packed text, so they are
+  // remembered by it; only new or edited teams are unpacked, and removed teams are dropped.
+  const known = window.__sdTeamSprites2d instanceof Map ? window.__sdTeamSprites2d : new Map();
+  const seen = new Map();
   const teams = (Storage.teams || []).map((t, index) => {
-    let sets = [];
-    try {
-      sets = Storage.unpackTeam(t.team) || [];
-    } catch (e) {}
-    return { index, name: t.name, format: t.format, sprites: sets.slice(0, 6).map(sprite) };
+    const key = typeof t.team === 'string' ? t.team : '';
+    let sprites = known.get(key) || seen.get(key);
+    if (!sprites) {
+      let sets = [];
+      try {
+        sets = Storage.unpackTeam(t.team) || [];
+      } catch (e) {}
+      sprites = sets.slice(0, 6).map(sprite);
+    }
+    seen.set(key, sprites);
+    return { index, name: t.name, format: t.format, sprites: sprites.slice() };
   });
+  window.__sdTeamSprites2d = seen;
   const rd = app.roomsData || {};
+  // A paragraph as runs of plain text and links, so Home can show the whole post without
+  // ever inserting the page's HTML. Links keep only their text and resolved address.
+  const runs = (p) => {
+    const out = [];
+    const walk = (node) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) out.push({ text: child.textContent });
+        else if (child.nodeName === 'A') out.push({ text: child.textContent, href: child.href });
+        else if (child.nodeName === 'BR') out.push({ text: ' ' });
+        else if (child.nodeType === 1) walk(child);
+      }
+    };
+    walk(p);
+    return out;
+  };
   const news = [...document.querySelectorAll('.newsentry')].slice(0, 3).map((n) => {
     const paras = [...n.querySelectorAll('p')];
     const byline = paras.length > 1 ? paras.pop() : null;
@@ -51,6 +86,7 @@ function readClient() {
       date: Number(n.dataset.date),
       title: text(n.querySelector('h4')),
       text: paras.map(text).join(' '),
+      body: paras.map(runs),
       author: text(byline && byline.querySelector('strong')),
     };
   });
@@ -310,9 +346,12 @@ function cancelSearch() {
   return true;
 }
 
+// The client opens the user's message window with the challenge form in it; show that
+// conversation full size rather than the bare main menu, which the launcher hands to Home.
 function challenge(name, format) {
-  app.focusRoom('');
   app.rooms[''].challenge(name, format);
+  const userid = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!openPM(userid)) app.focusRoom('');
   return true;
 }
 
@@ -370,9 +409,19 @@ function login() {
   return true;
 }
 
+// Opens the friends pages straight away. Joining the page room creates and focuses it at once
+// (the client asks the server for its content), instead of showing the main menu until the
+// server's reply to /friends arrives. An already open friends page is simply focused.
 function friends() {
-  app.focusRoom('');
-  app.send('/friends');
+  const open = Object.keys(app.rooms).find((id) => /^view-friends(-|$)/.test(id));
+  if (open) {
+    app.focusRoom(open);
+    return true;
+  }
+  app.joinRoom('view-friends-all');
+  const room = app.rooms['view-friends-all'];
+  // The client shows "Page unavailable" until the page arrives, which replaces this.
+  if (room && room.$el) room.$el.html('<div class="pad"><p class="sd-page-loading">Loading…</p></div>');
   return true;
 }
 
@@ -1242,6 +1291,43 @@ function spriteUrl(path) {
   return typeof path === 'string' && SPRITE.test(path) ? `${SHOWDOWN}${path}.png` : null;
 }
 
+// A news post's full text for Home: paragraphs of plain-text runs, some of them links. Links
+// must be http(s) and open in the system browser; anything else stays as plain text. Bounded
+// in paragraphs, runs and total length, and whitespace is collapsed as a browser would.
+function newsBody(value) {
+  if (!Array.isArray(value)) return [];
+  let budget = 6000;
+  const out = [];
+  for (const para of value.slice(0, 20)) {
+    if (!Array.isArray(para) || budget <= 0) continue;
+    const runs = [];
+    for (const run of para.slice(0, 80)) {
+      if (!run || typeof run.text !== 'string' || budget <= 0) continue;
+      const text = run.text.replace(/\s+/g, ' ').slice(0, Math.min(1000, budget));
+      if (!text) continue;
+      budget -= text.length;
+      let href = '';
+      if (typeof run.href === 'string' && run.href.length <= 500) {
+        try {
+          const url = new URL(run.href);
+          if ((url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password) href = url.href;
+        } catch {}
+      }
+      const last = runs[runs.length - 1];
+      // Neighbouring plain text joins up, so the paragraph is a few runs rather than many.
+      if (!href && last && !last.href) last.text += text;
+      else runs.push(href ? { text, href } : { text });
+    }
+    if (runs.length) {
+      runs[0].text = runs[0].text.replace(/^ /, '');
+      const end = runs[runs.length - 1];
+      end.text = end.text.replace(/ $/, '');
+      if (runs.some((r) => r.text)) out.push(runs.filter((r) => r.text));
+    }
+  }
+  return out;
+}
+
 // Everything from the page is treated as untrusted and reduced to plain, bounded values.
 function sanitize(raw) {
   if (!raw || typeof raw !== 'object' || !raw.ready) return { ready: false };
@@ -1275,6 +1361,7 @@ function sanitize(raw) {
       date: count(n && n.date),
       title: str(n && n.title, 120),
       text: str(n && n.text, 400),
+      body: newsBody(n && n.body),
       author: str(n && n.author, 40),
     })),
     rooms: list(raw.rooms).slice(0, 300).map((r) => ({
@@ -1390,6 +1477,14 @@ function sanitizeFriends(raw) {
   return { available: raw.length === 0 || items.length > 0, items };
 }
 
+// A promise's value if it settles within the snapshot's network budget, else the fallback.
+// The promise keeps running and fills its cache for the next read.
+function within(promise, fallback) {
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), SNAPSHOT_NETWORK_WAIT); });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
 function copyFriends(value) {
   return { available: value.available, items: value.items.map((item) => ({ ...item })) };
 }
@@ -1398,6 +1493,7 @@ class ShowdownBridge {
   constructor(getContents) {
     this.getContents = getContents;
     this.ratings = new Map();
+    this.ratingsInFlight = new Map();
     this.friendsCache = new Map();
     this.friendsInFlight = new Map();
     this.friendsRequest = null;
@@ -1458,13 +1554,21 @@ class ShowdownBridge {
     state.friends = { available: false, items: [] };
     if (state.user.registered && state.user.userid) {
       const userid = state.user.userid;
+      // Last known values, however old, so a slow refresh never blanks what Home shows.
+      const knownRatings = this.ratings.get(userid);
+      const knownFriends = this.friendsCache.get(userid);
+      const unavailable = { available: false, items: [] };
       const [ratings, friends] = await Promise.all([
-        this.fetchRatings(userid),
-        state.connected ? this.fetchFriends(userid) : Promise.resolve({ available: false, items: [] }),
+        within(this.fetchRatings(userid), knownRatings ? knownRatings.value : null),
+        state.connected
+          ? within(this.fetchFriends(userid), knownFriends ? copyFriends(knownFriends.value) : null)
+          : Promise.resolve(unavailable),
       ]);
-      state.ratings = ratings;
+      state.ratings = ratings || {};
       state.stats = (this.ratings.get(userid) || {}).stats || {};
-      state.friends = friends;
+      state.friends = friends || { ...unavailable, loading: true };
+      // Something is still on its way: Home asks again soon rather than at its idle pace.
+      state.pending = !ratings || !friends;
     }
     return state;
   }
@@ -1507,10 +1611,19 @@ class ShowdownBridge {
     }
   }
 
-  // Public profile endpoint; no credentials are sent.
-  async fetchRatings(userid) {
+  // Public profile endpoint; no credentials are sent. Overlapping reads share one fetch.
+  fetchRatings(userid) {
     const cached = this.ratings.get(userid);
-    if (cached && Date.now() - cached.at < RATINGS_TTL) return cached.value;
+    if (cached && Date.now() - cached.at < RATINGS_TTL) return Promise.resolve(cached.value);
+    let pending = this.ratingsInFlight.get(userid);
+    if (!pending) {
+      pending = this.loadRatings(userid).finally(() => this.ratingsInFlight.delete(userid));
+      this.ratingsInFlight.set(userid, pending);
+    }
+    return pending;
+  }
+
+  async loadRatings(userid) {
     const value = {};
     const stats = {};
     try {
@@ -1551,7 +1664,7 @@ class ShowdownBridge {
       case 'challenge': {
         const name = str(args.user, 18).trim();
         if (!name || /[\u0000-\u001f]/.test(name) || !isId(args.format)) return false;
-        code = call(challenge, name, args.format);
+        code = callWith([pmWindow, openPM], challenge, name, args.format);
         break;
       }
       case 'join':

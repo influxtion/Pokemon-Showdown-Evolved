@@ -72,6 +72,66 @@ test('snapshot bounds untrusted client data and rejects malformed fields', async
   assert.equal(state.rooms[1].desc.length, 200);
 });
 
+test('a news post\'s full text arrives as bounded plain-text runs with safe links only', async () => {
+  const raw = {
+    ready: true, user: {}, counts: {}, formats: [], teams: [], rooms: [],
+    news: [{ id: '7', title: 'Post', text: 'Preview', body: [
+      [{ text: '  Join   the ' }, { text: 'thread', href: 'https://www.smogon.com/forums/threads/1/' }, { text: ' today.\n' }],
+      [{ text: 'Bad ' }, { text: 'script', href: 'javascript:alert(1)' }, { text: ' and ' }, { text: 'creds', href: 'https://u:p@evil.example/' },
+        { text: ' and ' }, { text: 'file', href: 'file:///C:/secret' }, { text: '<b>not html</b>' }],
+      'not a paragraph', [null, { text: 5 }], [{ text: '   ' }],
+      [{ text: 'x'.repeat(9000) }],
+    ] }],
+  };
+  const state = await new ShowdownBridge(() => fakeContents(raw)).snapshot();
+  const body = state.news[0].body;
+  assert.deepEqual(body[0], [{ text: 'Join the ' }, { text: 'thread', href: 'https://www.smogon.com/forums/threads/1/' }, { text: ' today.' }]);
+  // Unsafe links become plain text, joined with their neighbours; markup stays literal text.
+  assert.deepEqual(body[1], [{ text: 'Bad script and creds and file<b>not html</b>' }]);
+  assert.equal(body.length, 3, 'malformed and empty paragraphs are dropped');
+  assert.ok(body[2][0].text.length <= 1000, 'runs are bounded');
+  const total = body.flat().reduce((sum, r) => sum + r.text.length, 0);
+  assert.ok(total <= 6000, 'the post is bounded');
+  assert.deepEqual((await new ShowdownBridge(() => fakeContents({ ...raw, news: [{ id: '8', title: 'Old' }] })).snapshot()).news[0].body, []);
+});
+
+test('team sprites are worked out once per team, not on every Home read', async () => {
+  const unpacked = [];
+  const window = {};
+  const Storage = {
+    teams: [{ name: 'A', format: 'gen9ou', team: 'packed-a' }, { name: 'B', format: 'gen9ou', team: 'packed-b' }],
+    unpackTeam: (packed) => { unpacked.push(packed); return [{ species: packed }]; },
+  };
+  Object.assign(window, {
+    app: { rooms: { '': { curFormat: 'gen9ou' } }, roomsData: {}, user: { get: () => '' } },
+    BattleFormats: {}, Storage,
+  });
+  // Like the client: a gen 5 dex gives the 2D gen5 sprites; the default dex gives HOME renders.
+  const gen5 = { gen: 5 };
+  const context = vm.createContext({
+    window, app: window.app, BattleFormats: {}, Storage,
+    Dex: {
+      forGen: (gen) => (gen === 5 ? gen5 : null),
+      getTeambuilderSpriteData: (set, dex) => ({ spriteDir: dex === gen5 ? 'sprites/gen5' : 'sprites/home-centered', spriteid: set.species }),
+    },
+    document: { querySelectorAll: () => [] },
+  });
+  const contents = { isLoading: () => false, executeJavaScript: async (code) => vm.runInContext(code, context) };
+  const bridge = new ShowdownBridge(() => contents);
+  const sprites = (state) => state.teams.map((t) => t.sprites[0]);
+  assert.deepEqual(sprites(await bridge.snapshot()), [
+    'https://play.pokemonshowdown.com/sprites/gen5/packed-a.png', 'https://play.pokemonshowdown.com/sprites/gen5/packed-b.png',
+  ]);
+  await bridge.snapshot();
+  await bridge.snapshot();
+  assert.deepEqual(unpacked, ['packed-a', 'packed-b'], 'later reads reuse them');
+  // An edited team is unpacked again; a deleted one is forgotten.
+  Storage.teams = [{ name: 'A', format: 'gen9ou', team: 'packed-a2' }];
+  assert.deepEqual(sprites(await bridge.snapshot()), ['https://play.pokemonshowdown.com/sprites/gen5/packed-a2.png']);
+  assert.deepEqual(unpacked, ['packed-a', 'packed-b', 'packed-a2']);
+  assert.deepEqual([...window.__sdTeamSprites2d.keys()], ['packed-a2']);
+});
+
 test('snapshot and session survive malformed client results', async () => {
   const contents = fakeContents(null);
   const bridge = new ShowdownBridge(() => contents);
@@ -178,9 +238,61 @@ test('only allowlisted actions with valid arguments reach the client', async () 
   assert.equal(await bridge.act('leave-room', { room: 'rooms' }), false);
   assert.equal(contents.codes.length, 0);
   assert.equal(await bridge.act('challenge', { user: 'Rival', format: 'gen9ou' }), true);
-  assert.match(contents.codes[0], /\("Rival", "gen9ou"\)$/);
+  assert.match(contents.codes[0], /\("Rival", "gen9ou"\);\n\}\)\(\)$/);
   assert.equal(await bridge.act('search', { format: 'gen9ou', team: null }), true);
   assert.match(contents.codes[1], /\("gen9ou", null\)$/);
+});
+
+test('Open list opens the friends page at once instead of waiting on the main menu', async () => {
+  const focused = [];
+  const joined = [];
+  const sent = [];
+  const html = [];
+  const app = {
+    rooms: { '': {}, lobby: {} },
+    focusRoom: (id) => focused.push(id),
+    send: (text) => sent.push(text),
+    // The client creates and focuses the page room itself, and asks the server for it.
+    joinRoom: (id) => { joined.push(id); app.rooms[id] = { $el: { html: (value) => html.push(value) } }; focused.push(id); },
+  };
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('friends', {}), true);
+  assert.deepEqual(joined, ['view-friends-all']);
+  assert.deepEqual(focused, ['view-friends-all'], 'never the main menu');
+  assert.deepEqual(sent, []);
+  assert.match(html[0], /Loading/, 'a loading line instead of "Page unavailable"');
+
+  // A friends page already open (any of its tabs) is focused, not opened twice.
+  delete app.rooms['view-friends-all'];
+  app.rooms['view-friends-settings'] = {};
+  focused.length = 0;
+  assert.equal(await bridge.act('friends', {}), true);
+  assert.deepEqual(focused, ['view-friends-settings']);
+  assert.deepEqual(joined, ['view-friends-all']);
+});
+
+test('Challenge a user opens that conversation, not the bare main menu', async () => {
+  const challenged = [];
+  const focused = [];
+  const classes = new Set(['sd-menu-community']);
+  const pm = { addClass() { pm.active = true; return pm; }, show: () => pm, data: () => false,
+    find: () => ({ removeClass() {}, scrollTop() {}, height: () => 0 }) };
+  const menu = {
+    challenge: (name, format) => { challenged.push([name, format]); menu.open = true; },
+    $pmBox: { find: (selector) => {
+      if (selector === '.pm-window-rival' && menu.open) return Object.assign([pm], { length: 1, ...pm });
+      return { length: 0, removeClass() {} };
+    } },
+  };
+  const app = { rooms: { '': menu }, focusRoom: (id) => focused.push(id) };
+  const document = { documentElement: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } } };
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app, document }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('challenge', { user: 'Rival', format: 'gen9ou' }), true);
+  assert.deepEqual(challenged, [['Rival', 'gen9ou']]);
+  assert.ok(classes.has('sd-menu-pm') && !classes.has('sd-menu-community'), 'the conversation view');
+  assert.equal(pm.active, true);
 });
 
 test('team shortcut opens the selected team and preserves existing edits or stale selections', async () => {

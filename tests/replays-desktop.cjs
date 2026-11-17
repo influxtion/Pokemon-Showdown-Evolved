@@ -174,15 +174,6 @@ app.whenReady().then(async () => {
   assert.equal(await run("document.getElementById('replay-list').children.length"), 2);
   assert.equal(opened.length, 0);
 
-  // Home's recent-note link targets the actual saved ID.
-  await load('index.html');
-  await until(() => run("!document.getElementById('recent-replays-section').hidden"), 'Home recent notes');
-  const recentLink = await run("Array.from(document.querySelectorAll('#recent-replays a')).find(a => a.textContent.includes('First private replay')).getAttribute('href')");
-  assert.equal(recentLink, `replays.html?id=${saved.id}`);
-  await run("Array.from(document.querySelectorAll('#recent-replays a')).find(a => a.textContent.includes('First private replay')).click()");
-  await until(() => renderer.getURL().includes(`replays.html?id=${saved.id}`), 'Home recent-note navigation');
-  await until(() => run("document.getElementById('note-title').value === 'First private replay'"), 'Home note selected');
-
   // A simulated current battle supplies only a title and format; its room ID is not an uploaded replay URL.
   await client.executeJavaScript(`window.__testSends = [];
     window.app = {
@@ -308,7 +299,7 @@ app.whenReady().then(async () => {
   assert.equal(saveDialogs.length, saveDialogsBeforeCorruptExport, 'invalid store blocks export before dialog');
 
   fs.rmSync(exportDirectory, { recursive: true, force: true });
-  console.log('PASS replay desktop smoke: CRUD, drafts, export/cancel/failures, Home link, search/filter, private URL, dedup, dialogs, save failure, corrupt store, themes/layout');
+  console.log('PASS replay desktop smoke: CRUD, drafts, export/cancel/failures, search/filter, private URL, dedup, dialogs, save failure, corrupt store, themes/layout');
   app.exit(0);
 }).catch((error) => {
   console.error(error);

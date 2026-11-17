@@ -81,7 +81,11 @@ app.whenReady().then(async () => {
   await until(() => run("document.getElementById('start-page').value === 'replays'"), 'Settings loaded');
   assert.equal(await run("document.getElementById('confirm-on-close').checked"), true);
   assert.equal(await run("document.getElementById('notify-messages').checked"), true);
-  for (const id of ['theme', 'start-page', 'confirm-on-close', 'notify-messages', 'reload-client', 'open-logs', 'sign-out', 'reset-launcher', 'showdex-enabled', 'showdex-status', 'showdex-reload-banner', 'showdex-reload']) {
+  assert.equal(await run("document.getElementById('home-layout').value"), '', 'no layout chosen yet');
+  await run("document.getElementById('home-layout').value = 'classic'; document.getElementById('home-layout').dispatchEvent(new Event('change', {bubbles:true}))");
+  await until(() => readSettings().homeLayout === 'classic', 'home layout saved');
+  assert.equal((await result("setSetting('homeLayout', null)")).ok, false, 'a chosen layout cannot be unset from a page');
+  for (const id of ['theme', 'home-layout', 'start-page', 'confirm-on-close', 'notify-messages', 'reload-client', 'open-logs', 'sign-out', 'reset-launcher', 'showdex-enabled', 'showdex-status', 'showdex-reload-banner', 'showdex-reload']) {
     assert.equal(await run(`Boolean(document.getElementById(${JSON.stringify(id)}))`), true, `${id} control`);
   }
   await run("document.getElementById('start-page').value = 'home'; document.getElementById('start-page').dispatchEvent(new Event('change', {bubbles:true}))");
@@ -98,6 +102,7 @@ app.whenReady().then(async () => {
   assert.equal(await run("document.getElementById('confirm-on-close').checked"), false);
   assert.equal(await run("document.getElementById('notify-messages').checked"), false);
   assert.equal(await run("document.getElementById('start-page').value"), 'home');
+  assert.equal(await run("document.getElementById('home-layout').value"), 'classic');
   assert.deepEqual((await result('getSettings()')).settings, readSettings());
   assert.equal((await result("setSetting('unknown', true)")).ok, false);
   assert.equal((await result("setSetting('showdexEnabled', 'true')")).ok, false);
@@ -163,7 +168,7 @@ app.whenReady().then(async () => {
   assert.equal((await result('resetLauncher()')).ok, true);
   assert.equal(await noteCount(), 0);
   assert.equal(fs.existsSync(replayFile), false);
-  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true });
+  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null });
   assert.equal(await run("localStorage.getItem('launcher-marker')"), null);
   assert.equal(await client().executeJavaScript("localStorage.getItem('session-marker')"), 'keep-after-reset');
 
@@ -204,6 +209,10 @@ app.whenReady().then(async () => {
   await until(() => readSettings().showdexEnabled === false, 'Showdex preference disabled');
   showdexState = { ...showdexState, enabled: false, pendingReload: true };
   await until(() => run("document.getElementById('showdex-status').textContent === 'Loaded · reload to disable' && !document.getElementById('showdex-reload-banner').hidden"), 'Showdex disable pending');
+  // A room is open, so the Showdown screen stays up (its bare main menu would return to Home).
+  await client().executeJavaScript(`app.rooms['battle-gen9ou-2'] = {
+    title:'Spectating', battle:{p1:{name:'Alpha'},p2:{name:'Beta'},tier:'[Gen 9] OU',ended:false}
+  }; app.curRoom = {id:'battle-gen9ou-2'}; 0`);
   await load('play.html');
   await until(() => run("document.getElementById('showdex-status').textContent === 'Showdex: Loaded · reload to disable'"), 'Play loaded pending label');
   showdexState = { ...showdexState, loaded: false, status: 'failed', pendingReload: false, error: 'Test load error' };

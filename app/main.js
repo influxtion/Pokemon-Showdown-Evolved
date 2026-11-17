@@ -28,7 +28,7 @@ let showdexApplied = false;
 let showdexLoadFailed = false;
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
-const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-messages.css', 'client-rooms.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
+const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-messages.css', 'client-rooms.css', 'client-friends.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
 const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
@@ -198,6 +198,12 @@ function ensureClient() {
   contents.on('will-redirect', (event, url) => {
     if (!isShowdownUrl(url)) event.preventDefault();
   });
+  // The client moves its address (/lobby, /battle-…) whenever it opens or switches rooms.
+  // Tell the launcher page at once, so its tabs and top bar follow without waiting for the
+  // next poll. It carries no data; the page reads the session through the bridge as usual.
+  contents.on('did-navigate-in-page', (_event, _url, isMainFrame) => {
+    if (isMainFrame && win && !win.isDestroyed()) win.webContents.send('client:changed');
+  });
   contents.on('did-create-window', popup => {
     const child = popup.webContents;
     denyPermissions(child.session);
@@ -293,14 +299,16 @@ function createWindow() {
     openExternal(url);
     return { action: 'deny' };
   });
-  contents.on('will-navigate', (event, url) => {
-    if (!launcherUrl(url, RENDERER_DIR)) {
-      event.preventDefault();
-      openExternal(url);
-    }
-  });
+  // will-frame-navigate fires first, for every frame; cancelling it there means will-navigate
+  // never fires, so an outside link (Home's news, for one) is handed to the browser here.
   contents.on('will-frame-navigate', event => {
-    if (!event.isMainFrame || !launcherUrl(event.url, RENDERER_DIR)) event.preventDefault();
+    if (event.isMainFrame && launcherUrl(event.url, RENDERER_DIR)) return;
+    event.preventDefault();
+    if (event.isMainFrame) openExternal(event.url);
+  });
+  // Kept as a second guard; it only blocks, so a link can never open twice.
+  contents.on('will-navigate', (event, url) => {
+    if (!launcherUrl(url, RENDERER_DIR)) event.preventDefault();
   });
   contents.on('will-redirect', event => event.preventDefault());
   // Every launcher page change hides the client; play.html shows it again with fresh bounds.

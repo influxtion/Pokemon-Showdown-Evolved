@@ -9,9 +9,13 @@ const path = require('node:path');
 const bridgeFile = path.join(__dirname, '..', 'app', 'showdown.js');
 const originalLoad = Module._load;
 let ShowdownBridge;
+// The public profile fetch behind ratings; a test can swap in a slow one.
+const quickFetch = async () => ({ ok: false });
+let fetchImpl = quickFetch;
+let fetchCalls = 0;
 try {
   Module._load = function (request, parent, isMain) {
-    if (request === 'electron') return { net: { fetch: async () => ({ ok: false }) } };
+    if (request === 'electron') return { net: { fetch: (...args) => { fetchCalls += 1; return fetchImpl(...args); } } };
     return originalLoad.call(this, request, parent, isMain);
   };
   ({ ShowdownBridge } = require(bridgeFile));
@@ -136,6 +140,57 @@ test('cache and concurrent snapshots do not duplicate queries or mix accounts', 
   const again = await bridge.snapshot();
   assert.equal(again.friends.items[0].userid, 'alice');
   assert.equal(source.sends.length, 2);
+});
+
+test('a friends query the server is slow to answer never holds Home back', async () => {
+  const source = page({ silent: true });
+  const bridge = new ShowdownBridge(() => source.contents);
+  const started = Date.now();
+  const first = await bridge.snapshot();
+  assert.ok(Date.now() - started < 1000, 'answered within the network budget, not the 4.5 s timeout');
+  assert.equal(first.ready, true);
+  assert.deepEqual(first.friends, { available: false, items: [], loading: true });
+  assert.equal(first.pending, true, 'Home is told to look again soon');
+  assert.deepEqual(source.sends, ['/cmd friends']);
+
+  // The answer lands in the background; the next read has it, without asking again.
+  source.listeners.get('response:friends')([{ userid: 'alice', name: 'Alice', online: true, status: 'online' }]);
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = await bridge.snapshot();
+  assert.equal(second.friends.items[0].userid, 'alice');
+  assert.equal(second.pending, false);
+  assert.equal(source.sends.length, 1);
+
+  // Once that goes stale, the old list shows at once while a fresh query runs.
+  bridge.friendsCache.get('tester').at = 0;
+  const stale = await bridge.snapshot();
+  assert.equal(stale.friends.items[0].userid, 'alice', 'last known friends, not a blank panel');
+  assert.equal(source.sends.length, 2, 'refreshing in the background');
+  source.listeners.get('response:friends')([{ userid: 'bob', name: 'Bob', online: false, status: 'offline' }]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await bridge.snapshot()).friends.items[0].userid, 'bob');
+});
+
+test('a slow ratings fetch shows last known ratings and is shared by overlapping reads', async (t) => {
+  let release;
+  fetchImpl = () => new Promise((resolve) => { release = () => resolve({ ok: false }); });
+  fetchCalls = 0;
+  t.after(() => { fetchImpl = quickFetch; });
+  const source = page({ response: [] });
+  const bridge = new ShowdownBridge(() => source.contents);
+  const started = Date.now();
+  const [a, b] = await Promise.all([bridge.snapshot(), bridge.snapshot()]);
+  assert.ok(Date.now() - started < 1000);
+  assert.deepEqual(a.ratings, {});
+  assert.equal(a.pending, true);
+  assert.equal(b.pending, true);
+  assert.equal(fetchCalls, 1, 'one fetch for both reads');
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const after = await bridge.snapshot();
+  assert.equal(after.pending, false);
+  assert.equal(fetchCalls, 1, 'the finished fetch is cached');
 });
 
 test('account switch waits for the previous untagged response before querying', async () => {

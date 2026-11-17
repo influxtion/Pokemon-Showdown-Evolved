@@ -93,7 +93,8 @@ body {
 textarea,
 input[type="text"],
 input[type="search"],
-input[type="password"] {
+input[type="password"],
+input.textbox {
   appearance: none !important;
 }
 /* Selects keep their native arrow; color-scheme above makes them match the theme. */

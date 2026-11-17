@@ -63,7 +63,9 @@
     </header>
 
     <main class="content content--flush">
-      <div class="hub">
+      <!-- One page, two layouts: hub--classic (Showdown's menu, modernized) and hub--modern
+           (the focused redesign). The player picks once in the welcome; Settings switches. -->
+      <div class="hub" id="hub">
 
         <div class="banner banner--live" id="live-battle" hidden>
           <span id="live-battle-text"></span>
@@ -72,13 +74,12 @@
 
         <div class="hub-grid">
 
-          <div class="hub-col hub-menu">
             <section class="hero hero--menu" aria-label="Start a battle">
+              <div class="hero-main">
               <div class="hero-top">
                 <span class="hero-kicker" id="hero-kicker">Ready to battle</span>
                 <h2 class="hero-title" id="hero-format">Pokémon Showdown</h2>
                 <p class="hero-sub" id="hero-sub">Loading formats and teams…</p>
-                <div class="hero-record num" id="hero-record" hidden></div>
               </div>
 
               <div class="hero-pickers">
@@ -111,76 +112,63 @@
                   <button class="btn btn-quiet" type="button" id="challenge-cancel">Cancel</button>
                 </form>
               </div>
-              <div class="hero-stats num" id="hero-stats"></div>
+              </div>
+
+              <div class="hero-aside">
+                <div class="hero-record num" id="hero-record" hidden></div>
+                <!-- Revamped layout: shortcuts live inside the battle panel. -->
+                <nav class="hero-links" aria-label="Shortcuts">
+                  <a class="hero-link" href="#" data-room="teambuilder"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3z"/><path d="M9 4l3 3"/></svg>Teambuilder</a>
+                  <a class="hero-link" href="#" data-room="ladder"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 13h10M4.5 13V8M8 13V3M11.5 13V6"/></svg>Ladder</a>
+                  <a class="hero-link" href="#" data-room="battles"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>Watch</a>
+                  <a class="hero-link" href="stats.html"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg>Your stats</a>
+                </nav>
+                <div class="hero-stats num" id="hero-stats"></div>
+              </div>
             </section>
 
-            <nav class="menu-list" aria-label="Quick links">
-          <a class="menu-row" href="#" data-room="teambuilder">
-            <span class="menu-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3z"/><path d="M9 4l3 3"/></svg></span>
-            <span class="menu-text"><span class="menu-title">Teambuilder</span><span class="menu-sub" id="tile-teams">Build and import teams</span></span>
-          </a>
-          <a class="menu-row" href="#" data-room="ladder">
-            <span class="menu-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 13h10M4.5 13V8M8 13V3M11.5 13V6"/></svg></span>
-            <span class="menu-text"><span class="menu-title">Ladder</span><span class="menu-sub">Rankings by format</span></span>
-          </a>
-          <a class="menu-row" href="#" data-room="battles">
-            <span class="menu-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
-            <span class="menu-text"><span class="menu-title">Watch a battle</span><span class="menu-sub" id="tile-battles">Live battles</span></span>
-          </a>
-          <a class="menu-row" href="stats.html">
-            <span class="menu-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg></span>
-            <span class="menu-text"><span class="menu-title">Your stats</span><span class="menu-sub">Ratings and win rates</span></span>
-          </a>
+            <!-- Classic layout: shortcuts as tiles beneath the battle panel. -->
+            <nav class="hub-tiles" aria-label="Shortcuts">
+              <a class="hub-tile" href="#" data-room="tournaments"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M5 2.5h6v3a3 3 0 0 1-6 0zM5 3.5H2.5c0 2 1 3 2.7 3M11 3.5h2.5c0 2-1 3-2.7 3M8 8.5v3M5.5 13.5h5"/></svg>Tournaments</a>
+              <a class="hub-tile" href="#" data-room="ladder"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 13h10M4.5 13V8M8 13V3M11.5 13V6"/></svg>Ladder</a>
+              <a class="hub-tile" href="#" data-room="battles"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>Spectate</a>
             </nav>
-          </div>
 
-          <div class="hub-col">
-            <section class="window" aria-labelledby="news-title">
-              <div class="window-head">
-                <h2 id="news-title">Latest news</h2>
-                <span class="window-space"></span>
-                <a href="https://pokemonshowdown.com/news">All news</a>
-                <button class="window-toggle" type="button" data-window="news" aria-expanded="true" aria-label="Minimize Latest news" title="Minimize"></button>
-              </div>
-              <div class="posts" id="news"><div class="empty">Loading news…</div></div>
-            </section>
+            <div class="hub-side">
+              <section class="window hub-news" aria-labelledby="news-title">
+                <div class="window-head">
+                  <h2 id="news-title">Latest news</h2>
+                  <span class="window-space"></span>
+                  <a href="https://pokemonshowdown.com/news">All news</a>
+                </div>
+                <div class="posts window-body" id="news"><div class="empty">Loading news…</div></div>
+              </section>
 
-            <section class="window" aria-labelledby="notes-title">
-              <div class="window-head">
-                <h2 id="notes-title">Replay notes</h2>
-                <span class="window-count num" id="count-notes" hidden></span>
-                <span class="window-space"></span>
-                <a href="replays.html">All notes</a>
-                <button class="window-toggle" type="button" data-window="notes" aria-expanded="true" aria-label="Minimize Replay notes" title="Minimize"></button>
-              </div>
-              <div class="empty" id="recent-replays-empty">No replay notes yet. Save one after a battle, or add one in Replay notes.</div>
-              <div id="recent-replays-section" hidden>
-                <div id="recent-replays"></div>
-              </div>
-            </section>
-          </div>
+              <div class="hub-lower">
+                <section class="window hub-rooms" aria-labelledby="rooms-title">
+                  <div class="window-head">
+                    <h2 id="rooms-title">Chat rooms</h2>
+                    <span class="window-space"></span>
+                    <button class="btn" type="button" id="rooms-edit" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="room-list window-body" id="rooms"><div class="empty">Loading rooms…</div></div>
+                  <form class="window-foot room-add" id="rooms-add" hidden>
+                    <input class="input" id="rooms-add-name" maxlength="40" placeholder="Room name" aria-label="Room to add" autocomplete="off">
+                    <button class="btn" type="submit">Add</button>
+                  </form>
+                  <div class="window-foot" id="rooms-all"><a href="#" data-room="rooms">All rooms</a></div>
+                </section>
 
-          <div class="hub-col hub-side">
-            <section class="window" aria-labelledby="friends-title">
-              <div class="window-head" id="friends-head">
-                <h2 id="friends-title">Friends</h2>
-                <span class="window-count window-count--live num" id="count-friends" hidden></span>
-                <span class="window-space"></span>
-                <button class="window-toggle" type="button" data-window="friends" aria-expanded="true" aria-label="Minimize Friends" title="Minimize"></button>
+                <section class="window hub-friends" aria-labelledby="friends-title">
+                  <div class="window-head" id="friends-head">
+                    <h2 id="friends-title">Friends</h2>
+                    <span class="window-count window-count--live num" id="count-friends" hidden></span>
+                    <span class="window-space"></span>
+                  </div>
+                  <div class="friends-body window-body" id="friends"></div>
+                </section>
               </div>
-              <div class="friends-body" id="friends"></div>
-            </section>
-
-            <section class="window" aria-labelledby="rooms-title">
-              <div class="window-head">
-                <h2 id="rooms-title">Chat rooms</h2>
-                <span class="window-space"></span>
-                <a href="#" data-room="rooms">All rooms</a>
-                <button class="window-toggle" type="button" data-window="rooms" aria-expanded="true" aria-label="Minimize Chat rooms" title="Minimize"></button>
-              </div>
-              <div class="room-list" id="rooms"><div class="empty">Loading rooms…</div></div>
-            </section>
-          </div>
+            </div>
 
         </div>
       </div>
@@ -188,6 +176,74 @@
 
   </div>
 </div>
+
+<!-- First launch only: shown while no Home layout has been chosen. -->
+<dialog class="welcome" id="welcome" closedby="none" aria-labelledby="welcome-title" aria-describedby="welcome-desc">
+  <h2 id="welcome-title">Welcome to Showdown Desktop</h2>
+  <p id="welcome-desc">Choose how your Home screen looks. You can always switch between them later in Settings.</p>
+  <div class="welcome-options">
+    <button class="welcome-option" type="button" data-layout="classic">
+      <!-- A small, labelled copy of each layout, in its real proportions. -->
+      <span class="layout-preview layout-preview--classic" aria-hidden="true">
+        <span class="lp-rail"></span>
+        <span class="lp-app">
+          <span class="lp-strip"><span class="lp-tab lp-tab--on">Home</span><span class="lp-tab">Community</span><span class="lp-tab">Lobby</span></span>
+          <span class="lp-body">
+            <span class="lp-left">
+              <span class="lp-hero">
+                <span class="lp-group"><span class="lp-kicker">Ready to battle</span><span class="lp-format">[Gen 9] OU</span></span>
+                <span class="lp-select">Format</span>
+                <span class="lp-select">Team</span>
+                <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="lp-group"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge a user</span></span>
+              </span>
+              <span class="lp-tiles"><span>Tournaments</span><span>Ladder</span><span>Spectate</span></span>
+            </span>
+            <span class="lp-right">
+              <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span><span class="lp-line lp-line--short"></span></span>
+              <span class="lp-pair">
+                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span><span class="lp-item">Tournaments</span></span>
+                <span class="lp-panel"><span class="lp-head">Friends</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--away">Offline</span></span>
+              </span>
+            </span>
+          </span>
+        </span>
+      </span>
+      <span class="welcome-option-kicker">Modernized</span>
+      <span class="welcome-option-title">Classic</span>
+      <span class="welcome-option-desc">The Showdown menu you know. Battle, news, chat rooms and friends, all on one screen.</span>
+    </button>
+    <button class="welcome-option" type="button" data-layout="modern">
+      <span class="layout-preview layout-preview--modern" aria-hidden="true">
+        <span class="lp-rail"></span>
+        <span class="lp-app">
+          <span class="lp-strip"><span class="lp-tab lp-tab--on">Home</span><span class="lp-tab">Community</span><span class="lp-tab">Lobby</span></span>
+          <span class="lp-body">
+            <span class="lp-column">
+              <span class="lp-hero lp-hero--wide">
+                <span class="lp-hero-main">
+                  <span class="lp-kicker">Ready to battle</span>
+                  <span class="lp-format">[Gen 9] OU</span>
+                  <span class="lp-selects"><span class="lp-select">Format</span><span class="lp-select">Team</span></span>
+                  <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+                  <span class="lp-actions"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge</span></span>
+                </span>
+                <span class="lp-links"><span>Teambuilder</span><span>Ladder</span><span>Watch</span><span>Your stats</span></span>
+              </span>
+              <span class="lp-pair lp-pair--split">
+                <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span></span>
+                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span></span>
+              </span>
+            </span>
+          </span>
+        </span>
+      </span>
+      <span class="welcome-option-kicker">New</span>
+      <span class="welcome-option-title">Revamped</span>
+      <span class="welcome-option-desc">A focused, centered layout built around the Battle button, with news and your chat rooms beneath it.</span>
+    </button>
+  </div>
+</dialog>
 <script src="home.js"></script>
 <script src="nav.js"></script>
 </body>
