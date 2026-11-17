@@ -65,20 +65,26 @@
       </div>
     </header>
     <main class="content content--flush practice-content">
-      <section class="practice-setup panel" id="practice-setup">
-        <div class="panel-head">Practice against Foul Play</div>
-        <div class="panel-body">
-          <p>Play an unrated battle with generated teams. Your online Showdown account is separate.</p>
-          <p class="field-hint" id="practice-opponent-description"></p>
-          <fieldset class="field engine-field">
-            <legend class="field-label">Run Foul Play on</legend>
+      <div class="banner banner--bar banner--warn" id="practice-message" role="status" hidden></div>
+      <section class="practice-setup" id="practice-setup">
+        <div class="practice-page">
+          <header class="practice-head">
+            <h2>Practice against Foul Play</h2>
+            <p>Play unrated Gen 9 Random Battles with generated teams.</p>
+            <p class="practice-bot" id="practice-opponent-description"></p>
+          </header>
+
+          <fieldset class="engine-field">
+            <legend class="practice-section">Run Foul Play on</legend>
             <div class="engine-choice" role="radiogroup" aria-label="Run Foul Play on">
               <label class="engine-option">
                 <input type="radio" name="practice-engine" value="cloud" id="practice-engine-cloud" checked>
+                <span class="engine-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 12.5h7a2.75 2.75 0 0 0 .4-5.47A4 4 0 0 0 4.2 6.4 3.05 3.05 0 0 0 4.5 12.5z"/></svg></span>
                 <span class="engine-text"><strong>Cloud server</strong><span class="engine-note" id="practice-engine-cloud-note">Nothing to install. Needs an internet connection.</span></span>
               </label>
               <label class="engine-option">
                 <input type="radio" name="practice-engine" value="local" id="practice-engine-local">
+                <span class="engine-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 13.5h4M8 11v2.5"/></svg></span>
                 <span class="engine-text"><strong>This computer</strong><span class="engine-note" id="practice-engine-local-note">Works offline after a one-time install. Uses your CPU while it thinks.</span></span>
               </label>
             </div>
@@ -99,19 +105,26 @@
               <button class="btn btn-danger" id="practice-local-remove" hidden>Remove from this computer</button>
             </div>
           </div>
-          <div class="field">
-            <label class="field-label" for="practice-preset">Computation</label>
-            <select class="select" id="practice-preset">
-              <option value="quiet">Quiet · 1 search thread</option>
-              <option value="balanced">Balanced · 2 search threads</option>
-              <option value="full" selected>Full · 8 search threads</option>
-            </select>
-            <div class="field-hint" id="practice-preset-hint">More threads search deeper in the same time. These settings control computation, not difficulty or Elo.</div>
+
+          <div class="practice-field">
+            <label class="practice-section" for="practice-preset">Computation</label>
+            <div class="practice-card">
+              <select class="select" id="practice-preset">
+                <option value="quiet">Quiet · 1 search thread</option>
+                <option value="balanced">Balanced · 2 search threads</option>
+                <option value="full" selected>Full · 8 search threads</option>
+              </select>
+              <p class="practice-hint" id="practice-preset-hint">More threads search deeper in the same time. These settings control computation, not difficulty or Elo.</p>
+            </div>
           </div>
-          <button class="btn btn-primary" id="practice-start" disabled>Play against Foul Play</button>
+
+          <div class="practice-start-bar">
+            <span class="practice-start-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .92.5l7.4-4.8a.6.6 0 0 0 0-1L5.92 2.7A.6.6 0 0 0 5 3.2z"/></svg></span>
+            <span class="practice-start-text"><strong>Unrated practice</strong><span>Separate from your online Showdown account. The battle opens right here.</span></span>
+            <button class="btn btn-primary" id="practice-start" disabled>Play against Foul Play</button>
+          </div>
         </div>
       </section>
-      <div class="banner banner--bar banner--warn" id="practice-message" role="status" hidden></div>
       <div class="client-view practice-area" id="practice-area" hidden>Starting battle client…</div>
     </main>
   </div>

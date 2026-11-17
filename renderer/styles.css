@@ -962,35 +962,65 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .hero .btn:not(.btn-primary):not(.btn-quiet):hover { background: var(--hero-team-bg); }
 #cancel-search { height: 34px; }
-/* Practice uses the same native-view layout as the online client. */
+/* Practice uses the same native-view layout as the online client. The setup page is a
+   centered column styled like the Teambuilder's team list: a large title, rounded cards and
+   a closing bar holding the one primary action. */
 .practice-content { display: flex; flex-direction: column; min-height: 0; }
-.practice-setup { margin: 24px; max-width: 760px; flex-shrink: 0; }
-.practice-setup .field { margin: 16px 0; max-width: 500px; }
-.practice-setup .btn-primary { margin-top: var(--space-3); height: 34px; padding: 0 var(--space-4); font-weight: 600; }
 .practice-area { flex: 1; min-height: 0; }
-.engine-field { border: 0; padding: 0; min-width: 0; }
-.engine-field legend { padding: 0; margin-bottom: var(--space-2); }
-.engine-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.practice-setup {
+  --practice-gold: color-mix(in srgb, var(--primary) 45%, var(--text));
+  flex: 1; min-height: 0; overflow-y: auto;
+}
+@media (prefers-color-scheme: dark) { .practice-setup { --practice-gold: var(--primary); } }
+.practice-page {
+  display: flex; flex-direction: column; gap: 22px;
+  max-width: 720px; margin: 0 auto; padding: 40px 32px 48px;
+}
+.practice-head { text-align: center; }
+.practice-head h2 { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.2; }
+.practice-head p { margin: 6px 0 0; color: var(--text-2); font-size: var(--fs-md); }
+.practice-head .practice-bot { margin-top: 2px; color: var(--text-3); font-size: var(--fs-sm); }
+.practice-head .practice-bot:empty { display: none; }
+
+/* Section labels: small caps with a hairline, as in the Teambuilder's format groups. */
+.practice-section {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin-bottom: 10px;
+  color: var(--text-2); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.practice-section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.engine-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.engine-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .engine-option {
-  display: flex; gap: var(--space-2); align-items: flex-start; padding: 10px 12px; cursor: pointer;
-  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-input);
+  position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
+  transition: border-color 0.12s ease;
 }
 .engine-option:hover { border-color: var(--border-hover); }
-.engine-option:has(input:checked) { border-color: var(--accent); background: var(--bg-selected); }
+.engine-option:has(input:checked) { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.engine-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .engine-option:has(input:disabled) { cursor: default; opacity: 0.6; }
-.engine-option input { margin: 2px 0 0; accent-color: var(--accent); }
-.engine-option input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.engine-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.engine-note { font-size: var(--fs-xs); color: var(--text-3); }
+.engine-option input { position: absolute; opacity: 0; pointer-events: none; }
+.engine-icon, .practice-start-icon {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--practice-gold);
+}
+.engine-icon svg, .practice-start-icon svg { width: 16px; height: 16px; }
+.engine-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-top: 1px; }
+.engine-text strong { font-size: var(--fs-md); }
+.engine-note { font-size: var(--fs-sm); color: var(--text-3); }
 .engine-note--ok { color: var(--ok); }
 .engine-note--warn { color: var(--warn); }
-.local-install {
-  max-width: 500px; margin: 0 0 16px; padding: 12px; border: 1px solid var(--border);
-  border-radius: var(--radius); background: var(--bg-subtle);
+
+.practice-card, .local-install {
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
 }
-.local-install-text { margin: 0 0 var(--space-2); color: var(--text-2); }
+.local-install { margin-top: -10px; }
+.practice-card .select { height: 36px; border-radius: 8px; }
+.practice-hint { margin: 8px 0 0; color: var(--text-3); font-size: var(--fs-sm); }
+.local-install-text { margin: 0 0 var(--space-3); color: var(--text-2); }
 .local-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.practice-setup .local-actions .btn { margin-top: 0; }
+.local-actions .btn { height: 32px; border-radius: 8px; padding: 0 14px; font-weight: 600; }
 .install-progress { margin: 0 0 var(--space-3); }
 .install-progress-head { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--fs-sm); margin-bottom: 4px; }
 .install-progress progress {
@@ -998,12 +1028,26 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   appearance: none; background: var(--border);
 }
 .install-progress progress::-webkit-progress-bar { background: var(--border); border-radius: 4px; }
-.install-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; transition: width 0.3s ease; }
+.install-progress progress::-webkit-progress-value { background: var(--primary); border-radius: 4px; transition: width 0.3s ease; }
 .install-detail {
   margin-top: 4px; font-size: var(--fs-xs); color: var(--text-3); font-family: var(--font-mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-@media (max-width: 640px) { .engine-choice { grid-template-columns: 1fr; } }
+
+/* Closing bar: what the battle is, and the page's one primary action. */
+.practice-start-bar {
+  display: flex; align-items: center; gap: 14px; margin-top: 4px; padding: 14px 16px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
+}
+.practice-start-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.practice-start-text strong { font-size: var(--fs-md); }
+.practice-start-text span { color: var(--text-2); font-size: var(--fs-sm); }
+.practice-start-bar .btn-primary { flex: none; height: 38px; padding: 0 18px; border-radius: 8px; font-weight: 600; }
+@media (max-width: 640px) {
+  .engine-choice { grid-template-columns: 1fr; }
+  .practice-start-bar { flex-wrap: wrap; }
+  .practice-start-bar .btn-primary { width: 100%; }
+}
 
 /* ---------- Rail rooms, room title and result bar ---------- */
 
