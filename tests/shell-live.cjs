@@ -90,7 +90,11 @@ app.whenReady().then(async () => {
   const battleId = href.slice(1);
   assert.equal(await page(`window.desktop.showdown('join', { room: ${JSON.stringify(battleId)} })`), true);
   await until(async () => (await rail()).some((row) => row.live && row.current), 'spectated battle current in the rail', 30000);
-  const battle = (await session()).rooms.find((room) => room.id === battleId);
+  // The tab exists before the server has delivered the battle's initial state.
+  const battle = await until(async () => {
+    const room = (await session()).rooms.find((entry) => entry.id === battleId);
+    return room?.formatId && Number.isInteger(room.turn) ? room : null;
+  }, 'battle format and turn arrive', 30000);
   assert.equal(battle.kind, 'battle');
   assert.ok(battle.formatId && Number.isInteger(battle.turn), 'battle format and turn readable');
   assert.equal(await js('Object.keys(app.rooms).filter((id) => app.rooms[id].el && app.rooms[id].el.getClientRects().length).length'), 1, 'one room at a time');

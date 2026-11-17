@@ -256,6 +256,23 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 
 ## 6. Testing
 
+Electron is pinned to 45.3.3. The dependency override upgrades only affected
+`minimatch` versions (7 through 11.0.0) to 11.0.1 for GHSA-g3hv-75wg-m249;
+older unaffected consumers retain their compatible APIs. The build dependency
+test exercises electron-builder's actual file filters and the universal build
+allowlist matcher without creating an installer. Reassess the override when
+updating electron-builder. The live shell test waits for battle metadata as well
+as the tab: the server can deliver the initial turn after the tab appears.
+
+November 16 audit follow-up: syntax, 152 unit tests (one optional skip), all seven
+isolated desktop suites, live shell and live replay review passed on Electron
+45.3.3. Full and production-only npm audits reported zero vulnerabilities. A
+fresh guest performance probe measured Home ready at 180 ms from script entry,
+the connected shell at 2.8 s, and page navigation at 25–74 ms in both themes and
+window sizes. These are development-PC samples, not cold installed-app startup,
+low-end hardware or sustained-memory guarantees. No installer was rebuilt and
+no hosted bot deployment was changed.
+
 | Command | Covers |
 | --- | --- |
 | `npm run check` | Syntax |
