@@ -1272,6 +1272,14 @@ function installTeamEditor() {
   return true;
 }
 
+// Teambuilder teams of one format, for practice. Returns packed teams: the launcher's main process
+// checks and uses them, and only names reach the Bots page.
+function readTeams(format) {
+  if (!window.Storage || !Array.isArray(Storage.teams)) return null;
+  return Storage.teams.map((t, index) => ({ index, name: t.name, format: t.format, team: t.team }))
+    .filter((t) => t.format === format);
+}
+
 function readShowdex() {
   const state = window.__SHOWDOWN_DESKTOP_SHOWDEX;
   // The pinned bootstrap sets this only after render; closing its room does not unload it.
@@ -1542,6 +1550,19 @@ class ShowdownBridge {
     try {
       return await contents.executeJavaScript(call(installTeamsView)) === true;
     } catch { return false; }
+  }
+
+  // Teambuilder teams for `format`: [{ index, name, team }] with the packed team, or null if the
+  // client is not loaded.
+  async teams(format) {
+    const contents = this.getContents();
+    if (!isId(format) || !contents || contents.isLoading()) return null;
+    let raw;
+    try { raw = await contents.executeJavaScript(call(readTeams, format)); } catch { return null; }
+    if (!Array.isArray(raw)) return null;
+    return raw.slice(0, 500).filter((t) => t && Number.isSafeInteger(t.index) && t.index >= 0 && t.index <= 9999 &&
+      typeof t.team === 'string' && t.team.length <= 8192 && !/[\r\n]/.test(t.team))
+      .map((t) => ({ index: t.index, name: str(t.name, 80) || 'Untitled', team: t.team }));
   }
 
   async showdexStatus() {

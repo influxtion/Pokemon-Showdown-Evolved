@@ -14,6 +14,7 @@ const { PracticeSession } = require('./practice-session');
 const { CloudEngine } = require('./practice-engines');
 const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
+const { PracticeTeams, FORMATS: TEAM_FORMATS } = require('./practice-teams');
 const { Logger } = require('./logging');
 const { WindowState } = require('./window-state');
 const { MessageAlerts } = require('./message-alerts');
@@ -48,6 +49,7 @@ let replayImports = null;
 let replayReview = null;
 let practice = null;
 let practiceView = null;
+let practiceTeams = null;
 // The cloud server that computes Foul Play's moves. Lives for the whole app, independent of windows.
 let cloudEngine = null;
 let choosingReplayImport = false;
@@ -272,6 +274,7 @@ function createWindow() {
     practice.state = 'failed';
     practice.error = 'Battle configuration could not load. Check the practice runtime setup.';
   }
+  practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
     background: background(), onFailure: token => practice?.clientFailed(token) });
   practice.on('ready', connection => { logger.write('practice-ready'); practiceView?.open(connection); });
@@ -388,10 +391,42 @@ ipcMain.handle('practice:status', async event => {
   const clientState = await practiceView.status();
   return { ...practice.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status() };
 });
-ipcMain.handle('practice:start', (event, options) => {
+// A team the Bots page picked: a Teambuilder team ({ source: 'teambuilder', index, name }) or a
+// pasted export ({ source: 'paste', text }). Teambuilder teams are read here, never sent by the page.
+async function practiceTeam(format, spec) {
+  if (!spec || typeof spec !== 'object') return { ok: false, error: 'Choose a team.' };
+  if (spec.source === 'paste') return practiceTeams.check(format, 'export', typeof spec.text === 'string' ? spec.text : '');
+  if (spec.source !== 'teambuilder' || !Number.isSafeInteger(spec.index) || typeof spec.name !== 'string') {
+    return { ok: false, error: 'Choose a team.' };
+  }
+  const teams = await bridge.teams(format);
+  if (!teams) return { ok: false, error: "The Teambuilder isn't loaded yet. Try again in a moment." };
+  const team = teams.find(value => value.index === spec.index && value.name === spec.name.slice(0, 80));
+  if (!team) return { ok: false, error: 'This team is no longer in the Teambuilder. Choose another.' };
+  return practiceTeams.check(format, 'packed', team.team);
+}
+const publicTeam = result => (result.ok ? { ok: true, species: result.species } : { ok: false, error: result.error, problems: result.problems });
+
+ipcMain.handle('practice:teams', async (event, format) => {
+  if (!isPracticeFrame(event, ['/practice.html']) || !Object.hasOwn(TEAM_FORMATS, format)) return null;
+  const teams = await bridge.teams(format);
+  return { ready: Boolean(teams), teams: (teams || []).map(({ index, name }) => ({ index, name })) };
+});
+ipcMain.handle('practice:check-team', async (event, value) => {
+  if (!isPracticeFrame(event, ['/practice.html']) || !value || typeof value !== 'object' || !Object.hasOwn(TEAM_FORMATS, value.format)) {
+    return { ok: false };
+  }
+  return publicTeam(await practiceTeam(value.format, value.team));
+});
+ipcMain.handle('practice:start', async (event, options) => {
   if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
-  const { opponent, preset } = options;
-  return practice.start({ opponent, preset });
+  const { opponent, preset, format } = options;
+  if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset });
+  if (!Object.hasOwn(TEAM_FORMATS, format) || !options.teams || typeof options.teams !== 'object') return { ok: false, error: 'Choose both teams first.' };
+  const [player, bot] = await Promise.all([practiceTeam(format, options.teams.player), practiceTeam(format, options.teams.bot)]);
+  if (!player.ok) return { ok: false, error: `Your team: ${player.error}`, side: 'player' };
+  if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
+  return practice.start({ opponent, preset, format, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
 });
 // Closing the battle's tab ends practice, and that tab can be closed from any launcher page.
 // A battle still on is forfeited by stopping, so the launcher confirms first in its own popup

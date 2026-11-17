@@ -1,7 +1,9 @@
 'use strict';
 
-// The Bots page: one collapsible group of cards per difficulty, hardest first. Each card starts a
-// practice battle against its bot. The simple bots run on this computer; Foul Play needs the cloud.
+// The Bots page: format tabs, then one collapsible group of cards per difficulty, hardest first.
+// Each card starts a practice battle against its bot. The simple bots run on this computer; the
+// Foul Play levels need the cloud. In OU the player also picks both teams, each from the
+// Teambuilder or pasted; Play waits until both are legal.
 (() => {
   const $ = id => document.getElementById(id);
   const status = $('practice-status');
@@ -9,6 +11,7 @@
   const running = $('practice-running');
   const go = $('practice-go');
   const groups = $('practice-bots');
+  const teamsSection = $('practice-teams');
   let busy = false;
   let polling = false;
   let actionError = '';
@@ -16,10 +19,19 @@
 
   const GROUPS = [['hard', 'Hard'], ['medium', 'Medium'], ['easy', 'Easy']];
   const FORMATS = { gen9randombattle: 'Random Battle', gen9ou: 'OU' };
+  // Formats where the player brings both teams.
+  const TEAM_FORMATS = ['gen9ou'];
   const COLLAPSED = 'bots.collapsed';
+  const FORMAT_KEY = 'bots.format';
+  // The last Teambuilder team picked for each side, by index and name. Pasted teams are never saved.
+  const PICKS_KEY = 'bots.ouTeams';
+  const SIDES = ['player', 'bot'];
   // Line icons, 24 × 24, drawn in the card's accent color. Static markup, never built from data.
+  // The Foul Play levels share one search tree, with fewer branches the weaker the level.
   const ICONS = {
     foulplay: '<circle cx="12" cy="4.5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6.5v10.5M12 10l-7 7M12 10l7 7"/>',
+    'foulplay-medium': '<circle cx="12" cy="4.5" r="2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M12 6.5V10M12 10l-5 7M12 10l5 7"/>',
+    'foulplay-casual': '<circle cx="12" cy="4.5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M12 6.5v10.5"/>',
     heuristic: '<path d="M4 6.5l1.5 1.5L8.5 5M4 12.5l1.5 1.5 3-3M4 18.5l1.5 1.5 3-3M11.5 6.5H20M11.5 12.5H20M11.5 18.5H20"/>',
     greedy: '<path d="M13 2.5L5 13.5h6l-1 8 8-11h-6l1-8z"/>',
     random: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
@@ -28,16 +40,18 @@
   const CLOUD = '<path d="M4.5 12.5h7a2.75 2.75 0 0 0 .4-5.47A4 4 0 0 0 4.2 6.4 3.05 3.05 0 0 0 4.5 12.5z"/>';
   const CHEVRON = '<path d="M3 4.5l3 3 3-3"/>';
 
-  const collapsed = new Set((() => {
-    try { const value = JSON.parse(localStorage.getItem(COLLAPSED) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; }
-  })());
+  const remembered = key => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } };
+  const remember = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Remembering is optional. */ } };
+  const collapsed = new Set((() => { const value = remembered(COLLAPSED); return Array.isArray(value) ? value : []; })());
+  const saveCollapsed = () => remember(COLLAPSED, [...collapsed]);
+  let format = Object.hasOwn(FORMATS, remembered(FORMAT_KEY)) ? remembered(FORMAT_KEY) : 'gen9randombattle';
 
   function svg(paths, viewBox, extra = {}) {
     const template = document.createElement('template');
     template.innerHTML = `<svg viewBox="${viewBox}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-    const element = template.content.firstElementChild;
-    for (const [key, value] of Object.entries(extra)) element.setAttribute(key, value);
-    return element;
+    const node = template.content.firstElementChild;
+    for (const [key, value] of Object.entries(extra)) node.setAttribute(key, value);
+    return node;
   }
 
   function element(tag, className, text) {
@@ -47,7 +61,177 @@
     return node;
   }
 
-  // What the Foul Play card says about the cloud server, and whether it can start.
+  // ---- Teams (OU) -------------------------------------------------------------------------
+
+  // One side's choice. `result` is the last check: { ok, species } or { ok: false, error }.
+  const picks = remembered(PICKS_KEY) || {};
+  const sides = Object.fromEntries(SIDES.map(side => {
+    const slot = teamsSection.querySelector(`.team-slot[data-side="${side}"]`);
+    const saved = picks[side] && Number.isSafeInteger(picks[side].index) && typeof picks[side].name === 'string' ? picks[side] : null;
+    return [side, { slot, source: 'teambuilder', pick: saved, text: '', result: null, checking: false, ticket: 0, timer: null,
+      select: slot.querySelector('.team-pick'), paste: slot.querySelector('.team-paste'), note: slot.querySelector('.team-slot-note') }];
+  }));
+  let teambuilder = { ready: false, teams: [] };
+  let teamsKey = '';
+
+  function teamSpec(side) {
+    const state = sides[side];
+    if (state.source === 'paste') return state.text.trim() ? { source: 'paste', text: state.text } : null;
+    return state.pick ? { source: 'teambuilder', index: state.pick.index, name: state.pick.name } : null;
+  }
+
+  const teamsReady = () => SIDES.every(side => sides[side].result?.ok && !sides[side].checking);
+
+  function showSide(side) {
+    const state = sides[side];
+    for (const button of state.slot.querySelectorAll('.team-source button')) {
+      button.setAttribute('aria-selected', String(button.dataset.source === state.source));
+    }
+    state.select.hidden = state.source !== 'teambuilder';
+    state.paste.hidden = state.source !== 'paste';
+    const failed = state.result && !state.result.ok;
+    (state.source === 'paste' ? state.paste : state.select).setAttribute('aria-invalid', String(Boolean(failed)));
+    let text = '';
+    let tone = '';
+    if (state.checking) { text = 'Checking the team…'; tone = 'quiet'; }
+    else if (state.result?.ok) text = `${state.result.species.join(' · ')}. Legal for OU.`;
+    else if (failed) { text = state.result.error || 'This team cannot be used.'; tone = 'err'; }
+    else if (state.source === 'paste') { text = 'Paste the text from the Teambuilder’s Import/Export.'; tone = 'quiet'; }
+    else if (!teambuilder.ready) { text = 'Loading your Teambuilder teams…'; tone = 'quiet'; }
+    else if (!teambuilder.teams.length) { text = 'No OU teams in your Teambuilder yet. Build one there, or paste a team.'; tone = 'quiet'; }
+    else { text = 'Choose one of your OU teams.'; tone = 'quiet'; }
+    state.note.textContent = text;
+    state.note.className = `team-slot-note${tone ? ` team-slot-note--${tone}` : ''}`;
+  }
+
+  async function check(side) {
+    const state = sides[side];
+    clearTimeout(state.timer);
+    const spec = teamSpec(side);
+    const ticket = ++state.ticket;
+    state.checking = Boolean(spec);
+    if (!spec) {
+      state.result = null;
+      showSide(side);
+      updatePlay();
+      return;
+    }
+    showSide(side);
+    updatePlay();
+    let result;
+    try { result = await window.desktop.checkPracticeTeam(format, spec); } catch { result = null; }
+    if (ticket !== state.ticket) return;
+    state.checking = false;
+    state.result = result && typeof result.ok === 'boolean' ? result : { ok: false, error: 'The team could not be checked.' };
+    showSide(side);
+    updatePlay();
+  }
+
+  // Fills the Teambuilder list, keeping the remembered pick if that team is still there.
+  function fillTeams() {
+    const key = JSON.stringify(teambuilder);
+    if (key === teamsKey) return;
+    teamsKey = key;
+    for (const side of SIDES) {
+      const state = sides[side];
+      const options = [];
+      const blank = element('option', '', teambuilder.teams.length ? 'Choose a team' : teambuilder.ready ? 'No OU teams' : 'Loading…');
+      blank.value = '';
+      options.push(blank);
+      for (const team of teambuilder.teams) {
+        const option = element('option', '', team.name);
+        option.value = String(team.index);
+        options.push(option);
+      }
+      state.select.replaceChildren(...options);
+      state.select.disabled = !teambuilder.teams.length;
+      const kept = state.pick && (teambuilder.teams.find(team => team.index === state.pick.index && team.name === state.pick.name) ||
+        teambuilder.teams.filter(team => team.name === state.pick.name).length === 1 && teambuilder.teams.find(team => team.name === state.pick.name));
+      const before = state.pick;
+      if (teambuilder.ready) state.pick = kept ? { index: kept.index, name: kept.name } : null;
+      state.select.value = state.pick ? String(state.pick.index) : '';
+      const moved = JSON.stringify(before) !== JSON.stringify(state.pick);
+      if (state.source === 'teambuilder' && (moved || (state.pick && !state.result && !state.checking))) check(side);
+      else showSide(side);
+    }
+    if (teambuilder.ready) savePicks();
+  }
+
+  function savePicks() {
+    remember(PICKS_KEY, Object.fromEntries(SIDES.filter(side => sides[side].pick).map(side => [side, sides[side].pick])));
+  }
+
+  async function loadTeams() {
+    if (!TEAM_FORMATS.includes(format)) return;
+    const value = await window.desktop.getPracticeTeams(format).catch(() => null);
+    if (!value) return;
+    teambuilder = { ready: Boolean(value.ready), teams: Array.isArray(value.teams) ? value.teams : [] };
+    fillTeams();
+  }
+
+  for (const side of SIDES) {
+    const state = sides[side];
+    for (const button of state.slot.querySelectorAll('.team-source button')) {
+      button.addEventListener('click', () => {
+        if (state.source === button.dataset.source) return;
+        state.source = button.dataset.source;
+        state.result = null;
+        showSide(side);
+        if (state.source === 'paste') state.paste.focus();
+        check(side);
+      });
+    }
+    state.select.addEventListener('change', () => {
+      const team = teambuilder.teams.find(value => String(value.index) === state.select.value);
+      state.pick = team ? { index: team.index, name: team.name } : null;
+      savePicks();
+      check(side);
+    });
+    state.paste.addEventListener('input', () => {
+      state.text = state.paste.value;
+      state.result = null;
+      clearTimeout(state.timer);
+      state.ticket++;
+      state.checking = false;
+      showSide(side);
+      updatePlay();
+      state.timer = setTimeout(() => check(side), 400);
+    });
+  }
+
+  {
+    const toggle = $('bots-group-teams');
+    const grid = $('bots-teams');
+    const show = open => { toggle.setAttribute('aria-expanded', String(open)); grid.hidden = !open; };
+    show(!collapsed.has('teams'));
+    toggle.addEventListener('click', () => {
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      show(open);
+      if (open) collapsed.delete('teams'); else collapsed.add('teams');
+      saveCollapsed();
+    });
+  }
+
+  // ---- Format tabs and cards ----------------------------------------------------------------
+
+  function showFormat() {
+    for (const tab of document.querySelectorAll('.bots-format')) tab.setAttribute('aria-selected', String(tab.dataset.format === format));
+    teamsSection.hidden = !TEAM_FORMATS.includes(format);
+    if (TEAM_FORMATS.includes(format)) { for (const side of SIDES) showSide(side); loadTeams(); }
+  }
+
+  for (const tab of document.querySelectorAll('.bots-format')) {
+    tab.addEventListener('click', () => {
+      if (tab.dataset.format === format) return;
+      format = tab.dataset.format;
+      remember(FORMAT_KEY, format);
+      actionError = '';
+      showFormat();
+      refresh();
+    });
+  }
+
+  // What a Foul Play card says about the cloud server, and whether it can start.
   function cloudState(cloud) {
     if (!cloud?.configured) return { ready: false, text: 'Cloud server not set up in this build', tone: 'warn' };
     if (!cloud.checked) return { ready: true, text: 'Checking the cloud server…' };
@@ -63,7 +247,7 @@
     const body = element('div', 'bot-card-body');
     const name = element('div', 'bot-card-name');
     name.append(svg(ICONS[bot.id] || ICONS.bot, '0 0 24 24'), element('h4', '', bot.name));
-    const formats = (bot.formats || []).map(format => FORMATS[format] || format).join(', ');
+    const formats = (bot.formats || []).map(value => FORMATS[value] || value).join(', ');
     body.append(name, element('p', 'bot-card-meta', [bot.kind, formats].filter(Boolean).join(' · ')),
       element('p', 'bot-card-text', bot.description || ''));
     const foot = element('div', 'bot-card-foot');
@@ -81,14 +265,15 @@
     return article;
   }
 
-  // Builds the groups once per bot list; refresh() then only updates their state.
+  // Builds the groups once per bot list and format; refresh() then only updates their state.
   function build(list) {
-    const key = list.map(bot => `${bot.id}:${bot.difficulty}`).join(',');
+    const shown = list.filter(bot => (bot.formats || []).includes(format));
+    const key = `${format}|${shown.map(bot => `${bot.id}:${bot.difficulty}`).join(',')}`;
     if (key === built) return;
     built = key;
     const sections = [];
     for (const [id, label] of GROUPS) {
-      const members = list.filter(bot => (bot.difficulty || 'easy') === id);
+      const members = shown.filter(bot => (bot.difficulty || 'easy') === id);
       if (!members.length) continue;
       const section = element('section', 'bots-group');
       const heading = element('h3');
@@ -109,7 +294,7 @@
         const open = toggle.getAttribute('aria-expanded') !== 'true';
         show(open);
         if (open) collapsed.delete(id); else collapsed.add(id);
-        try { localStorage.setItem(COLLAPSED, JSON.stringify([...collapsed])); } catch { /* Remembering is optional. */ }
+        saveCollapsed();
       });
       heading.append(toggle);
       section.append(heading, grid);
@@ -118,24 +303,37 @@
     groups.replaceChildren(...sections);
   }
 
+  let last = null;
+
+  function updatePlay() {
+    if (!last) return;
+    const value = last;
+    const active = value.state === 'ready' || value.state === 'starting';
+    const list = Array.isArray(value.opponents) ? value.opponents : [];
+    const cloud = cloudState(value.cloud);
+    const needsTeams = TEAM_FORMATS.includes(format);
+    for (const article of groups.querySelectorAll('.bot-card')) {
+      const bot = list.find(item => item.id === article.dataset.bot);
+      const note = article.querySelector('.bot-card-cloud');
+      if (note) {
+        note.className = `bot-card-cloud${cloud.tone ? ` bot-card-cloud--${cloud.tone}` : ''}`;
+        note.querySelector('.bot-card-cloud-text').textContent = cloud.text;
+      }
+      const play = article.querySelector('.bot-play');
+      play.disabled = busy || active || !value.installed || (!bot?.local && !cloud.ready) || (needsTeams && !teamsReady());
+      play.title = needsTeams && !teamsReady() ? 'Choose both teams first' : '';
+    }
+  }
+
   async function refresh() {
     if (polling) return;
     polling = true;
     try {
       const value = await window.desktop.getPractice();
+      last = value;
       const active = value.state === 'ready' || value.state === 'starting';
-      const list = Array.isArray(value.opponents) ? value.opponents : [];
-      build(list);
-      const cloud = cloudState(value.cloud);
-      for (const article of groups.querySelectorAll('.bot-card')) {
-        const bot = list.find(item => item.id === article.dataset.bot);
-        const note = article.querySelector('.bot-card-cloud');
-        if (note) {
-          note.className = `bot-card-cloud${cloud.tone ? ` bot-card-cloud--${cloud.tone}` : ''}`;
-          note.querySelector('.bot-card-cloud-text').textContent = cloud.text;
-        }
-        article.querySelector('.bot-play').disabled = busy || active || !value.installed || (!bot?.local && !cloud.ready);
-      }
+      build(Array.isArray(value.opponents) ? value.opponents : []);
+      updatePlay();
 
       // The battle plays in its own tab; while it runs, this page only leads back to it.
       running.hidden = !active;
@@ -156,7 +354,9 @@
     busy = true;
     actionError = '';
     for (const play of groups.querySelectorAll('.bot-play')) play.disabled = true;
-    const pending = window.desktop.startPractice({ opponent });
+    const options = TEAM_FORMATS.includes(format)
+      ? { opponent, format, teams: { player: teamSpec('player'), bot: teamSpec('bot') } } : { opponent };
+    const pending = window.desktop.startPractice(options);
     let settled = null;
     pending.then(result => { settled = result || { ok: false }; }, () => { settled = { ok: false }; });
     const deadline = Date.now() + 5000;
@@ -169,11 +369,18 @@
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    if (settled && !settled.ok && !settled.cancelled) actionError = settled.error || 'Practice could not start.';
+    if (settled && !settled.ok && !settled.cancelled) {
+      // A team that stopped being usable (edited or deleted in the Teambuilder) is shown on its slot.
+      if (SIDES.includes(settled.side)) {
+        check(settled.side);
+      } else actionError = settled.error || 'Practice could not start.';
+    }
     busy = false;
     await refresh();
   }
 
+  showFormat();
   refresh();
   setInterval(refresh, 1000);
+  setInterval(loadTeams, 4000);
 })();
