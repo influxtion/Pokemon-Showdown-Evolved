@@ -122,6 +122,11 @@ function stageClient(target) {
     "if (!Config.practiceSocketUrl && this.gameType === 'battle' && this.room.battle && !this.room.battle.rated)");
   const closeRoom = "if (this.$('input[name=closeroom]')[0].checked)";
   battle = replaceOnce(battle, closeRoom, "if (!Config.practiceSocketUrl && this.$('input[name=closeroom]')[0].checked)");
+  // There is no main menu in practice: the finished battle offers the launcher's New battle instead.
+  const endControls = '<p><button class="button" name="closeAndMainMenu"><strong>Main menu</strong><br /><small>(closes this battle)</small></button> <button class="button" name="closeAndRematch"><strong>Rematch</strong><br /><small>(closes this battle)</small></button></p>';
+  battle = replaceOnce(battle, endControls, `' + (Config.practiceSocketUrl ? '<p><button class="button" name="closeAndRematch"><strong>New battle</strong><br /><small>(closes this battle)</small></button></p>' : '${endControls}') + '`);
+  const rematch = 'closeAndRematch: function () {';
+  battle = replaceOnce(battle, rematch, `${rematch}\n\t\t\tif (Config.practiceSocketUrl) return window.desktopPracticeStart && window.desktopPracticeStart();`);
   const chatLabel = '</i> Chat';
   if (battle.split(chatLabel).length !== 3) throw new Error('Classic battle log label anchor changed.');
   fs.writeFileSync(battleFile, battle.replaceAll(chatLabel, '</i> Battle log'));

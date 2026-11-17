@@ -1,17 +1,36 @@
 #header .tabbar a[href="/"],
 #header .tabbar a[href="/rooms"],
-#header .userbar,
-#mainmenu .mainmenuwrapper {
+#header .userbar {
   display: none;
 }
 
 .ps-room .battle-log { bottom: 0; }
 .ps-room .battle-log-add { display: none !important; }
 
-html[data-practice-state="connecting"] #mainmenu .mainmenuwrapper {
-  display: block;
+/* The client's main menu (#mainmenu, renamed #room- once the client starts) only shows when no
+   battle is open: while connecting, between battles, or after the battle's tab is closed. The
+   launcher's header starts and stops battles, so show a short status instead of the menu. */
+:is(#mainmenu, #room-) .mainmenuwrapper > * {
+  display: none !important;
 }
 
-html[data-practice-state="connecting"] #mainmenu .mainmenu > :not(#loading-message) {
-  display: none;
+:is(#mainmenu, #room-) .mainmenuwrapper::before {
+  display: block;
+  padding: 96px 24px 0;
+  text-align: center;
+  font-size: 15px;
+  opacity: .8;
+  content: "This battle is closed. Choose New battle at the top to play another.";
+}
+
+html[data-practice-state="connecting"] :is(#mainmenu, #room-) .mainmenuwrapper::before {
+  content: "Connecting to practice\2026";
+}
+
+html[data-practice-state="ready"] :is(#mainmenu, #room-) .mainmenuwrapper::before {
+  content: "Starting a battle\2026";
+}
+
+html[data-practice-state="failed"] :is(#mainmenu, #room-) .mainmenuwrapper::before {
+  content: "The battle client disconnected.";
 }
