@@ -5,7 +5,8 @@
 
 const { EventEmitter } = require('node:events');
 const { WebSocket } = require('ws');
-const { BOTS, PRESETS, CHOICE, RQID, ROOM, SESSION_ID, SERVER_MESSAGES, apiOrigin, isBattleFrame } = require('./protocol');
+const { BOTS, FORMAT, TEAM_FORMATS, PRESETS, CHOICE, RQID, ROOM, SESSION_ID, SERVER_MESSAGES, apiOrigin, isBattleFrame,
+  isTeamText } = require('./protocol');
 
 class ApiError extends Error {
   constructor(message, { status = 0, code = 'unreachable', retryAfter = null } = {}) {
@@ -107,9 +108,16 @@ class InferenceClient {
 
   info() { return this.request('/v1/info'); }
 
-  async createSession({ bot = 'foulplay', preset }) {
-    if (!Object.hasOwn(BOTS, bot) || !Object.hasOwn(PRESETS, preset)) throw new ApiError('Choose a supported bot and preset.', { code: 'invalid-options' });
-    const value = await this.request('/v1/sessions', { method: 'POST', body: { bot, preset } });
+  // `team` is the bot's own team as a Showdown export, for formats where the player brings it (OU).
+  async createSession({ bot = 'foulplay', preset, format = FORMAT, team }) {
+    if (!Object.hasOwn(BOTS, bot) || !Object.hasOwn(PRESETS, preset) || !BOTS[bot].formats.includes(format)) {
+      throw new ApiError('Choose a supported bot, format and preset.', { code: 'invalid-options' });
+    }
+    const needsTeam = TEAM_FORMATS.includes(format);
+    if (needsTeam && !isTeamText(team)) throw new ApiError('This format needs a team for the bot.', { code: 'invalid-team' });
+    // Older servers know only Random Battle and refuse unknown fields, so send the format only when it matters.
+    const body = format === FORMAT ? { bot, preset } : { bot, preset, format, team };
+    const value = await this.request('/v1/sessions', { method: 'POST', body });
     if (!SESSION_ID.test(value?.id || '')) throw new ApiError('The practice server sent an invalid session.', { code: 'invalid-reply' });
     return value;
   }

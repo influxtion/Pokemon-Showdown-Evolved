@@ -5,7 +5,7 @@
 //
 //   GET    /healthz                       liveness
 //   GET    /v1/info                       bots, presets, limits and current capacity
-//   POST   /v1/sessions                   {"bot": "foulplay", "preset": "quiet"|"balanced"|"full"}
+//   POST   /v1/sessions                   {"bot", "preset", "format"?, "team"?} (see README.md)
 //   GET    /v1/sessions/:id               session status
 //   DELETE /v1/sessions/:id               end a session
 //   WS     /v1/sessions/:id/socket        frames in, choices out (see protocol.js)
@@ -16,7 +16,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { WebSocketServer } = require('ws');
-const { API_VERSION, PRESETS, BOTS, ROOM, CHOICE, RQID, SESSION_ID, isBattleFrame } = require('./protocol');
+const { API_VERSION, FORMAT, TEAM_FORMATS, PRESETS, BOTS, ROOM, CHOICE, RQID, SESSION_ID, roomFormat, isBattleFrame,
+  isTeamText } = require('./protocol');
 
 const MINUTE = 60000;
 const HOUR = 60 * MINUTE;
@@ -94,8 +95,9 @@ function workerEnvironment() {
   return env;
 }
 
-function spawnWorker({ runtime, threads }) {
-  const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads)],
+function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT }) {
+  const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads),
+    '--level', level, '--format', format],
     { cwd: path.dirname(runtime.worker), env: workerEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   return child;
 }
@@ -103,6 +105,7 @@ function spawnWorker({ runtime, threads }) {
 const ERRORS = Object.freeze({
   'engine-failed': 'Foul Play stopped unexpectedly. Start a new battle to try again.',
   'engine-timeout': 'Foul Play took too long to start.',
+  'invalid-team': "Foul Play couldn't read its team. Check the team and try again.",
   'expired': 'This practice session reached its time limit. Start a new one.',
   'idle': 'This practice session was idle for too long.',
   'decision-limit': 'This practice session reached its move limit. Start a new one.',
@@ -164,13 +167,15 @@ function createApiServer({
     let text = '';
     for await (const chunk of request) {
       text += chunk;
-      if (text.length > 1024) throw new Error('Body too large');
+      // Room for an OU team; every other body is tiny.
+      if (text.length > 16384) throw new Error('Body too large');
     }
     return JSON.parse(text);
   }
 
   function describe(session) {
-    return { id: session.id, bot: session.bot, preset: session.preset, threads: session.threads, state: session.state,
+    return { id: session.id, bot: session.bot, level: BOTS[session.bot].level, format: session.format, preset: session.preset,
+      threads: session.threads, state: session.state,
       connected: Boolean(session.socket), battles: session.battles, decisions: session.decisions,
       expiresAt: new Date(session.created + lifetimeMs).toISOString() };
   }
@@ -197,18 +202,20 @@ function createApiServer({
   }
 
   function workerEvent(session, event) {
-    if (event.type === 'error') return end(session, 'engine-failed');
+    if (event.type === 'error') return end(session, event.code === 'invalid-team' ? 'invalid-team' : 'engine-failed');
     if (event.type === 'ready') {
-      if (session.state !== 'starting' || event.protocol !== 1 || event.bot !== session.bot || event.threads !== session.threads) {
+      if (session.state !== 'starting' || event.protocol !== 1 || event.bot !== 'foulplay' || event.threads !== session.threads ||
+          event.level !== BOTS[session.bot].level || event.format !== session.format) {
         return end(session, 'engine-failed');
       }
       clearTimeout(session.startupTimer);
       session.state = 'ready';
-      session.ready = { type: 'ready', bot: session.bot, threads: session.threads, searchMs: Number(event.searchMs) || 0 };
+      session.ready = { type: 'ready', bot: session.bot, level: event.level, format: session.format, threads: session.threads,
+        searchMs: Number(event.searchMs) || 0 };
       message(session, session.ready);
       return;
     }
-    if (session.state !== 'ready' || !ROOM.test(event.room || '')) return;
+    if (session.state !== 'ready' || !ROOM.test(event.room || '') || roomFormat(event.room) !== session.format) return;
     const turn = Number.isInteger(event.turn) && event.turn >= 0 && event.turn <= 10000 ? event.turn : undefined;
     if (event.type === 'battle') {
       session.battles++;
@@ -225,10 +232,14 @@ function createApiServer({
     }
   }
 
-  function startWorker(session, paths) {
+  // The team goes to the worker's stdin and is not kept on the session or logged.
+  function startWorker(session, paths, team) {
     let child;
-    try { child = launch({ runtime: paths, threads: session.threads }); } catch { return end(session, 'engine-failed'); }
+    try {
+      child = launch({ runtime: paths, threads: session.threads, level: BOTS[session.bot].level, format: session.format });
+    } catch { return end(session, 'engine-failed'); }
     session.worker = child;
+    if (team) child.stdin?.write(`${JSON.stringify({ type: 'team', data: team })}\n`);
     child.stderr?.on('data', () => {}); // Upstream diagnostics can include battle state; never log them.
     child.stdin?.on('error', () => {});
     child.once('error', () => end(session, 'engine-failed'));
@@ -254,8 +265,16 @@ function createApiServer({
     let options;
     try { options = await readBody(request); } catch { return failure(response, 400, 'invalid-request', 'Expected a small JSON body.'); }
     if (!options || typeof options !== 'object' || !Object.hasOwn(BOTS, options.bot) || !Object.hasOwn(PRESETS, options.preset) ||
-        Object.keys(options).some(key => !['bot', 'preset'].includes(key))) {
+        Object.keys(options).some(key => !['bot', 'preset', 'format', 'team'].includes(key))) {
       return failure(response, 400, 'invalid-options', 'Choose a supported bot and computation preset.');
+    }
+    const format = options.format === undefined ? FORMAT : options.format;
+    if (!BOTS[options.bot].formats.includes(format)) {
+      return failure(response, 400, 'invalid-format', `${BOTS[options.bot].name} does not play that format.`);
+    }
+    const needsTeam = TEAM_FORMATS.includes(format);
+    if (needsTeam ? !isTeamText(options.team) : options.team !== undefined) {
+      return failure(response, 400, 'invalid-team', needsTeam ? 'This format needs a team for the bot.' : 'This format has no team to send.');
     }
     const paths = resolveRuntime();
     if (!paths) return failure(response, 503, 'unavailable', 'Foul Play is not installed on this server.');
@@ -272,12 +291,12 @@ function createApiServer({
     if (sessions.size >= maxSessions) {
       return failure(response, 503, 'at-capacity', 'Every engine is busy right now. Try again shortly.', { 'Retry-After': '30' });
     }
-    const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, preset: options.preset,
+    const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, format, preset: options.preset,
       threads: threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
       decisions: 0, battles: 0, frames: new FrameBudget({ burst: frameBurst, perSecond: framesPerSecond, now }) };
     sessions.set(session.id, session);
-    startWorker(session, paths);
-    log('session-start', { bot: session.bot, threads: session.threads, active: sessions.size });
+    startWorker(session, paths, needsTeam ? options.team : null);
+    log('session-start', { bot: session.bot, format, threads: session.threads, active: sessions.size });
     return send(response, 201, { ...describe(session), socket: `/v1/sessions/${session.id}/socket` });
   }
 
@@ -291,7 +310,8 @@ function createApiServer({
       if (!authorized(request)) return failure(response, 401, 'unauthorized', 'This practice server needs an API key.');
       if (request.method === 'GET' && url.pathname === '/v1/info') {
         return send(response, 200, { api: API_VERSION,
-          bots: Object.values(BOTS).map(bot => ({ id: bot.id, name: bot.name, description: bot.description, available: available(),
+          bots: Object.values(BOTS).map(bot => ({ id: bot.id, name: bot.name, description: bot.description, level: bot.level,
+            formats: bot.formats, available: available(),
             presets: Object.fromEntries(Object.keys(PRESETS).map(preset => [preset, threadsFor(preset)])) })),
           limits: { maxSessionsPerClient, sessionsPerHour, sessionBurst, lifetimeMs, idleMs, maxDecisions },
           capacity: { active: sessions.size, max: maxSessions } });
@@ -337,7 +357,7 @@ function createApiServer({
         if (binary || !session.frames.take()) return end(session, 'rate-limited');
         let value;
         try { value = JSON.parse(data.toString('utf8')); } catch { return end(session, 'invalid-message'); }
-        if (!value || value.type !== 'frame' || !isBattleFrame(value.data) || value.data.length > maxFrameBytes) {
+        if (!value || value.type !== 'frame' || !isBattleFrame(value.data, session.format) || value.data.length > maxFrameBytes) {
           return end(session, 'invalid-message');
         }
         session.touched = now();

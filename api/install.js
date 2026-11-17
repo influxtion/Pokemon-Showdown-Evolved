@@ -1,7 +1,9 @@
 'use strict';
 
 // Installs the pinned Foul Play runtime: a standalone Python, Foul Play's source, its Python
-// packages and poke-engine compiled with Terastallization, on the API server (`npm run setup`).
+// packages, poke-engine compiled with Terastallization, and the set data and usage stats Foul Play
+// reads for Random Battle and OU, on the API server (`npm run setup`). The worker never downloads
+// anything itself. `npm run refresh-ou` moves the OU pins to the newest published data, by hand.
 //
 // Layout under `dir`:
 //   current/            the runtime the server uses (python/, foul-play/, install.json)
@@ -30,11 +32,21 @@ const STEPS = Object.freeze([
   { id: 'source', label: 'Downloading Foul Play', weight: 3 },
   { id: 'packages', label: 'Installing Python packages', weight: 7 },
   { id: 'engine', label: 'Compiling the search engine', weight: 55 },
-  { id: 'data', label: 'Downloading random battle sets', weight: 4 },
+  { id: 'data', label: 'Downloading set data and usage stats', weight: 4 },
   { id: 'verify', label: 'Checking the engine', weight: 3 },
   { id: 'finish', label: 'Finishing up', weight: 3 },
 ]);
 const TOTAL_WEIGHT = STEPS.reduce((sum, step) => sum + step.weight, 0);
+// Formats the worker checks after a build; each must load without a download.
+const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou']);
+// Where Foul Play looks for each OU file, relative to fp/data. Usage stats are stored without
+// their "info" header, as Foul Play caches them.
+const OU_FILES = Object.freeze({
+  usageStats: ['smogon_stats_cache', 'gen9ou-0.json'],
+  showdownSets: ['pkmn_sets_cache', 'gen9ou', 'showdown_sets.json'],
+  fullSets: ['pkmn_sets_cache', 'gen9ou', 'pokemon_full_sets.json'],
+  replayMoves: ['pkmn_sets_cache', 'gen9ou', 'replay_moves.json'],
+});
 
 function platformKey(platform = process.platform, arch = process.arch) {
   const key = `${platform}-${arch}`;
@@ -73,9 +85,9 @@ function sha256File(file) {
   });
 }
 
-async function download(entry, target, { signal, onFraction = () => {} }) {
+async function download(entry, target, { signal, onFraction = () => {}, fetcher = fetch } = {}) {
   if (fs.existsSync(target) && await sha256File(target) === entry.sha256) return target;
-  const response = await fetch(entry.url, { signal, redirect: 'follow' });
+  const response = await fetcher(entry.url, { signal, redirect: 'follow' });
   if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}): ${new URL(entry.url).hostname}`);
   const total = Number(response.headers.get('content-length')) || 0;
   const hash = crypto.createHash('sha256');
@@ -98,7 +110,8 @@ async function download(entry, target, { signal, onFraction = () => {} }) {
   }
   if (hash.digest('hex') !== entry.sha256) {
     await fsp.rm(partial, { force: true });
-    throw new Error(`Checksum mismatch for ${path.basename(target)}. The download was corrupted or changed upstream.`);
+    throw new Error(`Checksum mismatch for ${path.basename(target)}. The download was corrupted or changed upstream.` +
+      (entry.refresh ? ' If it changed upstream, run "npm run refresh-ou" and commit the new pins.' : ''));
   }
   await fsp.rename(partial, target);
   return target;
@@ -243,9 +256,14 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   const cache = path.join(where.staging, 'foul-play', 'fp', 'data', 'pkmn_sets_cache');
   await download(lock.randomSets, path.join(cache, 'gen9randombattle.json'), { signal, onFraction: fraction => report(fraction * 0.9) });
   await download(lock.randomSetsLicense, path.join(cache, 'randbats-LICENSE'), { signal });
+  await installOuData(path.join(where.staging, 'foul-play', 'fp', 'data'), downloads,
+    { signal, onFraction: fraction => report(0.9 + fraction * 0.1, 'OU') });
 
   next('verify');
-  await run(python, ['-I', '-B', worker, '--check', '--source', path.join(where.staging, 'foul-play')], { env, signal, onLine: log });
+  for (const format of FORMATS) {
+    await run(python, ['-I', '-B', worker, '--check', '--format', format, '--source', path.join(where.staging, 'foul-play')],
+      { env, signal, onLine: log });
+  }
 
   next('finish');
   await fsp.rm(downloads, { recursive: true, force: true });
@@ -261,6 +279,59 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   return inspect(dir, worker);
 }
 
+// Downloads the pinned OU files and puts each where Foul Play would have cached it.
+async function installOuData(dataDir, downloads, { signal, onFraction = () => {}, fetcher = fetch, pins = lock.ouData } = {}) {
+  const names = Object.keys(OU_FILES);
+  for (const [index, name] of names.entries()) {
+    const entry = { ...pins[name], refresh: true };
+    const file = await download(entry, path.join(downloads, `ou-${name}.json`), { signal, fetcher });
+    const target = path.join(dataDir, ...OU_FILES[name]);
+    await fsp.mkdir(path.dirname(target), { recursive: true });
+    if (name === 'usageStats') {
+      const stats = JSON.parse(await fsp.readFile(file, 'utf8'));
+      if (!stats || typeof stats.data !== 'object' || !stats.data) throw new Error('The OU usage stats are not in the expected shape.');
+      await fsp.writeFile(target, JSON.stringify(stats.data));
+    } else {
+      JSON.parse(await fsp.readFile(file, 'utf8'));
+      await fsp.copyFile(file, target);
+    }
+    onFraction((index + 1) / names.length);
+  }
+}
+
+// `npm run refresh-ou`: points the OU pins in lock.json at the newest published usage stats
+// and the current set data. Run it by hand, check the result, then commit lock.json and run
+// `npm run setup` on the server.
+async function refreshOuData({ fetcher = fetch, now = new Date(), lockFile = path.join(__dirname, 'lock.json'), onLog = () => {} } = {}) {
+  const hash = async url => {
+    const response = await fetcher(url, { redirect: 'follow' });
+    if (!response.ok) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    JSON.parse(bytes.toString('utf8'));
+    return crypto.createHash('sha256').update(bytes).digest('hex');
+  };
+  const next = { ...lock.ouData };
+  // Smogon publishes a month's stats early in the next month; fall back a month if not yet out.
+  for (let back = 1; back <= 3; back++) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
+    const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    const url = `https://www.smogon.com/stats/${month}/chaos/gen9ou-0.json`;
+    const sha256 = await hash(url);
+    if (sha256) { next.usageStats = { month, url, sha256 }; break; }
+  }
+  if (next.usageStats === lock.ouData.usageStats) onLog('No newer usage stats were found; keeping the current month.');
+  for (const name of ['showdownSets', 'fullSets', 'replayMoves']) {
+    const sha256 = await hash(lock.ouData[name].url);
+    if (!sha256) throw new Error(`Could not download ${lock.ouData[name].url}`);
+    next[name] = { url: lock.ouData[name].url, sha256 };
+  }
+  const text = await fsp.readFile(lockFile, 'utf8');
+  const updated = JSON.parse(text);
+  updated.ouData = next;
+  await fsp.writeFile(lockFile, `${JSON.stringify(updated, null, 2)}\n`);
+  return next;
+}
+
 async function remove(dir) {
   await fsp.rm(path.resolve(dir), { recursive: true, force: true });
 }
@@ -268,8 +339,13 @@ async function remove(dir) {
 async function main() {
   const { parseArgs } = require('node:util');
   const { values } = parseArgs({ options: { dir: { type: 'string', default: path.join(__dirname, 'runtime') },
-    'keep-toolchain': { type: 'boolean' }, status: { type: 'boolean' } } });
+    'keep-toolchain': { type: 'boolean' }, status: { type: 'boolean' }, 'refresh-ou': { type: 'boolean' } } });
   if (values.status) return console.log(JSON.stringify(inspect(values.dir), null, 2));
+  if (values['refresh-ou']) {
+    const pins = await refreshOuData({ onLog: line => console.error(line) });
+    console.log(`OU pins updated: usage stats ${pins.usageStats.month}. Commit lock.json, then run "npm run setup".`);
+    return;
+  }
   let last = '';
   const runtime = await install({ dir: values.dir, keepToolchain: values['keep-toolchain'],
     onProgress: ({ label, index, steps, fraction, detail }) => {
@@ -286,4 +362,5 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { install, inspect, remove, paths, platformKey, pythonExecutable, LOCK_VERSION, STEPS, WORKER };
+module.exports = { install, inspect, remove, paths, platformKey, pythonExecutable, installOuData, refreshOuData,
+  LOCK_VERSION, STEPS, WORKER, FORMATS, OU_FILES };

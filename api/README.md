@@ -1,6 +1,6 @@
 # Practice API
 
-Computes the practice bot's moves for Showdown Desktop. Only **Foul Play** is supported for now.
+Computes the practice bot's moves for Showdown Desktop. The bot is **Foul Play**, at three levels: **Foul Play** (Hard, upstream as it ships), **Foul Play Medium** and **Foul Play Casual**. All three play Gen 9 Random Battle. Hard also plays Gen 9 OU with a team the client sends.
 
 The battle itself always runs inside the desktop app, on its own private Showdown simulator. The app plays the bot's seat by streaming the bot's view of the battle to this API and sending back the move it returns. The app uses it only as a cloud server, a host you deploy from this folder ([Host it on a server](#host-it-on-a-server)); Foul Play never runs inside the app. Tests run the same server on `127.0.0.1` as a stand-in.
 
@@ -26,7 +26,21 @@ npm run setup     # downloads and builds Foul Play into api/runtime (a few minut
 npm start         # http://127.0.0.1:8787
 ```
 
-`npm run status` reports what is installed. To update after pulling new pins, run `npm run setup` again and then restart. The new build goes to `runtime/staging` and replaces `runtime/current` only after its self-check passes.
+`npm run status` reports what is installed. To update after pulling new pins, run `npm run setup` again and then restart. The new build goes to `runtime/staging` and replaces `runtime/current` only after its self-check passes, for Random Battle and for OU.
+
+Setup also downloads everything Foul Play would otherwise fetch during a battle, because the worker has no network access: the Random Battle sets and, for OU, Smogon's monthly usage stats (`gen9ou-0`), Showdown's sample sets and Foul Play's own set and move data. Each file is pinned by SHA-256 in `lock.json` (`ouData`).
+
+### Refreshing the OU data
+
+The OU usage stats and set data are refreshed by hand, when needed (for example once Smogon publishes a new month, or after a tier shift):
+
+```sh
+npm run refresh-ou   # moves the ouData pins in lock.json to the newest stats and current set data
+git diff lock.json   # check, then commit
+npm run setup        # on the server, then restart the service
+```
+
+The set files have fixed addresses that change in place upstream. If one changes before the pins are refreshed, `npm run setup` stops with a checksum mismatch and names this command.
 
 Supported hosts: Linux x64/arm64, macOS x64/arm64 and Windows x64.
 
@@ -192,6 +206,7 @@ Set `CLOUD_API_URL` in `app/practice-engines.js`. Release builds use it as the *
 | Task | Command |
 | --- | --- |
 | Update after new commits or pins | `cd ~/Pokemon-Showdown-Launcher-App && git pull && cd api && npm ci --omit=dev && npm run setup && sudo systemctl restart practice-api` |
+| Refresh the OU usage stats and sets | On a checkout: `cd api && npm run refresh-ou`, commit `lock.json`; then update the server as above |
 | Follow the logs | `journalctl -u practice-api -f` (Caddy: `journalctl -u caddy -f`) |
 | Status | `systemctl status practice-api caddy --no-pager` and `npm run status` |
 | Change limits | `sudo systemctl edit practice-api`, add `[Service]` and `Environment=MAX_SESSIONS=4`, then `sudo systemctl restart practice-api` |
@@ -241,13 +256,32 @@ All responses are JSON. Errors look like `{"error": {"code": "rate-limited", "me
 | Route | Purpose |
 | --- | --- |
 | `GET /healthz` | Liveness, no auth |
-| `GET /v1/info` | API version, bots and their presets (after `MAX_THREADS`), limits, current capacity |
-| `POST /v1/sessions` | Body `{"bot": "foulplay", "preset": "quiet" \| "balanced" \| "full"}` → `201 {id, threads, expiresAt, socket, …}` |
+| `GET /v1/info` | API version, bots with their level, formats and presets (after `MAX_THREADS`), limits, current capacity |
+| `POST /v1/sessions` | Body `{"bot", "preset", "format"?, "team"?}` (below) → `201 {id, bot, level, format, threads, expiresAt, socket, …}` |
 | `GET /v1/sessions/:id` | State, battles and decisions so far |
 | `DELETE /v1/sessions/:id` | End the session and its worker |
 | `WS /v1/sessions/:id/socket` | One socket per session. Requests with an `Origin` header (browsers) are refused |
 
 The session ID is 256 random bits and acts as the capability for that session.
+
+**Session options:**
+
+| Field | Values |
+| --- | --- |
+| `bot` | `foulplay` (Hard), `foulplay-medium`, `foulplay-casual` |
+| `preset` | `quiet`, `balanced`, `full`: search threads 1, 2, 8, capped by `MAX_THREADS` |
+| `format` | `gen9randombattle` (default) or `gen9ou`. OU is `foulplay` only |
+| `team` | OU only, and required there: Foul Play's own team as a Showdown export, up to 8,192 characters |
+
+The team goes straight to the worker's stdin. It is not stored on the session, returned by any route or logged. The client is expected to send a team its own simulator has validated for the format, and to give the bot the same team in the battle (`/utm`). If Foul Play cannot read it, the socket closes with `invalid-team`.
+
+**Levels.** The worker applies them; Hard leaves Foul Play untouched.
+
+| Level | Search per sampled world | Sampled worlds | Pick |
+| --- | --- | --- | --- |
+| Hard | 100 ms | Foul Play's own (2–4) | Weighted among moves with ≥ 75% of the best move's share |
+| Medium | 40 ms | Foul Play's own | Weighted among moves with ≥ 50% of the best move's share |
+| Casual | 20 ms | 1 (one guess about the opponent's team) | As Hard, but 30% of the time the second- or third-best move, if it has ≥ 20% of the best move's share |
 
 **Client → server:** `{"type": "frame", "data": ">battle-gen9randombattle-1\n|init|battle\n…"}`. `data` is one simulator frame for the bot's battle room, exactly as the simulator sent it to the bot. Anything else closes the socket.
 
@@ -255,14 +289,14 @@ The session ID is 256 random bits and acts as the capability for that session.
 
 | Message | Fields | Meaning |
 | --- | --- | --- |
-| `ready` | `bot, threads, searchMs` | The engine is loaded. Also sent on connect if it loaded first |
+| `ready` | `bot, level, format, threads, searchMs` | The engine is loaded. Also sent on connect if it loaded first |
 | `battle` | `room` | Foul Play saw `\|init\|battle` and is playing this room |
 | `thinking` | `room, turn` | A decision is due |
 | `choice` | `room, turn, choice, rqid, elapsedMs` | Send `room\|choice\|rqid` to the simulator as the bot |
 | `end` | `room, result` | `win`, `loss` or `tie`, from the bot's side |
 | `error` | `code, message` | Fatal; the socket closes next |
 
-`choice` is always `/choose move <id>`, optionally followed by ` terastallize`, or `/switch <1-6>`. Both the server and the client check this. A choice the simulator rejects ends the session; Foul Play never falls back to random play.
+`choice` is always `/choose move <id>`, optionally followed by ` terastallize`, `/switch <1-6>`, or in OU team preview `/team <order>` (up to six digits 1–6). Both the server and the client check this. Frames must be for a battle room of the session's format. A choice the simulator rejects ends the session; Foul Play never falls back to random play.
 
 `client.js` is a ready-made Node client, and `protocol.js` holds the shared constants.
 
@@ -273,10 +307,10 @@ The session ID is 256 random bits and acts as the capability for that session.
 | `server.js` | HTTP and WebSocket server, sessions, limits, worker supervision |
 | `client.js`, `protocol.js` | Node client used by the app; shared validation |
 | `install.js`, `lock.json` | Pinned, hash-checked installer (`npm run setup`) |
-| `worker/foulplay_worker.py` | Runs Foul Play's battle loop over stdio, with a loopback-only socket audit hook |
+| `worker/foulplay_worker.py` | Runs Foul Play's battle loop over stdio at a level and format, with a loopback-only socket audit hook |
 | `deploy/` | Dockerfile, Compose file, Caddyfile and systemd unit |
 | `test/` | `npm test`: server and client tests with a fake worker |
 
 ## Licensing
 
-This folder follows the repository's license, which has not been chosen yet. [Foul Play](https://github.com/pmariglia/foul-play) (pinned `8f541f8`) is GPL-3.0 and is downloaded by `npm run setup`; it is never committed or bundled with the app. Random battle set data comes from [`pkmn/randbats`](https://github.com/pkmn/randbats).
+This folder follows the repository's license, which has not been chosen yet. [Foul Play](https://github.com/pmariglia/foul-play) (pinned `8f541f8`) is GPL-3.0 and is downloaded by `npm run setup`; it is never committed or bundled with the app. Random battle set data comes from [`pkmn/randbats`](https://github.com/pkmn/randbats). OU usage stats come from [Smogon](https://www.smogon.com/stats/), sample sets from [Pokémon Showdown](https://play.pokemonshowdown.com/data/sets/) and set and move data from Foul Play's data site (`data.foulplay.cc`). All of it is downloaded on the server by `npm run setup` and never committed.
