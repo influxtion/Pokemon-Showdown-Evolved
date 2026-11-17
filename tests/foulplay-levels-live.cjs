@@ -57,7 +57,11 @@ function engine(kind, account) {
   if (SIMPLE.includes(kind)) return new LocalBot({ kind, data: loadData(path.join(simulatorRoot, 'server')) });
   const brain = new EventEmitter();
   const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', values.threads,
-    '--level', kind, '--format', FORMAT, '--account', account], { stdio: ['pipe', 'pipe', 'ignore'] });
+    '--level', kind, '--format', FORMAT, '--account', account], { stdio: ['pipe', 'pipe', 'pipe'] });
+  // Upstream diagnostics, kept only to explain a crash.
+  const tail = [];
+  child.stderr.on('data', data => { tail.push(...String(data).split('\n').filter(Boolean)); tail.splice(0, Math.max(0, tail.length - 12)); });
+  brain.closed = false;
   if (teamText) child.stdin.write(`${JSON.stringify({ type: 'team', data: teamText })}\n`);
   brain.ready = new Promise((resolve, reject) => {
     lines(child.stdout, event => {
@@ -65,11 +69,16 @@ function engine(kind, account) {
       else if (event.type === 'error') reject(new Error(`${kind} worker failed: ${event.code}`));
       else if (event.type === 'choice') brain.emit('choice', event);
     });
-    child.once('exit', code => reject(new Error(`${kind} worker exited (${code})`)));
+    child.once('exit', code => {
+      const error = new Error(`${kind} worker exited (${code}):\n${tail.join('\n')}`);
+      reject(error);
+      // Mid-match, a dead worker would leave its battle waiting forever.
+      if (!brain.closed) brain.emit('crash', error);
+    });
   });
   child.stdin.on('error', () => {});
   brain.send = frame => { if (child.stdin.writable) child.stdin.write(`${JSON.stringify({ type: 'frame', data: frame })}\n`); };
-  brain.close = () => { child.stdin.end(); child.kill(); };
+  brain.close = () => { brain.closed = true; child.stdin.end(); child.kill(); };
   return brain;
 }
 
@@ -129,8 +138,12 @@ async function match(a, b, games) {
     onEnd: winner => { if (index === 0) resolveGame(winner); } }));
   await Promise.all(seats.map(value => value.ready));
   const score = { [a]: 0, [b]: 0, tie: 0 };
+  let crashed;
+  const crash = new Promise((_resolve, reject) => { crashed = reject; });
+  crash.catch(() => {});
+  for (const brain of brains) brain.on('crash', crashed);
   for (let game = 0; game < games; game++) {
-    const result = new Promise(resolve => { resolveGame = resolve; });
+    const result = Promise.race([new Promise(resolve => { resolveGame = resolve; }), crash]);
     const challenger = game % 2;
     seats[challenger].challenge(names[1 - challenger]);
     const winner = await Promise.race([result, new Promise(resolve => setTimeout(() => resolve('timeout'), 900000))]);

@@ -281,7 +281,7 @@ The team goes straight to the worker's stdin. It is not stored on the session, r
 | --- | --- | --- | --- |
 | Hard | 100 ms | Foul Play's own (2–4) | Weighted among moves with ≥ 75% of the best move's share |
 | Medium | 40 ms | Foul Play's own | Weighted among moves with ≥ 50% of the best move's share |
-| Casual | 20 ms | 1 (one guess about the opponent's team) | As Hard, but 30% of the time the second- or third-best move, if it has ≥ 20% of the best move's share |
+| Casual | 15 ms | 1 (one guess about the opponent's team) | As Hard, but 35% of the time the second- or third-best move, if it has ≥ 20% of the best move's share |
 
 **Client → server:** `{"type": "frame", "data": ">battle-gen9randombattle-1\n|init|battle\n…"}`. `data` is one simulator frame for the bot's battle room, exactly as the simulator sent it to the bot. Anything else closes the socket.
 

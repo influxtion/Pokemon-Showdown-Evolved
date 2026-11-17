@@ -59,7 +59,7 @@ LOOPBACK = "127.0.0.1"
 LEVELS = {
     "hard": {"searchMs": 100, "worlds": None, "keep": 0.75, "slip": 0.0, "floor": 1.0},
     "medium": {"searchMs": 40, "worlds": None, "keep": 0.5, "slip": 0.0, "floor": 1.0},
-    "casual": {"searchMs": 20, "worlds": 1, "keep": 0.75, "slip": 0.3, "floor": 0.2},
+    "casual": {"searchMs": 15, "worlds": 1, "keep": 0.75, "slip": 0.35, "floor": 0.2},
 }
 # Files Foul Play reads for OU instead of downloading them (see install.js).
 OU_DATA = (
