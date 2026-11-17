@@ -157,7 +157,7 @@ async function smoke() {
   // The battle plays in its own tab; the setup page never shows the battle client.
   await load('practice-battle.html');
   assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')]
-    .some(tab => tab.title === 'Practice battle' && tab.getAttribute('aria-current') === 'page')`), true, 'battle tab open and current');
+    .some(tab => tab.title === 'Bot battle' && tab.getAttribute('aria-current') === 'page')`), true, 'battle tab open and current');
   await until(async () => {
     const state = await status();
     if (state.error || state.clientError) throw new Error(state.error || state.clientError);
@@ -435,7 +435,7 @@ async function smoke() {
   assert.equal((await call('startPractice', selection)).ok, true, 'start for the tab close check');
   await load('practice-battle.html');
   const closingPlayer = (await waitForBattle('battle before closing its tab')).webContents;
-  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Practice battle')
+  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Bot battle')
     .querySelector('.nav-close').click(); 0`);
   // The forfeit popup opens under the tab; Cancel keeps the battle, Forfeit ends practice.
   await until(() => run("Boolean(document.querySelector('.forfeit-ask'))"), 'forfeit popup');
@@ -443,13 +443,13 @@ async function smoke() {
   await pause(300);
   assert.equal((await status()).state, 'ready', 'Cancel keeps playing');
   assert.ok(renderer.getURL().endsWith('/practice-battle.html'));
-  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Practice battle')
+  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Bot battle')
     .querySelector('.nav-close').click(); 0`);
   await until(() => run("Boolean(document.querySelector('.forfeit-ask'))"), 'forfeit popup again');
   await run("document.querySelector('.forfeit-ask-yes').click(); 0");
   await until(() => renderer.getURL() && !renderer.getURL().endsWith('/practice-battle.html') && !renderer.isLoading(), 'left the closed battle tab');
   await until(async () => (await status()).state === 'idle' && closingPlayer.isDestroyed(), 'closing the tab ended practice');
-  assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].some(tab => tab.title === 'Practice battle')`), false,
+  assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].some(tab => tab.title === 'Bot battle')`), false,
     'battle tab removed');
   console.log(`PASS Practice desktop (Foul Play): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup, battle tab close`);
 }

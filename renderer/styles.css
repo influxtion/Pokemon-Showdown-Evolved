@@ -754,6 +754,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .hero .btn-quiet { color: var(--hero-text); }
 .hero .btn-quiet:hover { background: var(--hero-team-bg); color: var(--hero-text); }
+.hero-bots:hover { text-decoration: none; }
 .hero-stats { margin-left: auto; font-size: var(--fs-sm); color: var(--hero-muted); text-align: right; }
 .hero-stats strong { color: var(--hero-text); font-weight: 600; }
 
@@ -1203,7 +1204,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .hub--modern .hero-aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hub--modern .hero--menu .hero-pickers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .hub--modern .hero--menu .hero-actions { flex-direction: row; flex-wrap: wrap; align-items: stretch; }
-.hub--modern .btn-battle { flex: 1 1 200px; }
+.hub--modern .btn-battle { flex: 1 1 160px; min-width: 160px; }
 .hub--modern .hero-actions > .btn:not(.btn-battle) { height: 52px; padding: 0 var(--space-4); }
 .hub--modern .hero-challenge { flex: 1 1 100%; }
 .hub--modern .hero-record {
@@ -1671,7 +1672,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .rail .nav-item svg { width: 20px; height: 20px; }
 .rail .nav-item[aria-current="page"]::before { left: -6px; height: 28px; }
 .nav-text { max-width: 100%; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-sep { height: 1px; margin: 4px 10px; background: var(--rail-hover); flex: none; }
 .nav-item--end { margin-top: auto; }
 .rail-foot { padding: 8px 6px 12px; align-items: center; }
 .rail-version { display: none; }

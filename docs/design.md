@@ -90,11 +90,11 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 ### Practice
 - Gen 9 Random Battle against **Foul Play** on the cloud server, with a private simulator on the player's computer, never the public server.
 - Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default).
-- The Practice page sets a battle up; the battle plays in its own **Practice battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
+- The **Bots** page (under Teambuilder in the sidebar, also reachable from **Play against bots** in the Home battle panel) sets a battle up; the battle plays in its own **Bot battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
 - Practice and online games stay loaded side by side; the online account is never used.
 
 ### Settings
-- Appearance, Home layout, start page, close protection for battles and searches, client reload, open logs. Where Foul Play runs is chosen on the Practice page.
+- Appearance, Home layout, start page, close protection for battles and searches, client reload, open logs. Where Foul Play runs is chosen on the Bots page.
 - **Sign out** clears the Showdown partition, local teams included. **Reset launcher** clears settings and replay notes but keeps the session. Both confirm first.
 - Window size, position and maximized state are remembered.
 
@@ -218,7 +218,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 - **Opponent and presets:** Gen 9 Random Battle against **Foul Play**, on a private simulator the app starts on the player's computer. Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default). The cloud server caps threads (currently 2), and the page says so.
 - **Where Foul Play runs:** always on the cloud server, with nothing to install. A **Server** card shows whether it is online, busy or unreachable.
-- **Battle tab:** **Play against Foul Play** opens a **Practice battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Practice page offers **Go to battle** instead of starting another.
+- **Battle tab:** **Play against Foul Play** opens a **Bot battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Bots page offers **Go to battle** instead of starting another.
 - **Controls:** moves, switches and Terastallization in the battle; **Forfeit** (opens the client's confirmation), **New battle** after it ends, and **End practice** in the tab's header. Status shows starting, thinking, turn, elapsed time and result.
 - **Account separation:** practice and online games stay loaded side by side, and the online account is never involved.
 - How the bots decide, every protocol layer, performance and deployment: [bots.md](bots.md).

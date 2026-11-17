@@ -51,7 +51,7 @@
       } else if (starting || (running && !clientUp)) {
         showEmpty('Starting the battle', `Preparing the simulator and connecting to ${NAME}. This can take a moment.`, false);
       } else if (!running) {
-        showEmpty('No battle running', 'Start a new practice battle from the Practice page.', true);
+        showEmpty('No battle running', 'Start a new practice battle from the Bots page.', true);
       }
 
       let text = 'Not running';

@@ -5,7 +5,7 @@
 // Other pages can listen for the "showdown-session" event instead of polling again.
 (() => {
   // Following the current page's link reloads the renderer and resets its UI.
-  // (The practice battle page highlights Practice too, but that link leads back to setup.)
+  // (The practice battle page highlights Bots too, but that link leads back to setup.)
   const currentPage = document.querySelector('.rail a.nav-item[aria-current="page"]');
   const ownFile = (/([a-z-]+\.html)(?:[?#].*)?$/.exec(String(location.href)) || [])[1] || '';
   const currentHref = currentPage && currentPage.getAttribute('href');
@@ -34,7 +34,7 @@
     home: svg('<path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/>', round),
     stats: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
     replays: svg('<path d="M4 2.5h8v11l-4-3-4 3z"/>', round),
-    practice: svg('<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/>'),
+    practice: svg('<rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M6 9v.5M10 9v.5"/>', ' stroke-linejoin="round" stroke-linecap="round"'),
     settings: svg('<path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/>', ' stroke-linecap="round"'),
     x: svg('<path d="M4 4l8 8M12 4l-8 8"/>', ' stroke-linecap="round"'),
   };
@@ -272,8 +272,8 @@
     'index.html': { title: 'Home', kind: 'home' },
     'stats.html': { title: 'Stats', kind: 'stats' },
     'replays.html': { title: 'Replays', kind: 'replays' },
-    'practice.html': { title: 'Practice', kind: 'practice' },
-    'practice-battle.html': { title: 'Practice battle', kind: 'battle' },
+    'practice.html': { title: 'Bots', kind: 'practice' },
+    'practice-battle.html': { title: 'Bot battle', kind: 'battle' },
     'settings.html': { title: 'Settings', kind: 'settings' },
     teambuilder: { title: 'Teambuilder', kind: 'teambuilder', room: true },
   };

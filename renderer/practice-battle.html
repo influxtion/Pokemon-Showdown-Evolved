@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; connect-src 'none'; style-src 'self' 'unsafe-inline'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Practice battle · Showdown Desktop</title>
+  <title>Bot battle · Showdown Desktop</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,18 +23,17 @@
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 13l.5-3L10.5 3l2.5 2.5L6 12.5z"/></svg>
         <span class="nav-text">Teambuilder</span>
       </a>
+      <a class="nav-item" href="practice.html" aria-current="page" title="Bots">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M6 9v.5M10 9v.5"/></svg>
+        <span class="nav-text">Bots</span>
+      </a>
       <a class="nav-item" href="stats.html" title="Stats">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg>
         <span class="nav-text">Stats</span>
       </a>
-      <div class="rail-sep" aria-hidden="true"></div>
       <a class="nav-item" href="replays.html" title="Replay notes">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
         <span class="nav-text">Replays</span>
-      </a>
-      <a class="nav-item" href="practice.html" aria-current="page" title="Practice">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg>
-        <span class="nav-text">Practice</span>
       </a>
       <a class="nav-item nav-item--end" href="settings.html" title="Settings">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/></svg>
@@ -56,7 +55,7 @@
       <div class="rail-rooms" data-nav="rooms"></div>
     </nav>
     <header class="topbar">
-      <h1>Practice battle</h1>
+      <h1>Bot battle</h1>
       <span class="faint">vs. Foul Play · Gen 9 Random Battle</span>
       <div class="topbar-actions">
         <span class="status status--off" id="battle-status" role="status">Starting…</span>
@@ -73,7 +72,7 @@
           <span class="battle-empty-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg></span>
           <h2 id="battle-empty-title">Starting the battle</h2>
           <p id="battle-empty-text">Preparing the simulator and connecting to Foul Play.</p>
-          <a class="btn" href="practice.html" id="battle-back" hidden>Back to Practice</a>
+          <a class="btn" href="practice.html" id="battle-back" hidden>Back to Bots</a>
         </div>
       </section>
     </main>
