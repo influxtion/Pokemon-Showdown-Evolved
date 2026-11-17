@@ -26,7 +26,8 @@ async function fakeSimulator(t) {
     socket.on('message', data => {
       const text = data.toString();
       sim.received.push(text);
-      if (text === '|/trn FoulPlay,0,') socket.send('|updateuser| FoulPlay|1|1|{}');
+      const name = /^\|\/trn (\w+),0,$/.exec(text)?.[1];
+      if (name) socket.send(`|updateuser| ${name}|1|1|{}`);
     });
   });
   t.after(() => server.close());
@@ -47,6 +48,19 @@ function fakeWorkers() {
   return { workers, launch };
 }
 
+// Stands in for a simple bot: records the frames it gets and lets a test send a choice.
+function fakeBots() {
+  const bots = [];
+  const createBot = kind => {
+    const bot = Object.assign(new EventEmitter(), { kind, frames: [], ready: Promise.resolve({ type: 'ready' }), closed: false });
+    bot.send = text => bot.frames.push(text);
+    bot.close = () => { bot.closed = true; };
+    bots.push(bot);
+    return bot;
+  };
+  return { bots, createBot };
+}
+
 async function setup(t, { target } = {}) {
   const sim = await fakeSimulator(t);
   const fake = fakeWorkers();
@@ -62,11 +76,12 @@ async function setup(t, { target } = {}) {
     return child;
   };
   let requested = 0;
-  const session = new PracticeSession({ root: '/runtime', scripts: '/scripts', spawnChild, installed: () => true,
+  const local = fakeBots();
+  const session = new PracticeSession({ root: '/runtime', scripts: '/scripts', spawnChild, installed: () => true, createBot: local.createBot,
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }),
     target: target || (async () => { requested++; return { url }; }) });
   t.after(() => session.stop());
-  return { sim, session, workers: fake.workers, spawned, requested: () => requested, api };
+  return { sim, session, workers: fake.workers, spawned, requested: () => requested, api, bots: local.bots };
 }
 
 test('starts the simulator and an engine session, then logs the bot in', async t => {
@@ -137,7 +152,7 @@ test('fails when the engine connection drops mid-battle', async t => {
 
 test('rejects other opponents and presets', async t => {
   const { session } = await setup(t);
-  assert.match((await session.start({ opponent: 'laplace', preset: 'full' })).error, /Only Foul Play/);
+  assert.match((await session.start({ opponent: 'laplace', preset: 'full' })).error, /Choose a bot/);
   assert.equal((await session.start({ opponent: 'foulplay', preset: 'max' })).ok, false);
   assert.equal(session.status().state, 'idle');
 });
@@ -150,4 +165,57 @@ test('stop ends the API session and kills the simulator', async t => {
   await until(() => api.sessions.size === 0, 'api session closed');
   assert.equal(spawned[0].killed, true);
   assert.equal(session.status().state, 'idle');
+});
+
+test('Foul Play uses the full preset when the page sends none', async t => {
+  const { session } = await setup(t);
+  assert.deepEqual(await session.start({ opponent: 'foulplay' }), { ok: true });
+  assert.equal(session.status().preset, 'full');
+});
+
+test('lists Foul Play first, then the simple bots, hardest first', async t => {
+  const { session } = await setup(t);
+  const opponents = session.status().opponents;
+  assert.deepEqual(opponents.map(bot => bot.difficulty), ['hard', 'easy', 'easy', 'easy']);
+  assert.deepEqual(opponents.map(bot => bot.kind), ['Search bot', 'Rule-based bot', 'Rule-based bot', 'Rule-based bot']);
+  assert.ok(opponents.every(bot => bot.formats.length === 1 && bot.formats[0] === 'gen9randombattle'));
+  assert.deepEqual(opponents.map(bot => bot.id), ['foulplay', 'heuristic', 'greedy', 'random']);
+  assert.deepEqual(opponents.map(bot => bot.local), [false, true, true, true]);
+  assert.deepEqual(opponents.map(bot => bot.search), [true, false, false, false]);
+});
+
+test('plays a simple bot on this computer, with no cloud session', async t => {
+  const { session, sim, bots, requested, api } = await setup(t);
+  assert.deepEqual(await session.start({ opponent: 'greedy', preset: 'max' }), { ok: true });
+  assert.equal(requested(), 0);
+  assert.equal(api.sessions.size, 0);
+  assert.equal(bots.length, 1);
+  assert.equal(bots[0].kind, 'greedy');
+  assert.equal(session.connection.bot, 'GreedyBot');
+  assert.ok(sim.received.includes('|/trn GreedyBot,0,'));
+  const status = session.status();
+  assert.deepEqual([status.opponent, status.preset, status.threads], ['greedy', null, null]);
+
+  sim.socket.send('|pm| Player| GreedyBot|/challenge gen9randombattle|gen9randombattle|||');
+  await until(() => sim.received.includes('|/accept Player'), 'accept');
+  sim.socket.send(`>${ROOM}
+|init|battle
+|title|Player vs. GreedyBot`);
+  sim.socket.send(`>${ROOM}
+|request|{"active":[{}],"rqid":3}`);
+  await until(() => bots[0].frames.length === 2, 'frames handed to the bot');
+  bots[0].emit('choice', { room: ROOM, choice: '/choose move 2', rqid: 3, elapsedMs: 40 });
+  await until(() => sim.received.includes(`${ROOM}|/choose move 2|3`), 'choice sent');
+
+  session.stop();
+  assert.equal(bots[0].closed, true);
+});
+
+test('fails if a simple bot stops mid-battle', async t => {
+  const { session, bots } = await setup(t);
+  await session.start({ opponent: 'heuristic' });
+  const failure = once(session, 'failure');
+  bots[0].emit('close', {});
+  assert.deepEqual(await failure, ['bot']);
+  assert.match(session.status().error, /bot stopped unexpectedly/);
 });

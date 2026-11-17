@@ -14,7 +14,8 @@
   const emptyTitle = $('battle-empty-title');
   const emptyText = $('battle-empty-text');
   const back = $('battle-back');
-  const NAME = 'Foul Play';
+  const subtitle = $('battle-subtitle');
+  let NAME = 'the bot';
   let busy = false;
   let polling = false;
   let actionError = '';
@@ -37,6 +38,8 @@
     polling = true;
     try {
       const value = await window.desktop.getPractice();
+      NAME = value.opponents?.find(bot => bot.id === value.opponent)?.name || 'the bot';
+      subtitle.textContent = `vs. ${NAME} · Gen 9 Random Battle`;
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
       const finished = Boolean(running && value.battle?.finished);

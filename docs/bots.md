@@ -15,7 +15,7 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
-Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **Foul Play is the practice opponent**: its moves come from the practice API (`api/`), in the cloud or on the player's computer. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
+Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers four opponents**, hardest first: **Foul Play** (Hard), whose moves come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Weaker versions of Foul Play are planned to fill the gap. Only Foul Play's card shows the cloud server's state. The rest of this document is about the two search bots. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
 
 | | Foul Play | Laplace |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, 
 | Rejected choice | Session ends | Counted; server default used and surfaced |
 | Adapter | `api/worker/foulplay_worker.py` (through the practice API) | `scripts/laplace/runner.py` (harness) |
 
-Presets set the engine's search threads and nothing else: **Quiet** 1, **Balanced** 2, **Full** 8 (default; a cloud server may cap it with `MAX_THREADS`). They are CPU budgets, not difficulty levels.
+Presets set the engine's search threads and nothing else: **Quiet** 1, **Balanced** 2, **Full** 8 (default; a cloud server may cap it with `MAX_THREADS`). They are CPU budgets, not difficulty levels. The Bots page offers no choice: the launcher always sends **Full**.
 
 ## 2. Where the bots run
 
@@ -76,6 +76,20 @@ sequenceDiagram
 ```
 
 The Laplace harness (`app/practice-runtime.js`) still starts the simulator and the Laplace runner as two child processes on one machine. It is used by development tests only ([section 8](#8-running-and-hosting)).
+
+### Simple bots (`app/simple-bots.js`)
+
+Random, Greedy and Heuristic skip step 2: the same bridge logs in as `RandomBot`, `GreedyBot` or `HeuristicBot` and hands the battle frames to a `LocalBot` in the launcher instead of the API, so they need no cloud server and no internet connection. They are written from scratch and use no Foul Play code (which is GPL-3.0); move, species and type data come from the shipped simulator's own data files (`server/dist/data`, MIT). Each bot keeps a small picture of the battle from the log (both active Pokemon, HP, status, boosts, Tera, revealed moves and abilities, hazards) and answers every `|request|` about 40 ms later, once that turn's log has arrived. Every choice is built from the request, by move position, so it is always legal; if the simulator rejects one anyway, the bot sends `/choose default` rather than stall.
+
+| Bot | Plays |
+| --- | --- |
+| Random | A random usable move; switches at random about 15% of the time when it could attack |
+| Greedy | The move with the biggest estimated immediate damage; never switches by choice |
+| Heuristic | Takes a KO when it can, switches out of bad matchups (not twice in a row), sets each hazard and status move once, heals when low, sets up to +2 when safe, otherwise attacks; Tera only when it changes the result |
+
+Damage is a quick estimate: the standard formula with stats, boosts, STAB, type effectiveness, burn and accuracy, and an average roll. The opponent's stats are estimated from its species and level with Random Battle spreads (84 EVs, 31 IVs, neutral nature); items and abilities are ignored apart from Levitate. Tests: `tests/simple-bots.test.js` (needs `npm run build:practice`) and `tests/practice-session.test.js`.
+
+*(2026-11-17)* On the real simulator, 20 battles per pairing with no rejected choices: Random vs. Random 11–9, Greedy vs. Random 20–0, Heuristic vs. Random 20–0, Heuristic vs. Greedy 12–8.
 
 ## 3. Protocols
 

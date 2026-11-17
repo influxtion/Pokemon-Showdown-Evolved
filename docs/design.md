@@ -88,13 +88,12 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - Protocol, limits and deployment: [api/README.md](../api/README.md) and [bots.md](bots.md).
 
 ### Practice
-- Gen 9 Random Battle against **Foul Play** on the cloud server, with a private simulator on the player's computer, never the public server.
-- Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default).
-- The **Bots** page (under Teambuilder in the sidebar, also reachable from **Play against bots** in the Home battle panel) sets a battle up; the battle plays in its own **Bot battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
+- Gen 9 Random Battle on a private simulator on the player's computer, never the public server. Opponents: **Foul Play** (Hard, on the cloud server) and three simple bots that run in the app (Easy: **Heuristic**, **Greedy**, **Random**).
+- The **Bots** page (under Teambuilder in the sidebar, also reachable from **Play against bots** in the Home battle panel) lists the bots as cards with a **Play** button each; the battle plays in its own **Bot battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
 - Practice and online games stay loaded side by side; the online account is never used.
 
 ### Settings
-- Appearance, Home layout, start page, close protection for battles and searches, client reload, open logs. Where Foul Play runs is chosen on the Bots page.
+- Appearance, Home layout, start page, close protection for battles and searches, client reload, open logs. Foul Play always runs on the cloud server.
 - **Sign out** clears the Showdown partition, local teams included. **Reset launcher** clears settings and replay notes but keeps the session. Both confirm first.
 - Window size, position and maximized state are remembered.
 
@@ -216,9 +215,10 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Practice
 
-- **Opponent and presets:** Gen 9 Random Battle against **Foul Play**, on a private simulator the app starts on the player's computer. Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default). The cloud server caps threads (currently 2), and the page says so.
-- **Where Foul Play runs:** always on the cloud server, with nothing to install. A **Server** card shows whether it is online, busy or unreachable.
-- **Battle tab:** **Play against Foul Play** opens a **Bot battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Bots page offers **Go to battle** instead of starting another.
+- **Opponents:** Gen 9 Random Battle on a private simulator the app starts on the player's computer. The Bots page has format tabs (**Random Battle**; **OU** marked coming soon, planned for Foul Play) and one collapsible group per difficulty, hardest first: **Hard** (Foul Play) and **Easy** (Heuristic, Greedy, Random); weaker Foul Play versions are planned as a group between them. Every card is the same size: icon and name, type and formats, a description and its own **Play** button. Nothing on the page says "unrated"; practice never touches the online account.
+- **Where the bots run:** the simple bots run inside the app, offline ([bots.md](bots.md#simple-bots-appsimple-botsjs)). Foul Play always runs on the cloud server, with nothing to install; only its card shows the server's state (online, busy, unreachable).
+- **No computation setting:** Foul Play always asks for the **Full** preset and gets what the server allows (currently 2 threads). The presets only ever set search threads, not strength, so the page no longer offers them.
+- **Battle tab:** a card's **Play** opens a **Bot battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Bots page offers **Go to battle** instead of starting another.
 - **Controls:** moves, switches and Terastallization in the battle; **Forfeit** (opens the client's confirmation), **New battle** after it ends, and **End practice** in the tab's header. Status shows starting, thinking, turn, elapsed time and result.
 - **Account separation:** practice and online games stay loaded side by side, and the online account is never involved.
 - How the bots decide, every protocol layer, performance and deployment: [bots.md](bots.md).
@@ -249,7 +249,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | D7a | The simulator runs on the player's computer; only inference is remote | Run whole battles on the server | Owner decision (2026-11-16): a server that only searches, and a battle UI that never depends on the network. Foul Play only for now; anonymous access with rate limits |
 | D7b | Host the cloud API on one VM behind Caddy, named through sslip.io | Own domain; managed containers; Docker on the VM | Owner decision (2026-11-16): no domain to buy or manage, and a plain systemd service is simple to update with `git pull`. The hostname is derived from the static IP, so changing the IP means a new app build |
 | D8 | Practice on a private simulator with loopback enforced twice | Bot plays on the public server | Automated play on real accounts is impossible by construction ([bots.md §3.4](bots.md#34-network-confinement)) |
-| D9 | Presets are thread counts | Named difficulty levels | That is all they change; strength is not measured |
+| D9 | Presets are thread counts, not offered on the page | Named difficulty levels; a Computation picker | That is all they change; strength is not measured, and the server caps them anyway |
 | D10 | Every third-party input pinned by revision or hash | Track upstream | Reproducible builds and a recorded license position per component |
 
 Bot-internal decisions (thread pools, rejected-choice handling, pooling) are recorded in [bots.md](bots.md).

@@ -973,43 +973,72 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   flex: 1; min-height: 0; overflow-y: auto;
 }
 @media (prefers-color-scheme: dark) { .practice-setup { --practice-gold: var(--primary); } }
-.practice-page {
-  display: flex; flex-direction: column; gap: 22px;
-  max-width: 720px; margin: 0 auto; padding: 40px 32px 48px;
+/* Bots page: a format switcher, then one collapsible group of cards per difficulty, hardest first.
+   Every card is the same size; flat, with a hairline border and nearly square corners. */
+.bots-page {
+  display: flex; flex-direction: column; gap: 26px;
+  max-width: 1120px; margin: 0 auto; padding: 32px 40px 48px;
 }
-.practice-head { text-align: center; }
-.practice-head h2 { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.2; }
-.practice-head p { margin: 6px 0 0; color: var(--text-2); font-size: var(--fs-md); }
-.practice-head .practice-bot { margin-top: 2px; color: var(--text-3); font-size: var(--fs-sm); }
-.practice-head .practice-bot:empty { display: none; }
+.bots-head { display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--border); }
+.bots-title h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.2; }
+.bots-title p { margin: 4px 0 0; color: var(--text-2); font-size: var(--fs-md); }
+.bots-formats { display: flex; gap: 24px; margin-bottom: -1px; }
+.bots-format {
+  height: 38px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--text-2); font: inherit; font-size: var(--fs-md); cursor: pointer;
+}
+.bots-format[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+.bots-format:disabled { cursor: default; color: var(--text-3); }
+.bots-format span { font-size: var(--fs-sm); }
+.bots-format:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Section labels: small caps with a hairline, as in the Teambuilder's format groups. */
-.practice-section {
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin-bottom: 10px;
-  color: var(--text-2); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+.bots-running {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-panel);
+  font-size: var(--fs-md); color: var(--text-2);
 }
-.practice-section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.bots-running strong { color: var(--text); font-weight: 600; }
+.bots-running[hidden] { display: none; }
+.bots-running .btn-primary { height: 34px; padding: 0 16px; border-radius: 3px; font-weight: 600; }
 
-.engine-status {
-  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
-  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
+.bots-groups { display: flex; flex-direction: column; gap: 22px; }
+.bots-group { display: flex; flex-direction: column; gap: 12px; }
+.bots-group h3 { margin: 0; }
+.bots-group-toggle {
+  width: 100%; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; font: inherit;
+  color: var(--text-2); font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
 }
-.engine-icon, .practice-start-icon {
-  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--practice-gold);
-}
-.engine-icon svg, .practice-start-icon svg { width: 16px; height: 16px; }
-.engine-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-top: 1px; }
-.engine-text strong { font-size: var(--fs-md); }
-.engine-note { font-size: var(--fs-sm); color: var(--text-3); }
-.engine-note--ok { color: var(--ok); }
-.engine-note--warn { color: var(--warn); }
+.bots-group-toggle::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.bots-group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bots-group-toggle svg { width: 12px; height: 12px; transition: transform .15s; }
+.bots-group-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.bots-group-count { font-weight: 400; letter-spacing: 0; }
+.bots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.bots-grid[hidden] { display: none; }
 
-.practice-card {
-  padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
+.bot-card {
+  height: 228px; box-sizing: border-box; display: flex; flex-direction: column;
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px;
 }
-.practice-card .select { height: 36px; border-radius: 8px; }
-.practice-hint { margin: 8px 0 0; color: var(--text-3); font-size: var(--fs-sm); }
+.bot-card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; padding: 18px 20px 0; overflow: hidden; }
+.bot-card-name { display: flex; align-items: center; gap: 10px; }
+.bot-card-name svg { flex: none; width: 22px; height: 22px; color: var(--accent); }
+.bot-card-name h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.bot-card-meta { margin: 0; color: var(--text-3); font-size: var(--fs-sm); }
+.bot-card-text { margin: 4px 0 0; color: var(--text-2); font-size: var(--fs-md); line-height: 1.5; }
+.bot-card-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  margin-top: 14px; padding: 12px 20px; border-top: 1px solid var(--border);
+}
+.bot-card-cloud { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; color: var(--text-3); font-size: var(--fs-sm); }
+.bot-card-cloud svg { flex: none; width: 16px; height: 16px; }
+.bot-card-cloud--warn { color: var(--warn); }
+.bot-play.btn-primary { flex: none; height: 34px; min-width: 84px; padding: 0 16px; border-radius: 3px; font-weight: 600; }
+@media (max-width: 640px) {
+  .bots-page { padding: 24px 16px 40px; }
+  .bot-card { height: auto; min-height: 200px; }
+}
 
 /* Practice battle tab, before its battle client is up or after the session ends. */
 .battle-empty { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
@@ -1025,20 +1054,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .battle-empty-card h2 { margin: 4px 0 0; font-size: 18px; }
 .battle-empty-card p { margin: 0; color: var(--text-2); }
 .battle-empty-card .btn { margin-top: 8px; }
-
-/* Closing bar: what the battle is, and the page's one primary action. */
-.practice-start-bar {
-  display: flex; align-items: center; gap: 14px; margin-top: 4px; padding: 14px 16px;
-  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
-}
-.practice-start-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.practice-start-text strong { font-size: var(--fs-md); }
-.practice-start-text span { color: var(--text-2); font-size: var(--fs-sm); }
-.practice-start-bar .btn-primary { flex: none; height: 38px; padding: 0 18px; border-radius: 8px; font-weight: 600; }
-@media (max-width: 640px) {
-  .practice-start-bar { flex-wrap: wrap; }
-  .practice-start-bar .btn-primary { width: 100%; }
-}
 
 /* ---------- Rail rooms, room title and result bar ---------- */
 

@@ -255,7 +255,7 @@ async function smoke() {
   await load('practice.html');
   await pause(500);
   assert.equal(view.getVisible(), false, 'the setup page does not show the battle');
-  assert.equal(await run("!document.getElementById('practice-go').hidden && document.getElementById('practice-start').hidden"), true,
+  assert.equal(await run("!document.getElementById('practice-go').hidden && [...document.querySelectorAll('.bot-play')].every(play => play.disabled)"), true,
     'the setup page leads back to the running battle');
   await load('practice-battle.html');
   await until(() => view.getVisible(), 'Practice returns');

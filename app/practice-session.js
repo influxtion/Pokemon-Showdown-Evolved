@@ -1,8 +1,9 @@
 'use strict';
 
-// One practice session: the Showdown simulator runs on this computer, and the bot's seat in it is
-// played through the cloud practice inference API (see api/). The bridge logs in to the simulator as the bot, accepts the
-// player's challenge, forwards the bot's battle-room frames to the API and sends back its choices.
+// One practice session: the Showdown simulator runs on this computer. The bridge logs in to it as
+// the bot, accepts the player's challenge and hands the bot's battle-room frames to whoever plays
+// the bot's seat: the cloud practice inference API for Foul Play (see api/), or one of the simple
+// bots in app/simple-bots.js, which run right here. Choices come back the same way for both.
 
 const path = require('node:path');
 const os = require('node:os');
@@ -15,6 +16,20 @@ const { verifyInWorker } = require('./practice-verification');
 const { childEnvironment, PRESETS } = require('./practice-runtime');
 const { InferenceClient } = require('../api/client');
 const { BOTS, FORMAT, ROOM } = require('../api/protocol');
+const { LOCAL_BOTS, LocalBot, loadData } = require('./simple-bots');
+
+// What the Bots page shows, hardest first. `difficulty` is the group a bot is listed under; only
+// Foul Play searches, so only it uses the cloud and the computation presets.
+const SIMPLE = { local: true, search: false, difficulty: 'easy', kind: 'Rule-based bot', formats: [FORMAT] };
+const OPPONENTS = Object.freeze({
+  foulplay: Object.freeze({ ...BOTS.foulplay, local: false, search: true, difficulty: 'hard', kind: 'Search bot', formats: [FORMAT],
+    description: 'Searches possible futures every turn, guessing what your team could be holding.' }),
+  heuristic: Object.freeze({ ...LOCAL_BOTS.heuristic, ...SIMPLE }),
+  greedy: Object.freeze({ ...LOCAL_BOTS.greedy, ...SIMPLE }),
+  random: Object.freeze({ ...LOCAL_BOTS.random, ...SIMPLE }),
+});
+// The page has no computation setting; Foul Play uses the most the server allows.
+const DEFAULT_PRESET = 'full';
 
 const HUMAN = 'Player';
 const ERRORS = Object.freeze({
@@ -25,6 +40,7 @@ const ERRORS = Object.freeze({
   client: 'The battle client failed. Start a new session to try again.',
   integrity: 'The practice battle server failed its integrity check. Rebuild or reinstall it.',
   engine: 'Lost the connection to Foul Play. Start a new session to try again.',
+  bot: 'The bot stopped unexpectedly. Start a new session to try again.',
 });
 
 const toId = name => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -32,7 +48,8 @@ const toId = name => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 class PracticeSession extends EventEmitter {
   // target() resolves to { url, key } for the API that computes the bot's moves.
   constructor({ root, scripts, target, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
-    installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient }) {
+    installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient,
+    createBot = kind => new LocalBot({ kind, data: loadData(path.join(this.root, 'server')) }) }) {
     super();
     this.root = root;
     this.scripts = scripts;
@@ -44,7 +61,8 @@ class PracticeSession extends EventEmitter {
     this.timeoutMs = timeoutMs;
     this.WebSocketImpl = WebSocketImpl;
     this.Client = Client;
-    this.bot = BOTS.foulplay;
+    this.createBot = createBot;
+    this.bot = OPPONENTS.foulplay;
     this.generation = 0;
     this.state = 'idle';
     this.error = '';
@@ -74,20 +92,23 @@ class PracticeSession extends EventEmitter {
 
   status() {
     return { installed: this.installed(), state: this.state, opponent: this.bot.id, threads: this.threads,
-      opponents: [{ id: this.bot.id, name: this.bot.name, available: true, description: this.bot.description }],
+      opponents: Object.values(OPPONENTS).map(bot => ({ id: bot.id, name: bot.name, local: bot.local, search: bot.search,
+        difficulty: bot.difficulty, kind: bot.kind, formats: bot.formats, description: bot.description })),
       error: this.error, preset: this.preset, battle: this.battle };
   }
 
   changed() { this.emit('change', this.status()); }
 
   async start(options) {
-    const { opponent = 'foulplay', preset } = options && typeof options === 'object' ? options : {};
-    if (opponent !== this.bot.id) return { ok: false, error: 'Only Foul Play is available for practice right now.' };
-    if (!Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
+    const { opponent = 'foulplay', preset = DEFAULT_PRESET } = options && typeof options === 'object' ? options : {};
+    if (typeof opponent !== 'string' || !Object.hasOwn(OPPONENTS, opponent)) return { ok: false, error: 'Choose a bot to play against.' };
+    const bot = OPPONENTS[opponent];
+    // Only Foul Play uses the computation setting.
+    if (bot.search && !Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { preset, state: 'starting', error: '', battle: null });
+    Object.assign(this, { bot, preset: bot.search ? preset : null, state: 'starting', error: '', battle: null });
     this.reset();
     this.connection = { token: crypto.randomBytes(32).toString('hex'), human: HUMAN, bot: this.bot.account, port: null };
     this.changed();
@@ -114,7 +135,7 @@ class PracticeSession extends EventEmitter {
       return { ok: true };
     } catch (error) {
       if (!current()) return { ok: false, cancelled: true };
-      return this.fail(error.engine ? 'engine' : 'start', generation, error.message);
+      return this.fail(error.engine ? (this.bot.local ? 'bot' : 'engine') : 'start', generation, this.bot.local ? undefined : error.message);
     }
   }
 
@@ -152,6 +173,7 @@ class PracticeSession extends EventEmitter {
   }
 
   async startEngine(generation) {
+    if (this.bot.local) return this.startLocalBot(generation);
     const target = await this.target();
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
@@ -168,6 +190,18 @@ class PracticeSession extends EventEmitter {
       if (generation === this.generation && this.inference === socket) this.fail('engine', generation, error?.message);
     });
     await socket.ready;
+  }
+
+  // The simple bots play in this process; there is no API session and no thread count.
+  async startLocalBot(generation) {
+    const bot = this.createBot(this.bot.id);
+    if (generation !== this.generation) { bot.close(); return; }
+    this.inference = bot;
+    bot.on('choice', choice => this.choice(choice, generation));
+    bot.on('close', () => {
+      if (generation === this.generation && this.inference === bot) this.fail('bot', generation);
+    });
+    await bot.ready;
   }
 
   connectBot(generation) {
@@ -293,4 +327,4 @@ class PracticeSession extends EventEmitter {
   }
 }
 
-module.exports = { PracticeSession, ERRORS };
+module.exports = { PracticeSession, ERRORS, OPPONENTS };

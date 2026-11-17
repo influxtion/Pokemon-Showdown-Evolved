@@ -56,7 +56,6 @@
     </nav>
     <header class="topbar">
       <h1>Bots</h1>
-      <span class="faint">Gen 9 Random Battle</span>
       <div class="topbar-actions">
         <span class="status status--off" id="practice-status" role="status">Checking runtime…</span>
       </div>
@@ -64,39 +63,24 @@
     <main class="content content--flush practice-content">
       <div class="banner banner--bar banner--warn" id="practice-message" role="status" hidden></div>
       <section class="practice-setup" id="practice-setup">
-        <div class="practice-page">
-          <header class="practice-head">
-            <h2>Practice against Foul Play</h2>
-            <p>Play unrated Gen 9 Random Battles with generated teams.</p>
-            <p class="practice-bot" id="practice-opponent-description"></p>
+        <div class="bots-page">
+          <header class="bots-head">
+            <div class="bots-title">
+              <h2>Practice against a bot</h2>
+              <p>Choose a format, then an opponent.</p>
+            </div>
+            <div class="bots-formats" role="tablist" aria-label="Format">
+              <button type="button" class="bots-format" role="tab" aria-selected="true">Random Battle</button>
+              <button type="button" class="bots-format" role="tab" aria-selected="false" disabled>OU <span>(coming soon)</span></button>
+            </div>
           </header>
 
-          <div class="practice-field">
-            <span class="practice-section">Server</span>
-            <div class="engine-status">
-              <span class="engine-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 12.5h7a2.75 2.75 0 0 0 .4-5.47A4 4 0 0 0 4.2 6.4 3.05 3.05 0 0 0 4.5 12.5z"/></svg></span>
-              <span class="engine-text"><strong>Cloud server</strong><span class="engine-note" id="practice-engine-cloud-note" role="status">Needs an internet connection.</span></span>
-            </div>
-          </div>
-
-          <div class="practice-field">
-            <label class="practice-section" for="practice-preset">Computation</label>
-            <div class="practice-card">
-              <select class="select" id="practice-preset">
-                <option value="quiet">Quiet · 1 search thread</option>
-                <option value="balanced">Balanced · 2 search threads</option>
-                <option value="full" selected>Full · 8 search threads</option>
-              </select>
-              <p class="practice-hint" id="practice-preset-hint">More threads search deeper in the same time. These settings control computation, not difficulty or Elo.</p>
-            </div>
-          </div>
-
-          <div class="practice-start-bar">
-            <span class="practice-start-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .92.5l7.4-4.8a.6.6 0 0 0 0-1L5.92 2.7A.6.6 0 0 0 5 3.2z"/></svg></span>
-            <span class="practice-start-text"><strong id="practice-start-title">Unrated practice</strong><span id="practice-start-note">Separate from your online Showdown account. The battle opens in its own tab.</span></span>
-            <button class="btn btn-primary" id="practice-start" disabled>Play against Foul Play</button>
+          <div class="bots-running" id="practice-running" hidden>
+            <span><strong>A practice battle is running.</strong> It stays open in its own tab; close that tab to end it.</span>
             <a class="btn btn-primary" href="practice-battle.html" id="practice-go" hidden>Go to battle</a>
           </div>
+
+          <div class="bots-groups" id="practice-bots"></div>
         </div>
       </section>
     </main>
