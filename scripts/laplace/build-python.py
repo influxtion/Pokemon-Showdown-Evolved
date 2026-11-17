@@ -216,6 +216,9 @@ def build_engine(lock, temp, python, wheelhouse, env):
     cargo, toolchain = rust_toolchain(engine["rustVersion"], env)
     env["CARGO_HOME"] = str(contained_path(CACHE / "cargo-home"))
     env["CARGO_TARGET_DIR"] = str(temp / "cargo-target")
+    # Cargo starts one optimizing rustc per CPU thread by default; on many-core PCs with
+    # 16 GB of RAM that runs out of memory and the compilers crash mid-build.
+    env["CARGO_BUILD_JOBS"] = os.environ.get("CARGO_BUILD_JOBS") or str(min(4, os.cpu_count() or 1))
     command([cargo, "fetch", "--locked", "--target", toolchain["target"]], cwd=source, env=env)
     engine_wheels = temp / "engine-wheels"
     command([python.parent / "maturin.exe", "build", "--release", "--interpreter", python,

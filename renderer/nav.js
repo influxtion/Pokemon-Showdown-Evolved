@@ -5,8 +5,11 @@
 // Other pages can listen for the "showdown-session" event instead of polling again.
 (() => {
   // Following the current page's link reloads the renderer and resets its UI.
+  // (The practice battle page highlights Practice too, but that link leads back to setup.)
   const currentPage = document.querySelector('.rail a.nav-item[aria-current="page"]');
-  if (currentPage) currentPage.addEventListener('click', (event) => event.preventDefault());
+  const ownFile = (/([a-z-]+\.html)(?:[?#].*)?$/.exec(String(location.href)) || [])[1] || '';
+  const currentHref = currentPage && currentPage.getAttribute('href');
+  if (currentPage && (!currentHref || currentHref === ownFile)) currentPage.addEventListener('click', (event) => event.preventDefault());
 
   const $ = (name) => document.querySelector(`[data-nav="${name}"]`);
   const list = $('rooms');
@@ -82,8 +85,62 @@
     else go('play.html');
   }
 
+  // Closing a battle that is still on asks first, in a small popup under the tab, as Showdown
+  // does. It stays inside the tab strip and the top bar, the only part of the window not
+  // covered by a battle view. Resolves true for Forfeit, false for Cancel, Escape or a click away.
+  let forfeitAsk = null;
+  function confirmForfeit(tabId) {
+    if (forfeitAsk) forfeitAsk.finish(false);
+    return new Promise((resolve) => {
+      if (typeof document.createElement !== 'function' || !document.body) return resolve(false);
+      const anchor = [...list.querySelectorAll('[data-tab-id]')].find((node) => node.getAttribute('data-tab-id') === tabId) || null;
+      const box = make('div', 'forfeit-ask');
+      box.setAttribute('role', 'alertdialog');
+      box.setAttribute('aria-label', 'Forfeit this battle?');
+      const text = make('span', 'forfeit-ask-text');
+      text.append(make('strong', '', 'Forfeit this battle?'), make('span', '', ' You lose the battle.'));
+      const yes = make('button', 'btn forfeit-ask-yes', 'Forfeit');
+      const no = make('button', 'btn forfeit-ask-no', 'Cancel');
+      yes.type = no.type = 'button';
+      box.append(text, yes, no);
+      document.body.append(box);
+      // Under the tab's close button, kept inside the window.
+      const target = anchor && anchor.querySelector('.nav-close') ? anchor.querySelector('.nav-close') : anchor;
+      const rect = target ? target.getBoundingClientRect() : { left: innerWidth / 2, width: 0, bottom: 40 };
+      const width = box.offsetWidth;
+      const center = rect.left + rect.width / 2;
+      const left = Math.max(8, Math.min(center - width / 2, innerWidth - width - 8));
+      box.style.left = `${left}px`;
+      box.style.top = `${Math.round(rect.bottom) + 6}px`;
+      box.style.setProperty('--arrow-x', `${Math.round(center - left)}px`);
+      const onKey = (event) => {
+        if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+      };
+      const onDown = (event) => { if (!box.contains(event.target)) finish(false); };
+      function finish(answer) {
+        if (forfeitAsk !== handle) return;
+        forfeitAsk = null;
+        document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('mousedown', onDown, true);
+        box.remove();
+        resolve(answer);
+      }
+      const handle = { finish };
+      forfeitAsk = handle;
+      yes.addEventListener('click', () => finish(true));
+      no.addEventListener('click', () => finish(false));
+      document.addEventListener('keydown', onKey, true);
+      setTimeout(() => document.addEventListener('mousedown', onDown, true), 0);
+      no.focus();
+    });
+  }
+
   async function closeRoom(id) {
-    const result = await act('leave-room', { room: id });
+    let result = await act('leave-room', { room: id });
+    if (result === 'needs-forfeit') {
+      if (!(await confirmForfeit(id))) return false;
+      result = await act('leave-room', { room: id, forfeit: true });
+    }
     if (result === 'needs-client') {
       go('play.html');
     } else if (result === true) {
@@ -140,7 +197,8 @@
   // How a tab closes, or null when it cannot: Home and Community always stay.
   // The close button, a middle click and Ctrl+W all go through these.
   const rowCloser = ({ closable, pm, id }) => (!closable ? null : pm ? () => closeConversation(pm) : () => closeRoom(id));
-  const pageCloser = (file) => (file === 'index.html' ? null : PAGES[file].room ? () => closeRoom(file) : () => closePage(file));
+  const pageCloser = (file) => (file === 'index.html' ? null : PAGES[file].room ? () => closeRoom(file)
+    : file === BATTLE_PAGE ? closePracticeBattle : () => closePage(file));
 
   // A middle click anywhere on a closable tab closes it, as in a browser.
   function closeOnMiddleClick(node, close) {
@@ -157,6 +215,7 @@
   function row({ title, sub, tip, kind, live, unread, current, id, closable, tab, pm, challenge }) {
     const shut = rowCloser({ closable, pm, id });
     const node = make('div', `nav-item ${tab ? 'nav-tab' : 'nav-room'}${live ? ' nav-item--live' : ''}${challenge ? ' nav-item--challenge' : ''}`);
+    if (id && !pm) node.setAttribute('data-tab-id', id);
     closeOnMiddleClick(node, shut);
     node.title = tip || (sub ? `${title} · ${sub}` : title);
     if (current) node.setAttribute('aria-current', 'page');
@@ -214,12 +273,16 @@
     'stats.html': { title: 'Stats', kind: 'stats' },
     'replays.html': { title: 'Replays', kind: 'replays' },
     'practice.html': { title: 'Practice', kind: 'practice' },
+    'practice-battle.html': { title: 'Practice battle', kind: 'battle' },
     'settings.html': { title: 'Settings', kind: 'settings' },
     teambuilder: { title: 'Teambuilder', kind: 'teambuilder', room: true },
   };
   const isPage = (file) => Object.prototype.hasOwnProperty.call(PAGES, file);
   const pagesKey = 'nav.pages';
-  const thisPage = (/([a-z]+\.html)(?:[?#].*)?$/.exec(String(location.href)) || [])[1] || '';
+  const thisPage = ownFile;
+  // The practice battle's tab exists while a practice session does: starting one opens it,
+  // and closing it ends the session (after a confirmation while the battle is still on).
+  const BATTLE_PAGE = 'practice-battle.html';
 
   function savedPages() {
     try {
@@ -257,9 +320,41 @@
     if (lastSession) render(lastSession);
   }
 
+  async function closePracticeBattle() {
+    let result = null;
+    try {
+      result = await desktop.stopPractice();
+      if (result && result.needsConfirm) {
+        if (!(await confirmForfeit(BATTLE_PAGE))) return false;
+        result = await desktop.stopPractice(true);
+      }
+    } catch {}
+    if (result && result.cancelled) return false;
+    closePage(BATTLE_PAGE);
+    return true;
+  }
+
+  // Elsewhere, drop the battle tab once its session has ended (stopped, or the app restarted).
+  let pruned = false;
+  async function pruneBattleTab() {
+    if (pruned) return;
+    pruned = true;
+    if (thisPage === BATTLE_PAGE || !pages.includes(BATTLE_PAGE) || typeof desktop.getPractice !== 'function') return;
+    let state = null;
+    try {
+      state = (await desktop.getPractice())?.state;
+    } catch {}
+    if (state !== 'idle' || !pages.includes(BATTLE_PAGE)) return;
+    pages.splice(pages.indexOf(BATTLE_PAGE), 1);
+    savePages();
+    lastKey = null;
+    if (lastSession) render(lastSession);
+  }
+
   function pageTab({ file, current }) {
     const { title, kind, room } = PAGES[file];
     const node = make('div', 'nav-item nav-page');
+    node.setAttribute('data-tab-id', file);
     node.title = title;
     if (current) node.setAttribute('aria-current', 'page');
     const main = make('button', 'nav-room-main');
@@ -573,6 +668,7 @@
     }
     if (!session || !Array.isArray(session.rooms)) session = { ready: false, rooms: [] };
     render(session);
+    pruneBattleTab();
     if (session.ready) {
       try { sessionStorage.setItem(lastSessionKey, JSON.stringify(session)); } catch {}
     }
@@ -666,7 +762,7 @@
   }
   if (typeof desktop.onClientChange === 'function') desktop.onClientChange(clientChanged);
 
-  window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut };
+  window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut, closePracticeBattle };
   // Every launcher page is a fresh document. Draw the tab strip from the last session read in
   // this window straight away, so it never flashes empty while the first read is on its way;
   // that read then replaces it. Only the strip is drawn: nothing navigates on stale data.

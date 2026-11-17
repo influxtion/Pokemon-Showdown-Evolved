@@ -39,7 +39,8 @@ function pip(python, ...packages) {
 async function main() {
   const { values } = parseArgs({ options: { runtime: { type: 'string' }, python: { type: 'string', default: 'python' }, 'build-linux': { type: 'boolean' } } });
   if (values['build-linux'] && process.platform !== 'linux') throw new Error('--build-linux runs inside the Linux container.');
-  let root = path.resolve(values.runtime || path.join(workspace, 'vendor/laplace/dist'));
+  // The harness needs Python and Laplace, which only `npm run build:laplace` builds (never the app's runtime).
+  let root = path.resolve(values.runtime || path.join(workspace, 'out/laplace-runtime'));
   let laplacePython = path.join(root, 'python/python.exe');
   let laplaceSource;
   if (values['build-linux']) {
@@ -60,7 +61,9 @@ async function main() {
     // Editable metadata preserves upstream's __file__-relative model/data paths.
     pip(laplacePython, '--no-deps', '-e', laplaceSource);
   }
-  if (!fs.existsSync(path.join(root, 'client/practice-client.html'))) throw new Error('Build Laplace first or pass --runtime with an existing verified runtime.');
+  if (!fs.existsSync(path.join(root, 'client/practice-client.html')) || !fs.existsSync(laplacePython)) {
+    throw new Error('Run npm run build:laplace first, or pass --runtime with an existing verified Laplace runtime.');
+  }
   run(laplacePython, ['-I', '-B', path.join(workspace, 'scripts/laplace/runner.py'), '--check']);
   // Elsewhere the staged runtime is checked against its own manifest; the inventory then only pins the lock.
   const roots = values['build-linux'] ? [root, laplaceSource, path.dirname(path.dirname(laplacePython))]

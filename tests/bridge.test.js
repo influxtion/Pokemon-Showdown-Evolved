@@ -366,6 +366,30 @@ test('rooms are focused and left through the client, keeping its forfeit confirm
     ['popup', 'sounds'], ['popup', 'options']]);
 });
 
+test('a live battle asks in the launcher, then forfeits and leaves without showing the client', async () => {
+  const sent = [];
+  const removed = [];
+  const live = { battle: {}, side: 'p1', send: (text) => sent.push(text) };
+  const app = {
+    rooms: { '': {}, 'battle-gen9ou-2': live, 'battle-gen9ou-3': { battle: {}, side: 'p1', battleEnded: true }, 'battle-gen9ou-4': { battle: {} } },
+    popups: [],
+    leaveRoom: (id) => { removed.push(['leave', id]); return true; },
+    removeRoom: (id) => removed.push(['remove', id]),
+    addPopup: () => { throw new Error('the client popup must not open'); },
+  };
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2' }), 'needs-forfeit');
+  assert.deepEqual(sent, [], 'asking does not forfeit');
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2', forfeit: true }), true);
+  assert.deepEqual(sent, ['/forfeit']);
+  assert.equal(live.battle.forfeitPending, true);
+  // Finished battles and battles the user only watches close normally.
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-3' }), true);
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-4' }), true);
+  assert.deepEqual(removed, [['remove', 'battle-gen9ou-2'], ['leave', 'battle-gen9ou-3'], ['leave', 'battle-gen9ou-4']]);
+});
+
 test('the client keeps its own header unless a full read confirms the launcher can drive rooms', async () => {
   const make = () => ({
     user: { get: (key) => key === 'name' ? 'Player' : false },

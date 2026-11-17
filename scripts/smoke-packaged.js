@@ -186,8 +186,8 @@ async function practiceSmoke(cdp, debugPort, child) {
     await evaluate(cdp, "location.href = 'index.html'; 0");
     await waitForPage(cdp);
     assert.equal((await state()).battle.room, firstRoom, 'local game survives Home');
-    await evaluate(cdp, "location.href = 'practice.html'; 0");
-    await until(() => evaluate(cdp, "location.pathname.endsWith('/practice.html') && document.readyState === 'complete' && !!window.desktop"), 'return to Practice');
+    await evaluate(cdp, "location.href = 'practice-battle.html'; 0");
+    await until(() => evaluate(cdp, "location.pathname.endsWith('/practice-battle.html') && document.readyState === 'complete' && !!window.desktop"), 'return to the practice battle tab');
     assert.equal(await battle(`
       const close = [...document.querySelectorAll('button[name=closeRoom]')].find(button => button.value === room.id);
       if (!close) return false;
@@ -206,9 +206,10 @@ async function practiceSmoke(cdp, debugPort, child) {
       const current = await state();
       return current.clientState === 'battle' && current.battle.room !== firstRoom;
     }, 'packaged rematch');
-    // Closing the actual packaged app must stop both the bundled Python and server.
+    // A fresh profile plays Foul Play in the cloud, so the simulator is the only runtime process,
+    // and releases carry no Python. Closing the app must stop it.
     const children = runtimeChildren(child.pid);
-    assert.deepEqual(children.map(value => value.kind).sort(), ['python', 'server'], 'both packaged runtime processes observed');
+    assert.deepEqual(children.map(value => value.kind).sort(), ['server'], 'only the packaged simulator runs locally');
     return { battleReadyMs, moveConfirmed: true, navigationPreserved: true, forfeitAndRematch: true,
       restrictedPath: true, childPids: children.map(value => value.pid) };
   } finally { player.close(); }

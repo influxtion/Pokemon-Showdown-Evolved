@@ -155,11 +155,14 @@ async function smoke() {
   await until(async () => (await status()).installed, 'practice runtime ready');
   assert.equal((await status()).state, 'idle');
   fs.mkdirSync(captures, { recursive: true });
-  await run(`document.getElementById('practice-engine-${engine}').click(); 0`);
-  await until(() => run("!document.getElementById('practice-start').disabled"), 'engine picker ready');
-  assert.equal((await status()).engines.selected, engine, 'engine choice saved');
-  await capture(renderer, 'engine-picker');
+  // The Practice page offers only the cloud; the harness picks the engine through the IPC call below.
+  assert.equal(await run("document.querySelector('input[name=\"practice-engine\"], #practice-install') === null"), true, 'no local option on the page');
+  await capture(renderer, 'setup');
   assert.equal((await call('startPractice', selection)).ok, true);
+  // The battle plays in its own tab; the setup page never shows the battle client.
+  await load('practice-battle.html');
+  assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')]
+    .some(tab => tab.title === 'Practice battle' && tab.getAttribute('aria-current') === 'page')`), true, 'battle tab open and current');
   await until(async () => {
     const state = await status();
     if (state.error || state.clientError) throw new Error(state.error || state.clientError);
@@ -183,6 +186,8 @@ async function smoke() {
     return url.protocol === 'ws:' && url.hostname === '127.0.0.1' && url.pathname.endsWith('/websocket');
   })()`), true);
   assert.equal(live.getVisible(), false);
+  assert.equal(await player.executeJavaScript("getComputedStyle(document.getElementById('header')).display"), 'none',
+    'the client header and its closable room tabs are hidden');
   const roomId = await until(async () => {
     const state = await status();
     if (state.error || state.clientError) throw new Error(state.error || state.clientError);
@@ -253,6 +258,11 @@ async function smoke() {
   assert.equal(live.webContents.id, liveId);
   assert.equal(view.getVisible(), false);
   await load('practice.html');
+  await pause(500);
+  assert.equal(view.getVisible(), false, 'the setup page does not show the battle');
+  assert.equal(await run("!document.getElementById('practice-go').hidden && document.getElementById('practice-start').hidden"), true,
+    'the setup page leads back to the running battle');
+  await load('practice-battle.html');
   await until(() => view.getVisible(), 'Practice returns');
   assert.equal(practice().webContents.id, playerId);
   assert.equal((await status()).battle.room, roomId);
@@ -281,7 +291,7 @@ async function smoke() {
       assert.equal(await call('setTheme', theme), true);
       await until(async () => {
         const expected = await run(`(() => {
-          const rect = document.getElementById('practice-area').getBoundingClientRect();
+          const rect = document.getElementById('battle-area').getBoundingClientRect();
           return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
         })()`);
         const bounds = view.getBounds();
@@ -331,16 +341,13 @@ async function smoke() {
     }
   }
 
-  assert.deepEqual(await call('stopPractice'), { ok: false, cancelled: true });
-  assert.equal(dialogs.at(-1).message, 'Stop this practice session?');
+  // A battle still on needs the launcher's own confirmation; no Windows dialog is used.
+  assert.deepEqual(await call('stopPractice'), { ok: false, needsConfirm: true });
   assert.equal((await status()).battle.room, roomId);
   assert.equal(practice().webContents.id, playerId);
   assert.ok(children.every(child => !childExited(child)));
-  response = 1;
-  assert.equal((await call('stopPractice')).ok, true);
-  assert.deepEqual(dialogs.map(item => item.buttons), [
-    ['Keep playing', 'Stop practice'], ['Keep playing', 'Stop practice'],
-  ]);
+  assert.equal((await call('stopPractice', true)).ok, true);
+  assert.equal(dialogs.length, 0, 'no native dialogs');
   await until(() => !practice() && player.isDestroyed(), 'Practice view disposed');
   await until(() => children.every(childExited), 'local runtime children exited');
   assert.equal((await status()).state, 'idle');
@@ -361,12 +368,12 @@ async function smoke() {
   const forfeitedRoom = (await status()).battle.room;
   assert.notEqual(restartedPlayer.id, playerId);
   assert.equal(children.length, 4);
-  assert.equal(await battleEval(restartedPlayer, `
-    const close = [...document.querySelectorAll('button[name=closeRoom]')].find(button => button.value === room.id);
-    if (!close) return false;
-    close.click();
+  await until(() => run(`(() => {
+    const forfeit = document.getElementById('battle-forfeit');
+    if (forfeit.hidden || forfeit.disabled) return false;
+    forfeit.click();
     return true;
-  `), true, 'clicked the local battle tab close control');
+  })()`), 'clicked Forfeit on the battle tab');
   await until(() => restartedPlayer.executeJavaScript(`
     (() => {
       const popup = [...document.querySelectorAll('.ps-popup')].find(element =>
@@ -384,7 +391,7 @@ async function smoke() {
       state.battle.result === 'loss' && state.clientState === 'finished';
   }, 'forfeit ended the battle and kept the room');
   await until(() => run(`(() => {
-    const next = document.getElementById('practice-next');
+    const next = document.getElementById('battle-next');
     if (next.hidden || next.disabled) return false;
     next.click();
     return true;
@@ -413,6 +420,8 @@ async function smoke() {
   assert.ok(hiddenChildren.every(child => !childExited(child)));
   await load('index.html');
   await until(() => !hiddenView.getVisible(), 'Practice hidden on Home before disconnect');
+  // Home checks once whether the battle tab still has a session; it does not keep polling Practice.
+  await pause(1500);
   const homeRequests = statusRequests;
   assert.equal(await hiddenPlayer.executeJavaScript(`(() => {
     if (window.app?.socket?.readyState !== WebSocket.OPEN) return false;
@@ -425,7 +434,29 @@ async function smoke() {
   assert.ok(win.isVisible() && renderer.getURL().endsWith('/index.html'), 'Home stayed visible');
   assert.equal(live.webContents.id, liveId);
   assert.equal(live.webContents.isDestroyed(), false);
-  console.log(`PASS Practice desktop (Foul Play, ${engine}): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup`);
+
+  // Closing the battle tab ends practice and returns to the tab on its left, never a blank page.
+  await load('practice.html');
+  assert.equal((await call('startPractice', selection)).ok, true, 'start for the tab close check');
+  await load('practice-battle.html');
+  const closingView = await waitForBattle('battle before closing its tab');
+  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Practice battle')
+    .querySelector('.nav-close').click(); 0`);
+  // The forfeit popup opens under the tab; Cancel keeps the battle, Forfeit ends practice.
+  await until(() => run("Boolean(document.querySelector('.forfeit-ask'))"), 'forfeit popup');
+  await run("document.querySelector('.forfeit-ask-no').click(); 0");
+  await pause(300);
+  assert.equal((await status()).state, 'ready', 'Cancel keeps playing');
+  assert.ok(renderer.getURL().endsWith('/practice-battle.html'));
+  await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Practice battle')
+    .querySelector('.nav-close').click(); 0`);
+  await until(() => run("Boolean(document.querySelector('.forfeit-ask'))"), 'forfeit popup again');
+  await run("document.querySelector('.forfeit-ask-yes').click(); 0");
+  await until(() => renderer.getURL() && !renderer.getURL().endsWith('/practice-battle.html') && !renderer.isLoading(), 'left the closed battle tab');
+  await until(async () => (await status()).state === 'idle' && closingView.webContents.isDestroyed(), 'closing the tab ended practice');
+  assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].some(tab => tab.title === 'Practice battle')`), false,
+    'battle tab removed');
+  console.log(`PASS Practice desktop (Foul Play, ${engine}): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup, battle tab close`);
 }
 
 app.whenReady().then(smoke).then(async () => { await service?.close(); app.exit(0); }, async error => {

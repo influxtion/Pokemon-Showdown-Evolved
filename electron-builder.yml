@@ -17,7 +17,6 @@ extraResources:
     to: practice-adapter
     filter:
       - server.cjs
-      - runner.py
 files:
   - app/**/*
   - renderer/**/*

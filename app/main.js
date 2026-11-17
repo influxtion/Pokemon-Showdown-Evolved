@@ -110,6 +110,8 @@ app.on('web-contents-created', (_event, contents) => {
     cycleFocus = true;
     clearTimeout(cycleFocusTimer);
     cycleFocusTimer = setTimeout(() => { cycleFocus = false; }, 2000);
+    // Ctrl+W can open the forfeit popup in the launcher, so its keys (Escape) must reach it.
+    if (shortcut.type === 'close' && contents !== win.webContents) win.webContents.focus();
     win.webContents.send('nav:shortcut', shortcut);
   });
 });
@@ -321,7 +323,7 @@ function createWindow() {
   });
   contents.on('did-navigate', () => {
     // An outgoing page's ResizeObserver can enqueue bounds during navigation.
-    if (!parseUrl(contents.getURL())?.pathname.endsWith('/practice.html')) practiceView?.hide();
+    if (!parseUrl(contents.getURL())?.pathname.endsWith('/practice-battle.html')) practiceView?.hide();
     // After Ctrl+Tab away from the client, typing must not go to the hidden view.
     if (cycleFocus && !parseUrl(contents.getURL())?.pathname.endsWith('/play.html')) {
       cycleFocus = false;
@@ -378,10 +380,14 @@ function createWindow() {
   ensureClient();
 }
 
-function isPracticeFrame(event) {
-  return isLauncherFrame(event) && parseUrl(event.senderFrame.url)?.pathname.endsWith('/practice.html') &&
-    parseUrl(win.webContents.getURL())?.pathname.endsWith('/practice.html');
+// Practice is set up on practice.html and played on practice-battle.html, its own tab.
+function isPracticeFrame(event, pages = ['/practice.html', '/practice-battle.html']) {
+  if (!isLauncherFrame(event)) return false;
+  const sender = parseUrl(event.senderFrame.url)?.pathname || '';
+  const shown = parseUrl(win.webContents.getURL())?.pathname || '';
+  return pages.some(page => sender.endsWith(page) && shown.endsWith(page));
 }
+const isBattleFrame = event => isPracticeFrame(event, ['/practice-battle.html']);
 
 ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
@@ -415,21 +421,36 @@ ipcMain.handle('practice:remove-local', async event => {
   if (result.response !== 1) return { ok: false, cancelled: true };
   try { return await localEngine.remove(); } catch { return { ok: false, error: 'Foul Play could not be removed. Close other apps using it and try again.' }; }
 });
-ipcMain.handle('practice:stop', async event => {
-  if (!isPracticeFrame(event)) return { ok: false };
-  if (practice.battle && !practice.battle.finished) {
-    const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep playing', 'Stop practice'],
-      defaultId: 0, cancelId: 0, message: 'Stop this practice session?', detail: 'The practice battle will end.' });
-    if (result.response !== 1) return { ok: false, cancelled: true };
-  }
+// Closing the battle's tab ends practice, and that tab can be closed from any launcher page.
+// A battle still on is forfeited by stopping, so the launcher confirms first in its own popup
+// under the battle's tab, then calls again with confirmed set.
+ipcMain.handle('practice:stop', async (event, confirmed) => {
+  if (!isLauncherFrame(event)) return { ok: false };
+  if (practice.battle && !practice.battle.finished && confirmed !== true) return { ok: false, needsConfirm: true };
   return practice.stop();
 });
 ipcMain.handle('practice:show', (event, bounds) => {
-  if (!isPracticeFrame(event)) return { ok: false };
+  if (!isBattleFrame(event)) return { ok: false };
   return { ok: practiceView.show(bounds) };
 });
+// The client's header is hidden in practice, so Forfeit opens the client's own confirmation
+// through the battle tab's (hidden) close button. Nothing is sent until the player confirms there.
+ipcMain.handle('practice:forfeit', async event => {
+  if (!isBattleFrame(event) || !practice.battle || practice.battle.finished || !practiceView.view) return { ok: false };
+  try {
+    const ok = await practiceView.view.webContents.executeJavaScript(`(() => {
+      const id = window.app?.curRoom?.id || '';
+      if (!/^battle-/.test(id)) return false;
+      const close = [...document.querySelectorAll('button[name=closeRoom]')].find(button => button.value === id);
+      if (!close) return false;
+      close.click();
+      return true;
+    })()`);
+    return { ok: Boolean(ok) };
+  } catch { return { ok: false, error: 'Could not open the forfeit prompt.' }; }
+});
 ipcMain.handle('practice:next', async event => {
-  if (!isPracticeFrame(event) || !practice.battle?.finished || !practiceView.view) return { ok: false };
+  if (!isBattleFrame(event) || !practice.battle?.finished || !practiceView.view) return { ok: false };
   try {
     const ok = await practiceView.view.webContents.executeJavaScript('Boolean(window.desktopPracticeStart?.())');
     return { ok };
@@ -544,6 +565,8 @@ async function openAlert(alert) {
   if (!parseUrl(win.webContents.getURL())?.pathname.endsWith('/play.html')) win.loadFile(path.join(RENDERER_DIR, 'play.html'));
 }
 
+// leave-room answers 'needs-forfeit' for a battle the user is still playing; the launcher asks
+// in its own popup under the tab and repeats the call with forfeit: true once confirmed.
 ipcMain.handle('showdown:action', (event, action, args) => {
   if (!isLauncherFrame(event) || typeof action !== 'string') return false;
   return bridge.act(action, args);

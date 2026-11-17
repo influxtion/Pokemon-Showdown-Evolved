@@ -80,8 +80,8 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 
 ### Practice API (`api/`)
 - **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API, and the cloud server and the local copy run the same code (`api/server.js`). Only Foul Play is supported for now.
-- **Cloud by default.** Practice uses the hosted API unless the player picks **This computer**. No bot code runs on the player's PC in that case.
-- **Optional local install.** **Install Foul Play** on the Practice page runs the pinned installer (`api/install.js`) with a step counter, progress bar and live output. It downloads a standalone Python, Foul Play and, if needed, a temporary Rust compiler, then builds the engine. Outdated installs offer **Update**; installed ones can be removed.
+- **Cloud only for players.** The Practice page always uses the hosted API, so no bot code runs on the player's PC.
+- **Local engine is a developer harness.** The local copy (`LocalEngine`, the pinned installer `api/install.js`) stays in the code for tests and self-hosting, but the Practice page no longer offers **This computer** or an install button.
 - **Not bundled.** Foul Play (GPL-3.0) is downloaded on request, hash-checked against `api/lock.json`, and never shipped in the installer.
 - **Limits.** Anonymous access with per-network rate limits, a server-wide session cap and a thread cap; an optional API key ([api/README.md](../api/README.md)).
 - **Hosting.** The default cloud server is one Google Cloud VM at `https://34-174-209-142.sslip.io` (`CLOUD_API_URL`). The API runs as a systemd service on `127.0.0.1:8787` behind Caddy, which provides HTTPS; only ports 80 and 443 are open. It serves 8 battles at once with 2 search threads each, so **Full** runs with 2 threads in the cloud. Step-by-step hosting: [api/README.md](../api/README.md#host-it-on-a-server).
@@ -89,9 +89,9 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - Protocol, limits and deployment: [api/README.md](../api/README.md) and [bots.md](bots.md).
 
 ### Practice
-- Gen 9 Random Battle against **Foul Play**, on a private simulator on the player's computer, never the public server. **Run Foul Play on** chooses the cloud server (default) or this computer; the choice is remembered.
+- Gen 9 Random Battle against **Foul Play** on the cloud server, with a private simulator on the player's computer, never the public server.
 - Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default).
-- Moves, switches, Tera, Forfeit, **Next battle** and **Stop practice**. Status shows thinking, turn, time and result.
+- The Practice page sets a battle up; the battle plays in its own **Practice battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
 - Practice and online games stay loaded side by side; the online account is never used.
 
 ### Settings
@@ -167,8 +167,8 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 ### Launcher shell and Home
 
 - **Icon bar:** an 84px cobalt bar on the left; each page (Home, Teambuilder, Stats, Replay notes, Practice, Settings) is an icon with its name underneath, and the account avatar and name sit at the foot.
-- **Page tabs:** the tab strip across the top of every page starts with small, label-width tabs for launcher pages, as in Showdown's own header. Home is always first and cannot be closed. Opening Stats, Replay notes, Practice or Settings from the icon bar adds its small tab after Home; it stays until closed or the app restarts, and closing the page being shown moves to the tab on its left. Teambuilder is the client's own room: its small tab is shown exactly while that room is open, and closing the tab leaves the room. A wider gap separates these from the room tabs. **Ctrl+Tab** opens the tab to the right of the open one and **Ctrl+Shift+Tab** the one to its left, through page tabs, rooms and conversations, wrapping at the ends. **Ctrl+1** to **Ctrl+8** open that tab counted from the left (Ctrl+1 is always Home) and **Ctrl+9** opens the last one. **Ctrl+W** closes the open tab and a **middle click** closes the tab under the pointer, both exactly as the tab's close button would, so a live battle of your own still asks before forfeiting; Home and Community have no close button and ignore both. The main process catches the keys, so they also work while the focus is inside the Showdown client, a replay or a practice battle.
-- **Room tabs:** the normal-sized tabs that follow. A fixed **Community** tab (with **Join a room**), then one tab per open room (battles, chats, ladder) in the client's order with a close button, then conversations after a Messages label. There is no Battle tab: Home replaces the client's main menu. If the Showdown screen is left on that menu (for example after closing a room), it returns to Home once two session reads agree, unless a client popup is waiting. Tabs sit flat on a darker strip with a short hairline between neighbours; the open tab takes the page colour, close buttons are always visible, and the hairlines beside it or beside a hovered tab drop away. Tabs share one width (up to 150px), shrink together to a 104px minimum, and then the strip scrolls (the mouse wheel scrolls it sideways). Closing an own live battle goes through the client's own leave path, so the forfeit prompt still appears.
+- **Page tabs:** the tab strip across the top of every page starts with small, label-width tabs for launcher pages, as in Showdown's own header. Home is always first and cannot be closed. Opening Stats, Replay notes, Practice or Settings from the icon bar adds its small tab after Home; it stays until closed or the app restarts, and closing the page being shown moves to the tab on its left. Teambuilder is the client's own room: its small tab is shown exactly while that room is open, and closing the tab leaves the room. **Practice battle** opens when a practice battle starts and exists while that session does; closing it ends practice, asking first in the same forfeit popup while the battle is on. A wider gap separates these from the room tabs. **Ctrl+Tab** opens the tab to the right of the open one and **Ctrl+Shift+Tab** the one to its left, through page tabs, rooms and conversations, wrapping at the ends. **Ctrl+1** to **Ctrl+8** open that tab counted from the left (Ctrl+1 is always Home) and **Ctrl+9** opens the last one. **Ctrl+W** closes the open tab and a **middle click** closes the tab under the pointer, both exactly as the tab's close button would, so a live battle of your own still asks before forfeiting; Home and Community have no close button and ignore both. The main process catches the keys, so they also work while the focus is inside the Showdown client, a replay or a practice battle.
+- **Room tabs:** the normal-sized tabs that follow. A fixed **Community** tab (with **Join a room**), then one tab per open room (battles, chats, ladder) in the client's order with a close button, then conversations after a Messages label. There is no Battle tab: Home replaces the client's main menu. If the Showdown screen is left on that menu (for example after closing a room), it returns to Home once two session reads agree, unless a client popup is waiting. Tabs sit flat on a darker strip with a short hairline between neighbours; the open tab takes the page colour, close buttons are always visible, and the hairlines beside it or beside a hovered tab drop away. Tabs share one width (up to 150px), shrink together to a 104px minimum, and then the strip scrolls (the mouse wheel scrolls it sideways). Closing an own live battle asks **Forfeit this battle?** in a small popup under the tab's close button (Forfeit or Cancel, as Showdown does; it fits over the top bar, since a battle view covers the page below), then sends the client's own `/forfeit` and leaves the room in the background, so the battle is never brought back on screen just to confirm. Other rooms close through the client's own leave path.
 - **Persistence:** the client stays loaded across page changes, so navigating never loses a battle. A newly started battle switches to the Showdown view and takes priority. Home shows **Return to battle** while one runs. An ended battle shows a result bar: **Save replay note**, **Close battle**, **Battle again**.
 - **Home hero:** format and team pickers (with the team's sprites: Showdown's 2D gen 5 style sprites, drawn pixelated, rather than the Teambuilder's 3D Pokémon HOME renders), **Battle**, **Cancel** and **Challenge a user**. Search runs in the background with an animated state. Choices are remembered per format as a convenience only.
 - **Home hero record:** the selected format's rating, win rate, win–loss record and GXE, from the public profile endpoint (cached 2 minutes), with user and battle counts and **Edit teams** (opens the selected team).
@@ -219,8 +219,9 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 ### Practice
 
 - **Opponent and presets:** Gen 9 Random Battle against **Foul Play**, on a private simulator the app starts on the player's computer. Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default). The cloud server caps threads (currently 2), and the page says so.
-- **Where Foul Play runs:** **Cloud** (default) needs nothing installed. Its status note shows whether the server is online, busy or unreachable. **This computer** offers **Install Foul Play** with a step counter, progress bar and current output, then **Update** when the pins change, and **Remove from this computer**. Installing or updating is refused during a local battle; quitting during an install asks first. The choice is remembered.
-- **Controls:** moves, switches, Terastallization, Forfeit, **Next battle** (rematch) and **Stop practice…**. Status shows starting, ready, thinking, turn, elapsed time and result.
+- **Where Foul Play runs:** always on the cloud server, with nothing to install. A **Server** card shows whether it is online, busy or unreachable.
+- **Battle tab:** **Play against Foul Play** opens a **Practice battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Practice page offers **Go to battle** instead of starting another.
+- **Controls:** moves, switches and Terastallization in the battle; **Forfeit** (opens the client's confirmation), **New battle** after it ends, and **End practice** in the tab's header. Status shows starting, thinking, turn, elapsed time and result.
 - **Account separation:** practice and online games stay loaded side by side, and the online account is never involved.
 - How the bots decide, every protocol layer, performance and deployment: [bots.md](bots.md).
 
@@ -316,7 +317,7 @@ For Showdex, run `npm run build:showdex`, then enable it in Settings and reload 
 **Packaging** (`electron-builder` 26.18.0, always `--publish never`):
 
 ```sh
-npm run build:practice   # required: packages bundle the Laplace test runtime
+npm run build:practice   # required: packages bundle the practice simulator and battle client
 npm run pack:win:dir     # unpacked app for inspection
 npm run smoke:packaged
 npm run smoke:practice-packaged
@@ -325,8 +326,8 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 
 - **Installer:** adds a Start menu shortcut but no desktop shortcut, and uses Electron's default icon until branding is decided.
 - **`app.asar`:** contains `app/`, `renderer/`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
-- **Bots are not in the base release** (D7). The package carries only the practice API's JavaScript, `api/lock.json` and the worker script (unpacked from the archive); Foul Play itself installs from the Practice page on request. Packaging still bundles the Laplace test runtime as below, because the practice simulator and client come from it.
-- **Laplace test runtime:** ships outside the archive under `resources/practice` and `resources/practice-adapter`. Before- and after-pack hooks re-verify every file, and packaging fails on any drift. When signing arrives, exclude the locked Python and Torch binaries from re-signing so the integrity gate still passes.
+- **Bots are not in the release** (D7). Practice plays Foul Play on the cloud server. The package carries the practice API's JavaScript, `api/lock.json` and the worker script (unpacked from the archive) only for the developer local engine; no Python, Foul Play or Laplace ships.
+- **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse a Laplace harness runtime, and packaging fails on any drift.
 - **Dependency audit:** reports a moderate `minimatch` advisory through electron-builder. It is a development-only dependency and is absent from the app.
 
 **Release path**, in order. Nothing is published, and there is no updater yet.
@@ -356,7 +357,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | --- | --- | --- |
 | Showdown client changes | Bridge reads or theme selectors break; a switch to Showdown's new Preact client would need a bridge rewrite | Fail-safe shell; `test:shell:live` before releases |
 | Licensing | AGPL/GPL obligations for the patched client, Foul Play and Showdex | Source and notices retained; owner review before release |
-| Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; **This computer** works without the server; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
+| Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; the local engine works without the server for development; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
 | Unproven demand | Users may not return | Invited alpha measures return use before more features |
 
 **Open decisions (owner)**

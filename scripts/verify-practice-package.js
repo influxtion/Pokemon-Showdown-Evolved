@@ -8,7 +8,9 @@ const { verifyRuntime } = require('../app/practice-manifest');
 const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(ROOT, 'vendor', 'laplace');
 const ADAPTER = path.join(__dirname, 'laplace');
-const ADAPTER_FILES = ['runner.py', 'server.cjs'];
+// Releases carry only the simulator entry point; Laplace's runner and runtime stay in the dev harness.
+const ADAPTER_FILES = ['server.cjs'];
+const BUILD_FILES = ['build-server.cjs', 'build-client.cjs'];
 const CLIENT_FILES = ['practice-client.html', 'practice-client.css', 'client-bootstrap.js'];
 
 function sha(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
@@ -26,14 +28,14 @@ function checkedRuntime(root, failureMessage) {
   if (!result.ok) throw new Error(failureMessage);
   const bytes = fs.readFileSync(path.join(root, 'manifest.json'));
   if (sha(bytes) !== result.identity) throw new Error('Practice runtime changed during verification.');
+  if (result.kind !== 'simulator') {
+    throw new Error('Only the simulator runtime can be packaged; the Laplace harness runtime never ships.');
+  }
   return { manifest: JSON.parse(bytes), identity: result.identity };
 }
 
 function verifySource(manifest) {
-  if (manifest.python?.lockSha256 !== fileSha(path.join(VENDOR, 'runtime-lock.json'))) {
-    throw new Error('Practice runtime is out of date with runtime-lock.json. Rebuild before packaging.');
-  }
-  for (const name of [...ADAPTER_FILES, 'build-client.cjs']) {
+  for (const name of [...ADAPTER_FILES, ...BUILD_FILES]) {
     if (manifest.files[`sources/desktop-adapter/${name}`]?.sha256 !== fileSha(path.join(ADAPTER, name))) {
       throw new Error(`Practice adapter ${name} changed after the runtime build. Rebuild before packaging.`);
     }

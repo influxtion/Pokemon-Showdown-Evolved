@@ -9,6 +9,8 @@ const ROOT = path.resolve(__dirname, '..');
 const SOURCE = path.join(ROOT, 'out', 'showdex-source');
 const STAGING = path.join(ROOT, 'out', 'showdex-source-archive');
 const VENDOR = path.join(ROOT, 'vendor', 'showdex');
+// Git Bash puts GNU tar first on PATH, and it reads `C:\...` as a remote host; Windows' bsdtar does not.
+const TAR = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 const DIST = path.join(VENDOR, 'dist');
 const MANIFEST = path.join(VENDOR, 'manifest.json');
 const UPSTREAM = 'https://github.com/doshidak/showdex.git';
@@ -84,7 +86,7 @@ function archiveSource() {
     standaloneResourceProtocol: 'showdex', standaloneResourcePrefix: 'assets',
     uuidStandaloneNamespace: UUID,
   }, null, 2) + '\n');
-  run('tar', ['-czf', path.join(DIST, 'showdex-source.tar.gz'), '-C', STAGING, '.']);
+  run(TAR, ['-czf', path.join(DIST, 'showdex-source.tar.gz'), '-C', STAGING, '.']);
   removeInside(path.join(ROOT, 'out'), STAGING);
 }
 

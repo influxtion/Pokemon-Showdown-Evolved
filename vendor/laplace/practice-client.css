@@ -1,15 +1,19 @@
-#header .tabbar a[href="/"],
-#header .tabbar a[href="/rooms"],
-#header .userbar {
-  display: none;
+/* The launcher gives the battle its own tab, with its own status and buttons, so the client's
+   header (logo, room tabs and their close buttons) is not shown. Closing a room from there left
+   the client with nothing open. Rooms fill the view instead. */
+#header {
+  display: none !important;
+}
+
+.ps-room {
+  top: 0 !important;
 }
 
 .ps-room .battle-log { bottom: 0; }
 .ps-room .battle-log-add { display: none !important; }
 
 /* The client's main menu (#mainmenu, renamed #room- once the client starts) only shows when no
-   battle is open: while connecting, between battles, or after the battle's tab is closed. The
-   launcher's header starts and stops battles, so show a short status instead of the menu. */
+   battle is open: while connecting or between battles. Show a short status instead. */
 :is(#mainmenu, #room-) .mainmenuwrapper > * {
   display: none !important;
 }
@@ -19,8 +23,12 @@
   padding: 96px 24px 0;
   text-align: center;
   font-size: 15px;
-  opacity: .8;
-  content: "This battle is closed. Choose New battle at the top to play another.";
+  color: #2b3a55;
+  content: "Choose New battle at the top to play another.";
+}
+
+.dark :is(#mainmenu, #room-) .mainmenuwrapper::before {
+  color: #d5deef;
 }
 
 html[data-practice-state="connecting"] :is(#mainmenu, #room-) .mainmenuwrapper::before {

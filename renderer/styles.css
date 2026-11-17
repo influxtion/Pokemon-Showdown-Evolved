@@ -989,18 +989,10 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .practice-section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-.engine-field { border: 0; padding: 0; margin: 0; min-width: 0; }
-.engine-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.engine-option {
-  position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; cursor: pointer;
+.engine-status {
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
-  transition: border-color 0.12s ease;
 }
-.engine-option:hover { border-color: var(--border-hover); }
-.engine-option:has(input:checked) { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
-.engine-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.engine-option:has(input:disabled) { cursor: default; opacity: 0.6; }
-.engine-option input { position: absolute; opacity: 0; pointer-events: none; }
 .engine-icon, .practice-start-icon {
   flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
   background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--practice-gold);
@@ -1012,27 +1004,26 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .engine-note--ok { color: var(--ok); }
 .engine-note--warn { color: var(--warn); }
 
-.practice-card, .local-install {
+.practice-card {
   padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
 }
-.local-install { margin-top: -10px; }
 .practice-card .select { height: 36px; border-radius: 8px; }
 .practice-hint { margin: 8px 0 0; color: var(--text-3); font-size: var(--fs-sm); }
-.local-install-text { margin: 0 0 var(--space-3); color: var(--text-2); }
-.local-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.local-actions .btn { height: 32px; border-radius: 8px; padding: 0 14px; font-weight: 600; }
-.install-progress { margin: 0 0 var(--space-3); }
-.install-progress-head { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--fs-sm); margin-bottom: 4px; }
-.install-progress progress {
-  display: block; width: 100%; height: 8px; border: 0; border-radius: 4px; overflow: hidden;
-  appearance: none; background: var(--border);
+
+/* Practice battle tab, before its battle client is up or after the session ends. */
+.battle-empty { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
+.battle-empty-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 420px; padding: 28px 32px;
+  text-align: center; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel);
 }
-.install-progress progress::-webkit-progress-bar { background: var(--border); border-radius: 4px; }
-.install-progress progress::-webkit-progress-value { background: var(--primary); border-radius: 4px; transition: width 0.3s ease; }
-.install-detail {
-  margin-top: 4px; font-size: var(--fs-xs); color: var(--text-3); font-family: var(--font-mono);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.battle-empty-icon {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--practice-gold, var(--primary));
 }
+.battle-empty-icon svg { width: 20px; height: 20px; }
+.battle-empty-card h2 { margin: 4px 0 0; font-size: 18px; }
+.battle-empty-card p { margin: 0; color: var(--text-2); }
+.battle-empty-card .btn { margin-top: 8px; }
 
 /* Closing bar: what the battle is, and the page's one primary action. */
 .practice-start-bar {
@@ -1044,7 +1035,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .practice-start-text span { color: var(--text-2); font-size: var(--fs-sm); }
 .practice-start-bar .btn-primary { flex: none; height: 38px; padding: 0 18px; border-radius: 8px; font-weight: 600; }
 @media (max-width: 640px) {
-  .engine-choice { grid-template-columns: 1fr; }
   .practice-start-bar { flex-wrap: wrap; }
   .practice-start-bar .btn-primary { width: 100%; }
 }
@@ -1787,3 +1777,25 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   border-left: 1px solid var(--tab-border);
   font-size: 10px;
 }
+
+/* Forfeit confirmation under a battle tab's close button. One row, so it fits over the top bar:
+   below that, a battle view covers the page. */
+.forfeit-ask {
+  position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px;
+  height: calc(var(--topbar-h) - 6px); padding: 0 6px 0 14px;
+  border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-panel); color: var(--text);
+  box-shadow: 0 8px 24px rgba(10, 20, 45, 0.28); white-space: nowrap; font-size: var(--fs-sm);
+  animation: forfeit-ask-in 0.12s ease-out;
+}
+.forfeit-ask::before {
+  content: ""; position: absolute; top: -6px; left: calc(var(--arrow-x, 50%) - 6px); width: 10px; height: 10px;
+  background: var(--bg-panel); border-left: 1px solid var(--border-strong); border-top: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+.forfeit-ask-text { margin-right: 4px; }
+.forfeit-ask-text span { color: var(--text-2); }
+.forfeit-ask .btn { height: 26px; padding: 0 12px; border-radius: 6px; font-weight: 600; }
+.forfeit-ask-yes { background: var(--err); border-color: var(--err); color: #fff; }
+.forfeit-ask-yes:hover { background: var(--err); filter: brightness(1.08); }
+@keyframes forfeit-ask-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .forfeit-ask { animation: none; } }

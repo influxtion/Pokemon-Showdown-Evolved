@@ -5,7 +5,7 @@ Computes the practice bot's moves for Showdown Desktop. Only **Foul Play** is su
 The battle itself always runs inside the desktop app, on its own private Showdown simulator. The app plays the bot's seat by streaming the bot's view of the battle to this API and sending back the move it returns. The same server runs in two places:
 
 - **Cloud** (default in the app): a host you deploy from this folder ([Host it on a server](#host-it-on-a-server)).
-- **This computer**: the app installs Foul Play with the same installer and runs this same server on `127.0.0.1`.
+- **Local (developer harness)**: the app can install Foul Play with the same installer and run this same server on `127.0.0.1`. Players are not offered this.
 
 Only the machine doing the search differs, so the protocol, limits and validation are identical in both places.
 
@@ -201,7 +201,7 @@ Set `CLOUD_API_URL` in `app/practice-engines.js`. Release builds use it as the *
 | Status | `systemctl status practice-api caddy --no-pager` and `npm run status` |
 | Change limits | `sudo systemctl edit practice-api`, add `[Service]` and `Environment=MAX_SESSIONS=4`, then `sudo systemctl restart practice-api` |
 
-A restart ends the battles in progress. Players see the cloud as unreachable and can start again, or switch to **This computer**.
+A restart ends the battles in progress. Players see the cloud as unreachable and can start again once it is back.
 
 ### Google Cloud notes
 

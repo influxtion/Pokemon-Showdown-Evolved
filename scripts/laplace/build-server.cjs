@@ -54,9 +54,12 @@ function canonicalPath(target) {
 
 function buildServer(target) {
   const destination = path.resolve(target);
-  const relative = path.relative(canonicalPath(path.join(vendor, 'dist')), canonicalPath(destination));
-  if (!relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) {
-    throw new Error('Choose a staging path outside the active Practice runtime.');
+  // Neither the app's simulator runtime nor the Laplace harness runtime may be built over in place.
+  for (const active of [path.join(vendor, 'dist'), path.join(workspace, 'out/laplace-runtime')]) {
+    const relative = path.relative(canonicalPath(active), canonicalPath(destination));
+    if (!relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) {
+      throw new Error('Choose a staging path outside the active Practice runtime.');
+    }
   }
   if (fs.existsSync(destination)) throw new Error('Showdown server output already exists.');
 

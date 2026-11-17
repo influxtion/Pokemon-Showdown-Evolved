@@ -24,7 +24,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const root = path.join(base, 'runtime');
   const filename = path.join(root, 'manifest.json');
-  const manifest = { version: 2, platform: 'win32', arch: 'x64', files: {} };
+  const manifest = { version: 3, kind: 'laplace', platform: 'win32', arch: 'x64', files: {} };
   const add = (name, contents) => {
     const target = path.join(root, name);
     const bytes = Buffer.from(contents);
@@ -49,7 +49,30 @@ test('verifies every runtime file and identifies the exact manifest bytes', t =>
   manifest.build = { extra: ['informational metadata'] };
   const bytes = save();
   assert.deepEqual(inspectRuntime(root), { ok: true });
-  assert.deepEqual(verifyRuntime(root), { ok: true, identity: sha256(bytes) });
+  assert.deepEqual(verifyRuntime(root), { ok: true, kind: 'laplace', identity: sha256(bytes) });
+});
+
+test('a simulator runtime needs only the server and client, and a Laplace one also needs Python', t => {
+  const { root, manifest, save } = fixture(t);
+  const laplaceOnly = REQUIRED.filter(name => !name.startsWith('server/') && !name.startsWith('client/'));
+  for (const name of laplaceOnly) {
+    fs.unlinkSync(path.join(root, name));
+    delete manifest.files[name];
+  }
+  fs.rmSync(path.join(root, 'python'), { recursive: true });
+  fs.rmSync(path.join(root, 'laplace'), { recursive: true });
+  save();
+  assert.deepEqual(verifyRuntime(root), INVALID, 'a Laplace runtime without Python is incomplete');
+  manifest.kind = 'simulator';
+  const bytes = save();
+  assert.deepEqual(verifyRuntime(root), { ok: true, kind: 'simulator', identity: sha256(bytes) });
+  manifest.kind = 'other';
+  save();
+  assert.deepEqual(verifyRuntime(root), INVALID, 'unknown runtime kinds are rejected');
+  manifest.kind = 'simulator';
+  manifest.version = 2;
+  save();
+  assert.deepEqual(verifyRuntime(root), INVALID, 'runtimes from before the split must be rebuilt');
 });
 
 test('full verification catches same-size corruption after a successful check', t => {

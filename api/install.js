@@ -20,6 +20,8 @@ const lock = require('./lock.json');
 // Changes whenever any pin changes, so an older install is reported as needing an update.
 const LOCK_VERSION = crypto.createHash('sha256').update(JSON.stringify(lock)).digest('hex').slice(0, 16);
 const WORKER = path.join(__dirname, 'worker', 'foulplay_worker.py');
+// Git Bash puts GNU tar first on PATH, and it reads `C:\...` as a remote host; Windows' bsdtar does not.
+const TAR = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 // Roughly how many crates cargo compiles for poke-engine; only used to move the progress bar.
 const ENGINE_CRATES = 40;
 
@@ -145,7 +147,7 @@ function probe(executable, args, env) {
 async function extract(archive, destination, signal) {
   await fsp.mkdir(destination, { recursive: true });
   // bsdtar ships with Windows 10+, and tar with every Linux and macOS install.
-  await run('tar', ['-xzf', archive, '-C', destination], { signal });
+  await run(TAR, ['-xzf', archive, '-C', destination], { signal });
 }
 
 // Uses an existing cargo if there is one; otherwise installs a private, pinned toolchain.
@@ -211,7 +213,9 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   next('toolchain');
   const rust = await toolchain(where, key, { signal, onFraction: fraction => report(fraction), onLog: log });
   const env = { ...rust.env, PYTHONNOUSERSITE: '1', PYTHONDONTWRITEBYTECODE: '1', PIP_NO_INPUT: '1',
-    PIP_DISABLE_PIP_VERSION_CHECK: '1' };
+    PIP_DISABLE_PIP_VERSION_CHECK: '1',
+    // Cargo's default of one optimizing rustc per CPU thread can exhaust memory and crash the build.
+    CARGO_BUILD_JOBS: process.env.CARGO_BUILD_JOBS || String(Math.min(4, os.availableParallelism())) };
 
   next('source');
   const sourceArchive = await download(lock.foulPlay, path.join(downloads, 'foul-play.tar.gz'),

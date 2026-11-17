@@ -7,10 +7,11 @@ const path = require('node:path');
 const test = require('node:test');
 const { buildServer } = require('../scripts/laplace/build-server.cjs');
 
-test('server builder refuses paths inside the active runtime', () => {
-  const active = path.resolve(__dirname, '../vendor/laplace/dist');
-  assert.throws(() => buildServer(active), /outside the active Practice runtime/);
-  assert.throws(() => buildServer(path.join(active, 'server')), /outside the active Practice runtime/);
+test('server builder refuses paths inside the app and Laplace harness runtimes', () => {
+  for (const active of [path.resolve(__dirname, '../vendor/laplace/dist'), path.resolve(__dirname, '../out/laplace-runtime')]) {
+    assert.throws(() => buildServer(active), /outside the active Practice runtime/);
+    assert.throws(() => buildServer(path.join(active, 'server')), /outside the active Practice runtime/);
+  }
 });
 
 test('server builder preserves an existing staging directory', t => {

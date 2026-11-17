@@ -375,10 +375,22 @@ function focusRoom(roomid) {
   return true;
 }
 
-// Goes through the client's own leave path, so a player's live battle still gets the
-// forfeit confirmation rather than being closed from outside.
-function leaveRoom(roomid) {
-  if (!app.rooms[roomid]) return true;
+// A battle the user is still playing must be forfeited to close. Its tab asks in the launcher
+// ('needs-forfeit'), so closing never brings the battle back on screen just to show the
+// client's popup; once confirmed, forfeit sends the client's own /forfeit and leaves the room.
+// Other rooms go through the client's own leave path ('needs-client' when it shows a popup).
+function leaveRoom(roomid, forfeit) {
+  const room = app.rooms[roomid];
+  if (!room) return true;
+  const live = /^battle-/.test(roomid) && room.battle && (room.side || room.requireForfeit) &&
+    !room.battleEnded && !room.expired && !room.battle.forfeitPending;
+  if (live) {
+    if (!forfeit) return 'needs-forfeit';
+    room.send('/forfeit');
+    room.battle.forfeitPending = true;
+    app.removeRoom(roomid);
+    return true;
+  }
   return app.leaveRoom(roomid) ? true : 'needs-client';
 }
 
@@ -1686,7 +1698,7 @@ class ShowdownBridge {
         break;
       case 'leave-room':
         if (!(typeof args.room === 'string' && ROOM_ID.test(args.room)) || args.room === 'rooms') return false;
-        code = call(leaveRoom, args.room);
+        code = call(leaveRoom, args.room, args.forfeit === true);
         break;
       case 'open-pm':
       case 'close-pm':
@@ -1722,7 +1734,7 @@ class ShowdownBridge {
     try {
       const result = await contents.executeJavaScript(code);
       // true: done in the background. 'needs-client': show the client so the user can respond.
-      return result === true || result === 'needs-client' ? result : false;
+      return result === true || result === 'needs-client' || result === 'needs-forfeit' ? result : false;
     } catch {
       return false;
     }

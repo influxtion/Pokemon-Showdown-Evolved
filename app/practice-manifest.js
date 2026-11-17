@@ -8,13 +8,13 @@ const MANIFEST = 'manifest.json';
 const MAX_MANIFEST_BYTES = 8 * 1024 ** 2;
 const MAX_FILES = 40000;
 const MAX_TOTAL_BYTES = 4 * 1024 ** 3;
-const REQUIRED = [
-  'python/python.exe',
-  'python/python312.dll',
-  'laplace/models/value_net.pt',
-  'server/dist/server/index.js',
-  'client/practice-client.html',
-];
+// Every runtime carries the simulator and the battle client. Only the Laplace harness runtime
+// (npm run build:laplace, never packaged) also carries Python and the Laplace model.
+const KINDS = Object.freeze({
+  simulator: ['server/dist/server/index.js', 'client/practice-client.html'],
+  laplace: ['server/dist/server/index.js', 'client/practice-client.html',
+    'python/python.exe', 'python/python312.dll', 'laplace/models/value_net.pt'],
+});
 const MISSING = Object.freeze({ ok: false, code: 'missing', error: 'Practice runtime is not installed.' });
 const INVALID = Object.freeze({ ok: false, code: 'invalid', error: 'Practice runtime failed integrity verification.' });
 const PRESENT = Object.freeze({ ok: true });
@@ -94,7 +94,8 @@ function readManifest(location) {
     return contents;
   });
   const manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  if (!manifest || manifest.version !== 2 || manifest.platform !== 'win32' || manifest.arch !== 'x64' ||
+  if (!manifest || manifest.version !== 3 || !Object.hasOwn(KINDS, manifest.kind) ||
+      manifest.platform !== 'win32' || manifest.arch !== 'x64' ||
       !manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) invalid();
   const names = Object.keys(manifest.files);
   if (names.length > MAX_FILES) invalid();
@@ -113,8 +114,8 @@ function readManifest(location) {
     caseFolded.add(key);
     files.set(name, { sha256: entry.sha256.toLowerCase(), size: entry.size });
   }
-  if (REQUIRED.some(name => !files.get(name)?.size)) invalid();
-  return { bytes, files };
+  if (KINDS[manifest.kind].some(name => !files.get(name)?.size)) invalid();
+  return { bytes, files, kind: manifest.kind };
 }
 
 function inspectRuntime(root) {
@@ -190,9 +191,9 @@ function verifyRuntime(root) {
   try {
     const location = locate(root);
     if (!location) return MISSING;
-    const { bytes, files } = readManifest(location);
+    const { bytes, files, kind } = readManifest(location);
     verifyTree(location, files);
-    return { ok: true, identity: createHash('sha256').update(bytes).digest('hex') };
+    return { ok: true, kind, identity: createHash('sha256').update(bytes).digest('hex') };
   } catch {
     return INVALID;
   }

@@ -11,6 +11,7 @@
     "start": "electron .",
     "build:showdex": "node scripts/build-showdex.js",
     "build:practice": "node scripts/build-practice.js",
+    "build:laplace": "node scripts/build-practice.js --laplace",
     "bots:setup": "node scripts/bots/setup.cjs",
     "api:setup": "node api/install.js",
     "api:start": "node api/server.js",

@@ -1,6 +1,6 @@
 # Laplace practice development runtime
 
-The Windows x64 development runtime under `dist/` is generated and ignored. Keep credentials, personal logs, saved games and developer server configuration out of it.
+Two Windows x64 runtimes are generated and ignored. `dist/` (`npm run build:practice`) holds only the Showdown simulator and battle client; it is what releases ship. `out/laplace-runtime/` (`npm run build:laplace`) adds Python, the Rust engine and the Laplace model for the developer harness and is never packaged. The Python, engine and wheel notes below apply only to that harness runtime. Keep credentials, personal logs, saved games and developer server configuration out of it.
 
 ## Sources
 
@@ -26,18 +26,19 @@ From the desktop repository, after installing its npm dependencies, run:
 
 ```powershell
 npm run build:practice
+npm run build:laplace
 npm run test:practice
 ```
 
-The build installs exact CPU dependency wheels by hash, fetches Cargo dependencies against the source lockfile, and compiles the native wheel offline after those dependencies are available. It builds the pinned Showdown simulator and classic client, runs the isolated Python engine and model check, then creates and verifies a v2 manifest with each payload file's size and SHA-256. A verified candidate replaces `dist/`. An earlier runtime is retained under `out/laplace/previous-runtime-*`. Stop a running Practice session before rebuilding.
+The Laplace build installs exact CPU dependency wheels by hash, fetches Cargo dependencies against the source lockfile, and compiles the native wheel offline after those dependencies are available. Both builds compile the pinned Showdown simulator and classic client; the Laplace build then runs the isolated Python engine and model check. Each creates and verifies a v3 manifest (`kind` `simulator` or `laplace`) with each payload file's size and SHA-256. A verified candidate replaces its runtime folder. An earlier runtime is retained under `out/laplace/previous-runtime-*`. Stop a running Practice session before rebuilding.
 
 For inspection while an existing runtime is in use, `npm run build:practice -- --stage-only`
-retains a verified `vendor/laplace/pending-*` candidate without replacing `dist/`.
+retains a verified `pending-*` candidate next to the runtime without replacing it.
 Failed candidates and temporary bootstrap directories are removed; prior active runtimes are preserved.
 
-The runtime's `sources/` folder retains archives of the pinned Laplace, Showdown simulator,
+The runtime's `sources/` folder retains archives of the pinned Showdown simulator,
 classic client and its separate data-generator repositories, plus the top-level builder,
-local adapter scripts, client shell, lock and notices. The engine source distribution and
+local adapter scripts, client shell and notices; the Laplace runtime adds the Laplace archive and lock. The engine source distribution and
 other locked download inputs are cached under `out/laplace/`. The installed runtime includes
 only the staged inputs and dependencies, without editable-install hooks or generated interpreter bytecode.
 

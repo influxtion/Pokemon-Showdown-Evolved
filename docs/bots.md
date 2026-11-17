@@ -40,7 +40,7 @@ Presets set the engine's search threads and nothing else: **Quiet** 1, **Balance
 The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`). The API runs in one of two places, and both use the same code, protocol and validation:
 
 - **Cloud server** (default): a host deployed from `api/` ([api/README.md](../api/README.md)).
-- **This computer**: the launcher installs Foul Play into its profile with `api/install.js` and serves the same API on `127.0.0.1`, with a random key generated at each launch.
+- **Local (developer harness only)**: the launcher can install Foul Play into its profile with `api/install.js` and serve the same API on `127.0.0.1`, with a random key generated at each launch. The Practice page does not offer this; tests reach it through IPC (`BOT_TEST_ENGINE=local`).
 
 For every session the launcher's `PracticeSession` (`app/practice-session.js`):
 
@@ -299,7 +299,7 @@ The runner refuses to start if versions or the model hash differ.
 Reproduce with the staged runtime and the pinned Laplace checkout (writes ignored `out/laplace/benchmark.json`; `--repeats 1` for a short run):
 
 ```powershell
-& '.\vendor\laplace\dist\python\python.exe' -I -B scripts/laplace/benchmark.py --laplace-root '<path to the Laplace checkout>'
+& '.\out\laplace-runtime\python\python.exe' -I -B scripts/laplace/benchmark.py --laplace-root '<path to the Laplace checkout>'
 ```
 
 ## 8. Running and hosting
@@ -326,18 +326,19 @@ Server setup, configuration, rate limits, the full protocol and a step-by-step h
 cd api && npm ci --omit=dev && npm run setup && npm start
 ```
 
-`npm run setup` installs Foul Play into `api/runtime` with the same installer as the app's **Install Foul Play** button: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
+`npm run setup` installs Foul Play into `api/runtime` with the same installer as the app's local engine: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
 
-To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, currently the hosted server at `https://34-174-209-142.sslip.io`. If it is empty, the Practice page says the cloud is not set up and offers **This computer**. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
+To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, currently the hosted server at `https://34-174-209-142.sslip.io`. If it is empty, the Practice page says the cloud is not set up. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
 
 ### Development setup
 
-The practice simulator and client come from the Laplace runtime build. Prerequisites: Node 24, Python 3.12, Git, a Rust toolchain, and on Windows the compiler listed in `vendor/laplace/SOURCE.md`.
+The app needs only the practice simulator and battle client, which `build:practice` builds with Node and Git. The Laplace harness needs a separate runtime with Python, the Rust engine and the model; it is never packaged. Its prerequisites: Python 3.12, a Rust toolchain, and on Windows the compiler listed in `vendor/laplace/SOURCE.md`. Rust builds use at most 4 parallel compilers (`CARGO_BUILD_JOBS` overrides), since one per CPU thread can exhaust memory.
 
 ```powershell
 npm ci
-npm run build:practice      # Laplace runtime (simulator, client, Laplace) under ignored vendor/laplace/dist/
-npm run bots:setup -- --runtime "$PWD\vendor\laplace\dist"
+npm run build:practice      # simulator and battle client under ignored vendor/laplace/dist/ (what releases ship)
+npm run build:laplace       # Laplace harness runtime under ignored out/laplace-runtime/ (dev only)
+npm run bots:setup          # harness config for that runtime
 npm run api:setup           # Foul Play into ignored api/runtime/
 ```
 
