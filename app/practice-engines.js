@@ -12,7 +12,7 @@ const { InferenceClient } = require('../api/client');
 const { apiOrigin } = require('../api/protocol');
 
 // The hosted practice API for release builds. Override with SHOWDOWN_PRACTICE_API_URL.
-const CLOUD_API_URL = '';
+const CLOUD_API_URL = 'https://34-174-209-142.sslip.io';
 
 // A packaged app keeps the worker script outside app.asar so Python can read it.
 function unpacked(file) {
