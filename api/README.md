@@ -2,15 +2,10 @@
 
 Computes the practice bot's moves for Showdown Desktop. Only **Foul Play** is supported for now.
 
-The battle itself always runs inside the desktop app, on its own private Showdown simulator. The app plays the bot's seat by streaming the bot's view of the battle to this API and sending back the move it returns. The same server runs in two places:
-
-- **Cloud** (default in the app): a host you deploy from this folder ([Host it on a server](#host-it-on-a-server)).
-- **Local (developer harness)**: the app can install Foul Play with the same installer and run this same server on `127.0.0.1`. Players are not offered this.
-
-Only the machine doing the search differs, so the protocol, limits and validation are identical in both places.
+The battle itself always runs inside the desktop app, on its own private Showdown simulator. The app plays the bot's seat by streaming the bot's view of the battle to this API and sending back the move it returns. The app uses it only as a cloud server, a host you deploy from this folder ([Host it on a server](#host-it-on-a-server)); Foul Play never runs inside the app. Tests run the same server on `127.0.0.1` as a stand-in.
 
 ```
-Showdown Desktop (always local)                  Practice API (cloud or 127.0.0.1)
+Showdown Desktop (always local)                  Practice API (cloud)            
 ┌──────────────────────────────────┐            ┌────────────────────────────────────┐
 │ practice client ──► simulator    │            │ HTTP: sessions, limits, API key    │
 │                        ▲         │  frames →  │ WS /v1/sessions/:id/socket         │
@@ -64,7 +59,7 @@ Access is anonymous by default, so limits are per **client network**: an IPv4 ad
 | Moves per session | 5,000 | Socket closed (`decision-limit`) |
 | Session lifetime, idle time, time to connect | 2 h, 15 min, 1 min | Session ended |
 
-A single battle needs one session; rematches reuse it. The app's own local server sets these limits much higher.
+A single battle needs one session; rematches reuse it.
 
 ## Host it on a server
 
@@ -277,7 +272,7 @@ The session ID is 256 random bits and acts as the capability for that session.
 | --- | --- |
 | `server.js` | HTTP and WebSocket server, sessions, limits, worker supervision |
 | `client.js`, `protocol.js` | Node client used by the app; shared validation |
-| `install.js`, `lock.json` | Pinned, hash-checked installer (also used by the app's Install button) |
+| `install.js`, `lock.json` | Pinned, hash-checked installer (`npm run setup`) |
 | `worker/foulplay_worker.py` | Runs Foul Play's battle loop over stdio, with a loopback-only socket audit hook |
 | `deploy/` | Dockerfile, Compose file, Caddyfile and systemd unit |
 | `test/` | `npm test`: server and client tests with a fake worker |

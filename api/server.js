@@ -1,8 +1,7 @@
 'use strict';
 
-// Practice inference API. The same server runs in the cloud and, for "run on this computer",
-// inside the desktop app on 127.0.0.1. Clients run the battle themselves and stream the bot's
-// view of it here; the server only computes the bot's moves.
+// Practice inference API, hosted in the cloud. Clients (the desktop app) run the battle themselves
+// and stream the bot's view of it here; the server only computes the bot's moves.
 //
 //   GET    /healthz                       liveness
 //   GET    /v1/info                       bots, presets, limits and current capacity
@@ -95,12 +94,9 @@ function workerEnvironment() {
   return env;
 }
 
-function spawnWorker({ runtime, threads, lowPriority }) {
+function spawnWorker({ runtime, threads }) {
   const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads)],
     { cwd: path.dirname(runtime.worker), env: workerEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-  if (lowPriority && child.pid) {
-    try { os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* Best effort. */ }
-  }
   return child;
 }
 
@@ -132,7 +128,6 @@ function createApiServer({
   frameBurst = 200,
   maxFrameBytes = 256 * 1024,
   trustProxy = false,
-  lowPriority = false,
   launch = spawnWorker,
   now = Date.now,
   log = () => {},
@@ -232,7 +227,7 @@ function createApiServer({
 
   function startWorker(session, paths) {
     let child;
-    try { child = launch({ runtime: paths, threads: session.threads, lowPriority }); } catch { return end(session, 'engine-failed'); }
+    try { child = launch({ runtime: paths, threads: session.threads }); } catch { return end(session, 'engine-failed'); }
     session.worker = child;
     child.stderr?.on('data', () => {}); // Upstream diagnostics can include battle state; never log them.
     child.stdin?.on('error', () => {});

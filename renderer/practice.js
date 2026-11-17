@@ -28,7 +28,7 @@
     if (!cloud.online) return { ready: true, text: "Can't reach the server right now.", tone: 'warn' };
     if (!cloud.available) return { ready: false, text: 'Foul Play is unavailable on the server right now.', tone: 'warn' };
     if (cloud.busy) return { ready: true, text: 'Online, but every engine is busy. Try again shortly.', tone: 'warn' };
-    return { ready: true, text: 'Online. Nothing to install.', tone: 'ok' };
+    return { ready: true, text: 'Online.', tone: 'ok' };
   }
 
   async function refresh() {
@@ -37,12 +37,11 @@
     try {
       const value = await window.desktop.getPractice();
       const active = value.state === 'ready' || value.state === 'starting';
-      const engines = value.engines || {};
       if (active && ['quiet', 'balanced', 'full'].includes(value.preset)) preset.value = value.preset;
-      const cloud = cloudState(engines.cloud);
+      const cloud = cloudState(value.cloud);
       note(cloudNote, cloud.text, cloud.tone);
       description.textContent = value.opponents?.[0]?.description || '';
-      const cap = engines.cloud?.presets?.full;
+      const cap = value.cloud?.presets?.full;
       presetHint.textContent = cap && cap < 8 ? `The cloud server runs up to ${cap} search thread${cap === 1 ? '' : 's'}. ${PRESET_HINT}` : PRESET_HINT;
 
       // The battle plays in its own tab; while it runs, this page only leads back to it.
@@ -70,7 +69,7 @@
     busy = true;
     actionError = '';
     start.disabled = true;
-    const pending = window.desktop.startPractice({ opponent: 'foulplay', preset: preset.value, engine: 'cloud' });
+    const pending = window.desktop.startPractice({ opponent: 'foulplay', preset: preset.value });
     let settled = null;
     pending.then(result => { settled = result || { ok: false }; }, () => { settled = { ok: false }; });
     const deadline = Date.now() + 5000;

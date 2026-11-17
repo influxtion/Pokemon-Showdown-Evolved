@@ -1,7 +1,7 @@
 'use strict';
 
-// Client for the practice inference API. The launcher uses it for both the cloud server and the
-// copy it runs on this computer: only the origin (and, locally, the key) differ.
+// Client for the practice inference API. The launcher uses it to reach the cloud server; tests
+// also point it at a copy of the server on loopback.
 
 const { EventEmitter } = require('node:events');
 const { WebSocket } = require('ws');

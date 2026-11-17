@@ -79,10 +79,9 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - **Privacy:** only the battle log is sent to the practice API, with no account details. Analysing an online game never acts on the account.
 
 ### Practice API (`api/`)
-- **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API, and the cloud server and the local copy run the same code (`api/server.js`). Only Foul Play is supported for now.
-- **Cloud only for players.** The Practice page always uses the hosted API, so no bot code runs on the player's PC.
-- **Local engine is a developer harness.** The local copy (`LocalEngine`, the pinned installer `api/install.js`) stays in the code for tests and self-hosting, but the Practice page no longer offers **This computer** or an install button.
-- **Not bundled.** Foul Play (GPL-3.0) is downloaded on request, hash-checked against `api/lock.json`, and never shipped in the installer.
+- **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API on the cloud server (`api/server.js`). Foul Play never runs in the app. Only Foul Play is supported for now.
+- **Cloud only.** The app has no local play: no engine choice, no install, and no bot code on the player's PC. Tests run the same server on loopback as a stand-in for the cloud.
+- **Not bundled.** Foul Play (GPL-3.0) is installed only on the server (`api/install.js`, hash-checked against `api/lock.json`) and never shipped in the app.
 - **Limits.** Anonymous access with per-network rate limits, a server-wide session cap and a thread cap; an optional API key ([api/README.md](../api/README.md)).
 - **Hosting.** The default cloud server is one Google Cloud VM at `https://34-174-209-142.sslip.io` (`CLOUD_API_URL`). The API runs as a systemd service on `127.0.0.1:8787` behind Caddy, which provides HTTPS; only ports 80 and 443 are open. It serves 8 battles at once with 2 search threads each, so **Full** runs with 2 threads in the cloud. Step-by-step hosting: [api/README.md](../api/README.md#host-it-on-a-server).
 - **Analysis endpoint (planned):** `POST /v1/analyze` with the battle log up to a decision, the player's side and the engine; it returns ranked choices and search shares. It is stateless and needs no simulator session.
@@ -132,7 +131,7 @@ flowchart LR
 | Showdex (`app/showdex-integration.js`) | Custom scheme inside the client view | Optional, pinned, SHA-256-verified |
 | Practice view (`app/practice-view.js`) | `WebContentsView` | Patched classic client; no preload, no Node; reaches only its session |
 | Practice session (`app/practice-session.js`) | Main ↔ local simulator ↔ practice API | Runs the simulator, plays the bot's seat, relays only the bot's battle-room frames and validated choices ([bots.md](bots.md)) |
-| Practice engines (`app/practice-engines.js`) | Main | Cloud API status; local install, update, removal and the loopback API server with a per-launch key |
+| Practice engines (`app/practice-engines.js`) | Main | Cloud API address, key and status |
 
 ### The Showdown bridge
 
@@ -146,7 +145,6 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | Replay notes | userData `replays.json` | Versioned; a corrupt file is reported and never overwritten |
 | Showdown login, teams, preferences | Partition `persist:showdown` | Separate from launcher data |
 | Logs | userData | Fixed event names and numeric codes only |
-| Foul Play (optional local install) | userData `foulplay/` (`SHOWDOWN_FOULPLAY_DIR` overrides) | Built in `staging/`, swapped into `current/` after its self-check; removable from the Practice page |
 
 `SHOWDOWN_DESKTOP_USER_DATA` selects an alternate profile for isolated tests.
 
@@ -247,8 +245,8 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | D4 | Launcher-owned room navigation, with a fail-safe | Keep Showdown's own tabs | One consistent rail; if client hooks change, the client's tabs return automatically |
 | D5 | Replay notes store links, not replays | Download replay archives | Showdown hosts replays; local data stays small, private and portable |
 | D6 | Import reviews conflicts and keeps existing notes by default | Overwrite or mirror the backup | Restoring must never silently lose notes |
-| D7 | Bots are a hosted API by default; local bots are an optional in-app install | Bundle bots with every release | Owner decision (2026-11-13): the bots are too large for the base release, and the hosted API serves everyone regardless of CPU. Players who want to can install and run them locally |
-| D7a | The simulator runs locally; only inference is remote, behind one API for cloud and local | Run whole battles on the server | Owner decision (2026-11-16): one interface whichever device computes the moves, a server that only searches, and a battle UI that never depends on the network. Foul Play only for now; anonymous access with rate limits |
+| D7 | Bots run only on the hosted API; the app has no local play | Bundle bots with every release; an optional in-app install | Owner decisions (2026-11-13, 2026-11-17): the bots are too large for the base release, the hosted API serves everyone regardless of CPU, and keeping Foul Play's GPL-3.0 code out of the app keeps its licensing simple. Local play is out of scope |
+| D7a | The simulator runs on the player's computer; only inference is remote | Run whole battles on the server | Owner decision (2026-11-16): a server that only searches, and a battle UI that never depends on the network. Foul Play only for now; anonymous access with rate limits |
 | D7b | Host the cloud API on one VM behind Caddy, named through sslip.io | Own domain; managed containers; Docker on the VM | Owner decision (2026-11-16): no domain to buy or manage, and a plain systemd service is simple to update with `git pull`. The hostname is derived from the static IP, so changing the IP means a new app build |
 | D8 | Practice on a private simulator with loopback enforced twice | Bot plays on the public server | Automated play on real accounts is impossible by construction ([bots.md §3.4](bots.md#34-network-confinement)) |
 | D9 | Presets are thread counts | Named difficulty levels | That is all they change; strength is not measured |
@@ -299,7 +297,7 @@ practice suites were not rerun against the hosted server.
 | `npm run test:shell:live` | Guest, spectate-only drift check of the client hooks the shell depends on. Run before each release |
 | `npm run test:showdex:live`, `npm run test:replays:live` | Guest-only checks of a real Showdex build and a real public replay, in both themes and sizes |
 | `npm run smoke:packaged` | The unpacked package with a fresh profile, system-only PATH and the public client blocked |
-| Bot suites | Real games against Foul Play through a local API server, a separate API server or the hosted one (`--url`), and the Laplace harness ([bots.md §8](bots.md#8-running-and-hosting)) |
+| Bot suites | Real games against Foul Play through a loopback copy of the API server or the hosted one (`--url`), and the Laplace harness ([bots.md §8](bots.md#8-running-and-hosting)) |
 
 No suite verifies a signed-in account. Those checks are manual and owner-only (section 9).
 
@@ -325,8 +323,8 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 ```
 
 - **Installer:** adds a Start menu shortcut but no desktop shortcut, and uses Electron's default icon until branding is decided.
-- **`app.asar`:** contains `app/`, `renderer/`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
-- **Bots are not in the release** (D7). Practice plays Foul Play on the cloud server. The package carries the practice API's JavaScript, `api/lock.json` and the worker script (unpacked from the archive) only for the developer local engine; no Python, Foul Play or Laplace ships.
+- **`app.asar`:** contains `app/`, `renderer/`, `api/client.js`, `api/protocol.js`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
+- **Bots are not in the release** (D7). Practice plays Foul Play on the cloud server. Of `api/`, only the client and protocol ship. The installer, API server, `api/lock.json` and the GPL-3.0-derived Foul Play worker are the cloud server's source and stay out of the app. The after-pack check fails the build if any other `api/` file is packaged. No Python, Foul Play or Laplace ships.
 - **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse a Laplace harness runtime, and packaging fails on any drift.
 - **Dependency audit:** reports a moderate `minimatch` advisory through electron-builder. It is a development-only dependency and is absent from the app.
 
@@ -346,7 +344,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | Area | State |
 | --- | --- |
 | Shell, Home, client, replay notes, review, backup, Showdex, settings | Implemented; automated suites pass |
-| Practice (Foul Play) | Implemented: cloud and local engines, in-app install with progress and updates. Local install verified on Linux x64 only |
+| Practice (Foul Play) | Implemented: cloud only |
 | Hosted practice API | Live on one Google Cloud VM over HTTPS; two real battles verified end to end. Docker image untested |
 | Windows installer | Builds and passes packaged smoke tests; never tested on a clean machine |
 | Public release | Not started |
@@ -357,7 +355,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | --- | --- | --- |
 | Showdown client changes | Bridge reads or theme selectors break; a switch to Showdown's new Preact client would need a bridge rewrite | Fail-safe shell; `test:shell:live` before releases |
 | Licensing | AGPL/GPL obligations for the patched client, Foul Play and Showdex | Source and notices retained; owner review before release |
-| Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; the local engine works without the server for development; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
+| Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; tests use a loopback copy of the server; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
 | Unproven demand | Users may not return | Invited alpha measures return use before more features |
 
 **Open decisions (owner)**

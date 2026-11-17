@@ -1,8 +1,7 @@
 'use strict';
 
 // One practice session: the Showdown simulator runs on this computer, and the bot's seat in it is
-// played through the practice inference API. Cloud and local play differ only in which API origin
-// computes the moves (see api/). The bridge logs in to the simulator as the bot, accepts the
+// played through the cloud practice inference API (see api/). The bridge logs in to the simulator as the bot, accepts the
 // player's challenge, forwards the bot's battle-room frames to the API and sends back its choices.
 
 const path = require('node:path');
@@ -18,7 +17,6 @@ const { InferenceClient } = require('../api/client');
 const { BOTS, FORMAT, ROOM } = require('../api/protocol');
 
 const HUMAN = 'Player';
-const ENGINES = new Set(['cloud', 'local']);
 const ERRORS = Object.freeze({
   missing: 'The practice battle server is not installed.',
   start: 'Practice could not start. Stop and try again.',
@@ -32,13 +30,13 @@ const ERRORS = Object.freeze({
 const toId = name => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 class PracticeSession extends EventEmitter {
-  // engines(engine) resolves to { url, key } for the API that should compute moves.
-  constructor({ root, scripts, engines, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
+  // target() resolves to { url, key } for the API that computes the bot's moves.
+  constructor({ root, scripts, target, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
     installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient }) {
     super();
     this.root = root;
     this.scripts = scripts;
-    this.engines = engines;
+    this.target = target;
     this.node = node;
     this.spawnChild = spawnChild;
     this.verify = verify;
@@ -51,7 +49,6 @@ class PracticeSession extends EventEmitter {
     this.state = 'idle';
     this.error = '';
     this.preset = 'full';
-    this.engine = 'cloud';
     this.connection = null;
     this.battle = null;
     this.children = new Set();
@@ -76,7 +73,7 @@ class PracticeSession extends EventEmitter {
   }
 
   status() {
-    return { installed: this.installed(), state: this.state, opponent: this.bot.id, engine: this.engine, threads: this.threads,
+    return { installed: this.installed(), state: this.state, opponent: this.bot.id, threads: this.threads,
       opponents: [{ id: this.bot.id, name: this.bot.name, available: true, description: this.bot.description }],
       error: this.error, preset: this.preset, battle: this.battle };
   }
@@ -84,14 +81,13 @@ class PracticeSession extends EventEmitter {
   changed() { this.emit('change', this.status()); }
 
   async start(options) {
-    const { opponent = 'foulplay', preset, engine = 'cloud' } = options && typeof options === 'object' ? options : {};
+    const { opponent = 'foulplay', preset } = options && typeof options === 'object' ? options : {};
     if (opponent !== this.bot.id) return { ok: false, error: 'Only Foul Play is available for practice right now.' };
     if (!Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
-    if (!ENGINES.has(engine)) return { ok: false, error: 'Choose where Foul Play should run.' };
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { preset, engine, state: 'starting', error: '', battle: null });
+    Object.assign(this, { preset, state: 'starting', error: '', battle: null });
     this.reset();
     this.connection = { token: crypto.randomBytes(32).toString('hex'), human: HUMAN, bot: this.bot.account, port: null };
     this.changed();
@@ -156,7 +152,7 @@ class PracticeSession extends EventEmitter {
   }
 
   async startEngine(generation) {
-    const target = await this.engines(this.engine);
+    const target = await this.target();
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
     this.api = api;

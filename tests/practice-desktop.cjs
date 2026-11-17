@@ -1,10 +1,9 @@
 'use strict';
 process.env.SHOWDOWN_DESKTOP_BACKGROUND = '1';
 
-// Real Practice battles against Foul Play in a disposable Electron profile: the local simulator,
-// the bridge, and the inference API either on this computer (BOT_TEST_ENGINE=local, default) or
-// as a separate "cloud" server (BOT_TEST_ENGINE=cloud). Needs a Foul Play install from
-// `npm run api:setup` (api/runtime) or BOT_TEST_FOULPLAY_DIR.
+// Real Practice battles against Foul Play in a disposable Electron profile: the app's simulator,
+// the bridge, and a stand-in for the cloud inference API (the same server, on loopback with an
+// API key). Needs a Foul Play install from `npm run api:setup` (api/runtime) or BOT_TEST_FOULPLAY_DIR.
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
@@ -21,9 +20,8 @@ const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const deadline = Date.now() + 240000;
 const children = [];
 const diagnose = process.argv.includes('--diagnose-practice');
-const engine = process.env.BOT_TEST_ENGINE || 'local';
 const foulPlayDir = path.resolve(process.env.BOT_TEST_FOULPLAY_DIR || path.join(root, 'api', 'runtime'));
-const selection = { opponent: 'foulplay', preset: 'balanced', engine };
+const selection = { opponent: 'foulplay', preset: 'balanced' };
 let service;
 let statusRequests = 0;
 
@@ -55,16 +53,12 @@ async function recordPracticeLifecycle() {
   try {
     const { inspect } = require('../api/install');
     if (!inspect(foulPlayDir).installed) throw new Error(`Foul Play is not installed in ${foulPlayDir}. Run npm run api:setup first.`);
-    if (engine === 'cloud') {
-      // The same server a remote host runs, here on loopback with an API key.
-      const { createApiServer } = require('../api/server');
-      const key = require('node:crypto').randomBytes(32).toString('hex');
-      service = createApiServer({ runtime: inspect(foulPlayDir), apiKey: key, maxThreads: 2 });
-      process.env.SHOWDOWN_PRACTICE_API_URL = await service.listen();
-      process.env.SHOWDOWN_PRACTICE_API_KEY = key;
-    } else {
-      process.env.SHOWDOWN_FOULPLAY_DIR = foulPlayDir;
-    }
+    // The same server the cloud host runs, here on loopback with an API key.
+    const { createApiServer } = require('../api/server');
+    const key = require('node:crypto').randomBytes(32).toString('hex');
+    service = createApiServer({ runtime: inspect(foulPlayDir), apiKey: key, maxThreads: 2 });
+    process.env.SHOWDOWN_PRACTICE_API_URL = await service.listen();
+    process.env.SHOWDOWN_PRACTICE_API_KEY = key;
     require('../app/main');
   } finally {
     childProcess.spawn = originalSpawn;
@@ -94,7 +88,7 @@ async function capture(contents, name) {
     try {
       const screenshot = await contents.capturePage();
       if (!screenshot.isEmpty()) {
-        fs.writeFileSync(path.join(captures, `foulplay-${engine}-${name}.png`), screenshot.toPNG());
+        fs.writeFileSync(path.join(captures, `foulplay-${name}.png`), screenshot.toPNG());
         return;
       }
     } catch (error) {
@@ -155,8 +149,9 @@ async function smoke() {
   await until(async () => (await status()).installed, 'practice runtime ready');
   assert.equal((await status()).state, 'idle');
   fs.mkdirSync(captures, { recursive: true });
-  // The Practice page offers only the cloud; the harness picks the engine through the IPC call below.
+  // Practice is cloud only: no engine choice on the page and no local install API in the bridge.
   assert.equal(await run("document.querySelector('input[name=\"practice-engine\"], #practice-install') === null"), true, 'no local option on the page');
+  assert.equal(await run("['installLocalPractice', 'cancelLocalPracticeInstall', 'removeLocalPractice'].some(name => name in window.desktop)"), false, 'no local install API');
   await capture(renderer, 'setup');
   assert.equal((await call('startPractice', selection)).ok, true);
   // The battle plays in its own tab; the setup page never shows the battle client.
@@ -196,8 +191,8 @@ async function smoke() {
     }
     const browserRoom = await battleEval(player, "return control('chooseMove') ? room.id : null;");
     return state.battle?.room === browserRoom && view.getVisible() ? browserRoom : null;
-  }, 'real local battle with a move request', 18000);
-  assert.equal(children.length, 2, 'local simulator and Foul Play worker started');
+  }, 'real battle with a move request', 18000);
+  assert.equal(children.length, 2, 'simulator and Foul Play worker started');
 
   const firstMove = await battleEval(player, `
     const move = control('chooseMove');
@@ -349,7 +344,7 @@ async function smoke() {
   assert.equal((await call('stopPractice', true)).ok, true);
   assert.equal(dialogs.length, 0, 'no native dialogs');
   await until(() => !practice() && player.isDestroyed(), 'Practice view disposed');
-  await until(() => children.every(childExited), 'local runtime children exited');
+  await until(() => children.every(childExited), 'simulator and worker exited');
   assert.equal((await status()).state, 'idle');
   assert.equal(live.webContents.id, liveId);
   assert.equal(externalOpens, 0);
@@ -363,7 +358,7 @@ async function smoke() {
     return (await battleEval(current.webContents, 'return room.id;')) === state.battle.room ? current : null;
   }, label, 27000);
   assert.equal((await call('startPractice', selection)).ok, true, 'restart after Stop');
-  const restarted = await waitForBattle('new local battle after Stop');
+  const restarted = await waitForBattle('new battle after Stop');
   const restartedPlayer = restarted.webContents;
   const forfeitedRoom = (await status()).battle.room;
   assert.notEqual(restartedPlayer.id, playerId);
@@ -401,9 +396,9 @@ async function smoke() {
     if (state.error || state.clientError) throw new Error(state.error || state.clientError);
     return state.battle?.room !== forfeitedRoom && !state.battle?.finished && state.clientState === 'battle' &&
       (await battleEval(restartedPlayer, 'return room.id;')) === state.battle?.room;
-  }, 'a distinct rematch opened on the same local view');
+  }, 'a distinct rematch opened on the same view');
   assert.equal(practice().webContents.id, restartedPlayer.id);
-  assert.equal(children.length, 4, 'rematch reuses both local children');
+  assert.equal(children.length, 4, 'rematch reuses the simulator and worker');
 
   restartedPlayer.forcefullyCrashRenderer();
   await until(async () => (await status()).state === 'failed', 'renderer crash reported as a Practice failure');
@@ -413,7 +408,7 @@ async function smoke() {
   assert.equal(live.webContents.isDestroyed(), false);
 
   assert.equal((await call('startPractice', selection)).ok, true, 'restart after renderer crash');
-  const hiddenView = await waitForBattle('new local battle after renderer crash');
+  const hiddenView = await waitForBattle('new battle after renderer crash');
   const hiddenPlayer = hiddenView.webContents;
   const hiddenChildren = children.slice(4);
   assert.equal(hiddenChildren.length, 2);
@@ -439,7 +434,7 @@ async function smoke() {
   await load('practice.html');
   assert.equal((await call('startPractice', selection)).ok, true, 'start for the tab close check');
   await load('practice-battle.html');
-  const closingView = await waitForBattle('battle before closing its tab');
+  const closingPlayer = (await waitForBattle('battle before closing its tab')).webContents;
   await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].find(tab => tab.title === 'Practice battle')
     .querySelector('.nav-close').click(); 0`);
   // The forfeit popup opens under the tab; Cancel keeps the battle, Forfeit ends practice.
@@ -453,10 +448,10 @@ async function smoke() {
   await until(() => run("Boolean(document.querySelector('.forfeit-ask'))"), 'forfeit popup again');
   await run("document.querySelector('.forfeit-ask-yes').click(); 0");
   await until(() => renderer.getURL() && !renderer.getURL().endsWith('/practice-battle.html') && !renderer.isLoading(), 'left the closed battle tab');
-  await until(async () => (await status()).state === 'idle' && closingView.webContents.isDestroyed(), 'closing the tab ended practice');
+  await until(async () => (await status()).state === 'idle' && closingPlayer.isDestroyed(), 'closing the tab ended practice');
   assert.equal(await run(`[...document.querySelectorAll('[data-nav="rooms"] .nav-page')].some(tab => tab.title === 'Practice battle')`), false,
     'battle tab removed');
-  console.log(`PASS Practice desktop (Foul Play, ${engine}): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup, battle tab close`);
+  console.log(`PASS Practice desktop (Foul Play): real loopback battle, move and switch, ${firstMove.tera ? 'server-confirmed Tera' : 'Tera unavailable'}, view retention, size/theme captures, Stop, Forfeit and rematch, crash and hidden disconnect cleanup, battle tab close`);
 }
 
 app.whenReady().then(smoke).then(async () => { await service?.close(); app.exit(0); }, async error => {

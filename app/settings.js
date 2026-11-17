@@ -6,12 +6,13 @@ const { randomUUID } = require('node:crypto');
 
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
-const PRACTICE_ENGINES = new Set(['cloud', 'local']);
+// Keys older versions saved that no longer mean anything; dropped on load so those files still open.
+const RETIRED_KEYS = new Set(['practiceEngine']);
 // Home layouts: 'classic' is Showdown's main menu modernised, 'modern' the focused redesign.
 // null means the player has not chosen yet, so Home asks once with a welcome.
 const HOME_LAYOUTS = new Set(['classic', 'modern']);
 const DEFAULTS = Object.freeze({
-  theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, practiceEngine: 'cloud',
+  theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null,
 });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
@@ -23,7 +24,6 @@ function valid(key, value) {
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';
-  if (key === 'practiceEngine') return PRACTICE_ENGINES.has(value);
   return false;
 }
 
@@ -32,6 +32,7 @@ function parse(text) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid settings');
   const values = { ...DEFAULTS };
   for (const [key, value] of Object.entries(raw)) {
+    if (RETIRED_KEYS.has(key)) continue;
     if (!KEYS.has(key) || !valid(key, value)) throw new Error('Invalid settings');
     values[key] = value;
   }

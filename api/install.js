@@ -1,8 +1,7 @@
 'use strict';
 
 // Installs the pinned Foul Play runtime: a standalone Python, Foul Play's source, its Python
-// packages and poke-engine compiled with Terastallization. The same code runs on a server
-// (`npm run setup`) and inside the desktop app (the one-click "Install Foul Play" button).
+// packages and poke-engine compiled with Terastallization, on the API server (`npm run setup`).
 //
 // Layout under `dir`:
 //   current/            the runtime the server uses (python/, foul-play/, install.json)

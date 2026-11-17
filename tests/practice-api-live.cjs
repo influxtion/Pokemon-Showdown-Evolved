@@ -1,10 +1,10 @@
 'use strict';
 
 // Two full battles against Foul Play through the practice inference API, without Electron:
-// a real simulator, the real bridge (PracticeSession) and a real local API server and worker.
+// a real simulator, the real bridge (PracticeSession) and a real API server and worker.
 // A scripted player challenges, plays "/choose default" every turn, and rematches once.
 //
-//   node tests/practice-api-live.cjs --runtime <foul play install dir>     (API on this computer)
+//   node tests/practice-api-live.cjs --runtime <foul play install dir>     (a stand-in API on loopback)
 //   node tests/practice-api-live.cjs --url https://host [--key KEY]       (a deployed API)
 // The simulator comes from out/bots/config.json (npm run bots:setup) or vendor/laplace/dist.
 
@@ -13,14 +13,16 @@ const path = require('node:path');
 const { parseArgs } = require('node:util');
 const { WebSocket } = require('ws');
 const { PracticeSession } = require('../app/practice-session');
-const { LocalEngine, CloudEngine } = require('../app/practice-engines');
+const crypto = require('node:crypto');
+const { CloudEngine } = require('../app/practice-engines');
+const { inspect } = require('../api/install');
+const { createApiServer } = require('../api/server');
 const { readBotConfig } = require('../app/bot-config');
 
 const root = path.join(__dirname, '..');
 const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
   preset: { type: 'string', default: 'quiet' } } });
 if (!values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
-const engine = values.url ? 'cloud' : 'local';
 const config = readBotConfig(path.join(root, 'out/bots/config.json'));
 const simulatorRoot = config?.root || path.join(root, 'vendor/laplace/dist');
 
@@ -60,11 +62,19 @@ async function finished(session) {
 }
 
 async function main() {
-  const local = values.runtime ? new LocalEngine({ dir: path.resolve(values.runtime) }) : null;
-  if (local) assert.equal(local.status().installed, true, 'Foul Play is not installed in --runtime');
-  const cloud = values.url ? new CloudEngine({ url: values.url, key: values.key || null }) : null;
+  // With --runtime, the same server the cloud runs starts here on loopback with an API key.
+  let service = null;
+  let target = { url: values.url, key: values.key || null };
+  if (values.runtime) {
+    const runtime = inspect(path.resolve(values.runtime));
+    assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
+    const key = crypto.randomBytes(32).toString('hex');
+    service = createApiServer({ runtime, apiKey: key });
+    target = { url: await service.listen(), key };
+  }
+  const cloud = new CloudEngine(target);
   const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/laplace'),
-    engines: requested => { assert.equal(requested, engine); return (local || cloud).target(); },
+    target: () => cloud.target(),
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }), installed: () => true });
   const decisions = [];
   let thinking = false;
@@ -76,11 +86,11 @@ async function main() {
   });
   const timeout = setTimeout(() => { console.error('Timed out', session.status()); process.exit(1); }, 600000);
   const ready = new Promise(resolve => session.once('ready', resolve));
-  const started = await session.start({ opponent: 'foulplay', preset: values.preset, engine });
+  const started = await session.start({ opponent: 'foulplay', preset: values.preset });
   assert.equal(started.ok, true, started.error);
   const connection = await ready;
   assert.equal(session.status().state, 'ready');
-  console.log(`Practice ready (${engine}, ${session.status().threads} search thread(s)); playing two battles against Foul Play.`);
+  console.log(`Practice ready (${values.url ? 'deployed API' : 'loopback API'}, ${session.status().threads} search thread(s)); playing two battles against Foul Play.`);
 
   const human = player(connection);
   const first = await human.battle();
@@ -101,7 +111,7 @@ async function main() {
 
   session.stop();
   human.socket.close();
-  await local?.dispose();
+  await service?.close();
   clearTimeout(timeout);
   assert.equal(session.status().state, 'idle');
   console.log('OK');

@@ -47,7 +47,7 @@ function fakeWorkers() {
   return { workers, launch };
 }
 
-async function setup(t, { engines } = {}) {
+async function setup(t, { target } = {}) {
   const sim = await fakeSimulator(t);
   const fake = fakeWorkers();
   const api = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch });
@@ -61,21 +61,21 @@ async function setup(t, { engines } = {}) {
     spawned.push(child);
     return child;
   };
-  const requested = [];
+  let requested = 0;
   const session = new PracticeSession({ root: '/runtime', scripts: '/scripts', spawnChild, installed: () => true,
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }),
-    engines: engines || (async engine => { requested.push(engine); return { url }; }) });
+    target: target || (async () => { requested++; return { url }; }) });
   t.after(() => session.stop());
-  return { sim, session, workers: fake.workers, spawned, requested, api };
+  return { sim, session, workers: fake.workers, spawned, requested: () => requested, api };
 }
 
 test('starts the simulator and an engine session, then logs the bot in', async t => {
   const { session, requested, spawned, workers } = await setup(t);
   const ready = once(session, 'ready');
-  const result = await session.start({ opponent: 'foulplay', preset: 'balanced', engine: 'local' });
+  const result = await session.start({ opponent: 'foulplay', preset: 'balanced' });
   assert.deepEqual(result, { ok: true });
   const [connection] = await ready;
-  assert.deepEqual(requested, ['local']);
+  assert.equal(requested(), 1);
   assert.equal(spawned.length, 1);
   assert.equal(workers.length, 1);
   assert.equal(connection.bot, 'FoulPlay');
@@ -87,7 +87,7 @@ test('starts the simulator and an engine session, then logs the bot in', async t
 
 test('accepts only the player challenge and relays the battle both ways', async t => {
   const { session, sim, workers } = await setup(t);
-  await session.start({ opponent: 'foulplay', preset: 'quiet', engine: 'cloud' });
+  await session.start({ opponent: 'foulplay', preset: 'quiet' });
   sim.socket.send('|pm| Stranger| FoulPlay|/challenge gen9randombattle|gen9randombattle|||');
   sim.socket.send('|pm| Player| FoulPlay|/challenge gen9ou|gen9ou|||');
   sim.socket.send('|pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|||');
@@ -118,8 +118,8 @@ test('accepts only the player challenge and relays the battle both ways', async 
 });
 
 test('fails with the server message when the engine refuses the session', async t => {
-  const { session } = await setup(t, { engines: async () => { throw new Error('No cloud practice server is set up in this build.'); } });
-  const result = await session.start({ opponent: 'foulplay', preset: 'quiet', engine: 'cloud' });
+  const { session } = await setup(t, { target: async () => { throw new Error('No cloud practice server is set up in this build.'); } });
+  const result = await session.start({ opponent: 'foulplay', preset: 'quiet' });
   assert.equal(result.ok, false);
   assert.equal(session.status().state, 'failed');
   assert.match(session.status().error, /No cloud practice server/);
@@ -127,7 +127,7 @@ test('fails with the server message when the engine refuses the session', async 
 
 test('fails when the engine connection drops mid-battle', async t => {
   const { session, workers } = await setup(t);
-  await session.start({ opponent: 'foulplay', preset: 'quiet', engine: 'cloud' });
+  await session.start({ opponent: 'foulplay', preset: 'quiet' });
   const failure = once(session, 'failure');
   workers[0].send({ type: 'error', code: 'engine-failed' });
   assert.deepEqual(await failure, ['engine']);
@@ -135,17 +135,16 @@ test('fails when the engine connection drops mid-battle', async t => {
   assert.match(session.status().error, /Foul Play stopped/);
 });
 
-test('rejects other opponents, presets and engines', async t => {
+test('rejects other opponents and presets', async t => {
   const { session } = await setup(t);
-  assert.match((await session.start({ opponent: 'laplace', preset: 'full', engine: 'cloud' })).error, /Only Foul Play/);
-  assert.equal((await session.start({ opponent: 'foulplay', preset: 'max', engine: 'cloud' })).ok, false);
-  assert.equal((await session.start({ opponent: 'foulplay', preset: 'full', engine: 'gpu' })).ok, false);
+  assert.match((await session.start({ opponent: 'laplace', preset: 'full' })).error, /Only Foul Play/);
+  assert.equal((await session.start({ opponent: 'foulplay', preset: 'max' })).ok, false);
   assert.equal(session.status().state, 'idle');
 });
 
 test('stop ends the API session and kills the simulator', async t => {
   const { session, spawned, api } = await setup(t);
-  await session.start({ opponent: 'foulplay', preset: 'quiet', engine: 'cloud' });
+  await session.start({ opponent: 'foulplay', preset: 'quiet' });
   assert.equal(api.sessions.size, 1);
   session.stop();
   await until(() => api.sessions.size === 0, 'api session closed');

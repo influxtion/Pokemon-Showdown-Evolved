@@ -1,6 +1,8 @@
 'use strict';
 
-// Runs the unpacked Windows executable with a temporary profile and blocked outbound traffic.
+// Runs the unpacked Windows executable with a temporary profile and blocked outbound web traffic.
+// With --practice it plays a short game whose moves come from the hosted cloud API (reached from
+// the main process, which the renderer proxy does not cover). SHOWDOWN_PRACTICE_API_URL overrides it.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -146,7 +148,7 @@ async function practiceSmoke(cdp, debugPort, child) {
   await evaluate(cdp, "location.href = 'practice.html'; 0");
   await until(() => evaluate(cdp, "location.pathname.endsWith('/practice.html') && document.readyState === 'complete' && !!window.desktop"), 'Practice page');
   const start = performance.now();
-  assert.equal((await evaluate(cdp, "window.desktop.startPractice('full')")).ok, true);
+  assert.equal((await evaluate(cdp, "window.desktop.startPractice({ opponent: 'foulplay', preset: 'quiet' })")).ok, true);
   const state = async () => {
     const value = await evaluate(cdp, 'window.desktop.getPractice()');
     if (value.error || value.clientError) throw new Error(value.error || value.clientError);
@@ -155,7 +157,7 @@ async function practiceSmoke(cdp, debugPort, child) {
   await until(async () => {
     const current = await state();
     return current.clientState === 'battle' && current.battle?.room;
-  }, 'packaged local battle', 90000);
+  }, 'packaged practice battle', 90000);
   const battleReadyMs = Math.round(performance.now() - start);
   const targets = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
   const target = targets.find(item => item.type === 'page' && item.url.includes('/practice/client/practice-client.html'));
@@ -235,6 +237,8 @@ async function main() {
     SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR, TEMP: profile, TMP: profile,
     PATH: path.join(process.env.SystemRoot, 'System32'),
     APPDATA: profile, LOCALAPPDATA: profile, SHOWDOWN_DESKTOP_USER_DATA: profile,
+    ...(process.env.SHOWDOWN_PRACTICE_API_URL ? { SHOWDOWN_PRACTICE_API_URL: process.env.SHOWDOWN_PRACTICE_API_URL } : {}),
+    ...(process.env.SHOWDOWN_PRACTICE_API_KEY ? { SHOWDOWN_PRACTICE_API_KEY: process.env.SHOWDOWN_PRACTICE_API_KEY } : {}),
   };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   const child = spawn(EXE, [

@@ -37,10 +37,7 @@ Presets set the engine's search threads and nothing else: **Quiet** 1, **Balance
 
 ## 2. Where the bots run
 
-The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`). The API runs in one of two places, and both use the same code, protocol and validation:
-
-- **Cloud server** (default): a host deployed from `api/` ([api/README.md](../api/README.md)).
-- **Local (developer harness only)**: the launcher can install Foul Play into its profile with `api/install.js` and serve the same API on `127.0.0.1`, with a random key generated at each launch. The Practice page does not offer this; tests reach it through IPC (`BOT_TEST_ENGINE=local`).
+The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`) on the cloud server, a host deployed from `api/` ([api/README.md](../api/README.md)). Foul Play never runs inside the app, and the app ships only the API client (`api/client.js`, `api/protocol.js`). Tests run the same server on loopback as a stand-in for the cloud.
 
 For every session the launcher's `PracticeSession` (`app/practice-session.js`):
 
@@ -95,7 +92,7 @@ Four layers sit between the player and a decision. With the cloud server, only t
 | `DELETE /v1/sessions/:id` | Stop the worker and clean up |
 | `WS /v1/sessions/:id/socket` | Frames in (`{"type":"frame","data":…}`), `ready`, `battle`, `thinking`, `choice`, `end` and `error` out |
 
-- Anonymous by default; an `API_KEY` makes every `/v1` call and socket need `Authorization: Bearer <key>`. The local server always uses a per-launch key.
+- Anonymous by default; an `API_KEY` makes every `/v1` call and socket need `Authorization: Bearer <key>`. Test stand-ins on loopback always use a random key.
 - Only frames for a `battle-gen9randombattle-N` room are accepted, up to 256 KiB each. Bursts of 200 frames, then 40 per second. Requests with an `Origin` header (browsers) cannot open a socket.
 - A choice must be `/choose move <id>`, optionally followed by ` terastallize`, or `/switch <1-6>`. The server and the launcher both check this before anything reaches the simulator.
 - Per client network: 1 concurrent session, and session creation in bursts of 6 refilling at 30 per hour. Server-wide: `MAX_SESSIONS` and `MAX_THREADS`. Sessions end after 2 hours, 15 minutes idle, 1 minute without a socket, 5,000 decisions, or when the socket closes. Full details are in [api/README.md](../api/README.md#rate-limits).
@@ -203,7 +200,7 @@ $$
 
 ### Worker (`api/worker/foulplay_worker.py`)
 
-- **Configuration:** `gen9randombattle`; search time 100 ms (team preview too); parallelism 1; threads from the preset, capped by the server's `MAX_THREADS` (Quiet 1, Balanced 2, Full 8 on this computer); no Smogon stats download, no log file, no saved replays.
+- **Configuration:** `gen9randombattle`; search time 100 ms (team preview too); parallelism 1; threads from the preset, capped by the server's `MAX_THREADS` (Quiet 1, Balanced 2, Full 8 uncapped); no Smogon stats download, no log file, no saved replays.
 - **No orphaned processes.** Upstream searches worlds in a `ProcessPoolExecutor`; the worker substitutes a `ThreadPoolExecutor`, so all search runs inside the one owned Python process.
 - **Connection.** Foul Play's websocket client is replaced by a stdio link. Upstream `pokemon_battle` runs unchanged, starting at the first `|init|battle` frame it receives. Rematches reuse the same worker. `hf`, `gg` and `/timer on` are dropped; only choices matching the grammar are emitted.
 - **Never silently weakened.** `[Invalid choice]` or `[Unavailable choice]` ends the session instead of falling back to random play.
@@ -326,9 +323,9 @@ Server setup, configuration, rate limits, the full protocol and a step-by-step h
 cd api && npm ci --omit=dev && npm run setup && npm start
 ```
 
-`npm run setup` installs Foul Play into `api/runtime` with the same installer as the app's local engine: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
+`npm run setup` installs Foul Play into `api/runtime` with `api/install.js`: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
 
-To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, currently the hosted server at `https://34-174-209-142.sslip.io`. If it is empty, the Practice page says the cloud is not set up. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
+To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, currently the hosted server at `https://34-174-209-142.sslip.io`. If it is empty, the Practice page says the cloud is not set up.
 
 ### Development setup
 
@@ -347,11 +344,11 @@ On Linux, `npm run bots:setup -- --build-linux --python python3` builds the simu
 | Command | Covers |
 | --- | --- |
 | `npm test` | Includes the bridge (`tests/practice-session.test.js`) and the API server and client with a fake worker (`api/test/`) |
-| `npm run test:practice:api` | Two real games against Foul Play through a local API server, without Electron. `node tests/practice-api-live.cjs --url <server> [--key …]` runs the same games against a deployed server |
-| `npm run test:practice` | A real Foul Play battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup (`BOT_TEST_ENGINE=local` or `cloud`) |
-| `npm run test:bots` | The desktop suite with the engine on this computer and through a separate API server |
+| `npm run test:practice:api` | Two real games against Foul Play through a loopback copy of the API server, without Electron. `node tests/practice-api-live.cjs --url <server> [--key …]` runs the same games against a deployed server |
+| `npm run test:practice` | A real Foul Play battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup, against a loopback copy of the API server |
+| `npm run test:bots` | Runs the desktop suite above as a standalone check |
 | `tests/bots-games.py` (run with the Laplace runtime's Python) | Two complete Laplace harness games against a heuristic player; result agreement and pipe shutdown |
-| `npm run smoke:practice-packaged` | A Laplace harness game inside an unpacked package, including a relocated copy |
+| `npm run smoke:practice-packaged` | A short practice game inside the unpacked package, with moves from the hosted cloud API (`SHOWDOWN_PRACTICE_API_URL` overrides) |
 
 All of these use disposable profiles and private servers, never the player's account or the public server. They are integration checks, not strength benchmarks. Test windows run with `SHOWDOWN_DESKTOP_BACKGROUND=1` (non-focusing, transparent, ignores the mouse).
 
