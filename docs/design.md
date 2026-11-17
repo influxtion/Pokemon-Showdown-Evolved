@@ -79,7 +79,7 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - **Privacy:** only the battle log is sent to the practice API, with no account details. Analysing an online game never acts on the account.
 
 ### Practice API (`api/`)
-- **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API on the cloud server (`api/server.js`). Foul Play never runs in the app. Only Foul Play is supported for now.
+- **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API on the cloud server (`api/server.js`). Foul Play never runs in the app. The bot is Foul Play at three levels (Hard, Medium, Casual); Hard also plays OU.
 - **Cloud only.** The app has no local play: no engine choice, no install, and no bot code on the player's PC. Tests run the same server on loopback as a stand-in for the cloud.
 - **Not bundled.** Foul Play (GPL-3.0) is installed only on the server (`api/install.js`, hash-checked against `api/lock.json`) and never shipped in the app.
 - **Limits.** Anonymous access with per-network rate limits, a server-wide session cap and a thread cap; an optional API key ([api/README.md](../api/README.md)).
@@ -88,7 +88,7 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - Protocol, limits and deployment: [api/README.md](../api/README.md) and [bots.md](bots.md).
 
 ### Practice
-- Gen 9 Random Battle on a private simulator on the player's computer, never the public server. Opponents: **Foul Play** (Hard, on the cloud server) and three simple bots that run in the app (Easy: **Heuristic**, **Greedy**, **Random**).
+- Gen 9 Random Battle and Gen 9 OU on a private simulator on the player's computer, never the public server. Opponents: **Foul Play** (Hard), **Foul Play Medium** and **Foul Play Casual** (Medium), all on the cloud server, and three simple bots that run in the app (Easy: **Heuristic**, **Greedy**, **Random**). OU is Foul Play (Hard) only, with both teams chosen by the player.
 - The **Bots** page (under Teambuilder in the sidebar, also reachable from **Play against bots** in the Home battle panel) lists the bots as cards with a **Play** button each; the battle plays in its own **Bot battle** tab with Forfeit, **New battle** and **End practice**. Closing that tab ends practice. Status shows thinking, turn, time and result.
 - Practice and online games stay loaded side by side; the online account is never used.
 
@@ -215,8 +215,9 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Practice
 
-- **Opponents:** Gen 9 Random Battle on a private simulator the app starts on the player's computer. The Bots page has format tabs (**Random Battle**; **OU** marked coming soon, planned for Foul Play) and one collapsible group per difficulty, hardest first: **Hard** (Foul Play) and **Easy** (Heuristic, Greedy, Random); weaker Foul Play versions are planned as a group between them. Every card is the same size: icon and name, type and formats, a description and its own **Play** button. Nothing on the page says "unrated"; practice never touches the online account.
-- **Where the bots run:** the simple bots run inside the app, offline ([bots.md](bots.md#simple-bots-appsimple-botsjs)). Foul Play always runs on the cloud server, with nothing to install; only its card shows the server's state (online, busy, unreachable).
+- **Opponents:** Gen 9 Random Battle and OU on a private simulator the app starts on the player's computer. The Bots page has format tabs (**Random Battle**, **OU**) and one collapsible group per difficulty, hardest first: **Hard** (Foul Play), **Medium** (Foul Play Medium, Foul Play Casual) and **Easy** (Heuristic, Greedy, Random). The weaker levels are Random Battle only. The OU tab lists Foul Play only. Every card is the same size: icon and name, type and formats, a description and its own **Play** button. Nothing on the page says "unrated"; practice never touches the online account.
+- **Where the bots run:** the simple bots run inside the app, offline ([bots.md](bots.md#simple-bots-appsimple-botsjs)). Foul Play, at every level, always runs on the cloud server, with nothing to install; only its cards show the server's state (online, busy, unreachable).
+- **OU teams:** above the Hard group, a **Teams** section has two equal slots, **Your team** and **Foul Play's team**. Each takes an OU team from the Teambuilder (**My teams**) or a pasted export (**Paste a team**); the same team can go on both sides. There are no built-in or sample teams. Both teams are checked with the practice simulator's validator as they are chosen; Play stays disabled until both are legal, and an illegal or unreadable team shows the reason under its slot. The page remembers the last Teambuilder teams chosen; pasted teams are not saved. **New battle** keeps both teams. Teams are used for the game only, never kept or logged ([bots.md](bots.md#ou)).
 - **No computation setting:** Foul Play always asks for the **Full** preset and gets what the server allows (currently 2 threads). The presets only ever set search threads, not strength, so the page no longer offers them.
 - **Battle tab:** a card's **Play** opens a **Bot battle** tab (`practice-battle.html`) showing only the battle: the client's own header and room tabs are hidden, so the battle cannot be closed from inside it and leave an empty client. While a battle runs, the Bots page offers **Go to battle** instead of starting another.
 - **Controls:** moves, switches and Terastallization in the battle; **Forfeit** (opens the client's confirmation), **New battle** after it ends, and **End practice** in the tab's header. Status shows starting, thinking, turn, elapsed time and result.
