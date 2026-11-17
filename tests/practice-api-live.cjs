@@ -6,6 +6,8 @@
 //
 //   node tests/practice-api-live.cjs --runtime <foul play install dir>     (a stand-in API on loopback)
 //   node tests/practice-api-live.cjs --url https://host [--key KEY]       (a deployed API)
+// Add --opponent foulplay-medium|foulplay-casual for a weaker level, or --format gen9ou --team <export>
+// for OU, where both sides use that team (the player plays it too).
 // The simulator comes from out/bots/config.json (npm run bots:setup) or vendor/laplace/dist.
 
 const assert = require('node:assert/strict');
@@ -18,13 +20,21 @@ const { CloudEngine } = require('../app/practice-engines');
 const { inspect } = require('../api/install');
 const { createApiServer } = require('../api/server');
 const { readBotConfig } = require('../app/bot-config');
+const { PracticeTeams } = require('../app/practice-teams');
+const fs = require('node:fs');
 
 const root = path.join(__dirname, '..');
 const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
-  preset: { type: 'string', default: 'quiet' } } });
+  preset: { type: 'string', default: 'quiet' }, opponent: { type: 'string', default: 'foulplay' },
+  format: { type: 'string', default: 'gen9randombattle' }, team: { type: 'string' } } });
 if (!values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
 const config = readBotConfig(path.join(root, 'out/bots/config.json'));
 const simulatorRoot = config?.root || path.join(root, 'vendor/laplace/dist');
+const FORMAT = values.format;
+// OU: one team, checked the way the app checks teams, used for both sides.
+const team = FORMAT === 'gen9randombattle' ? null
+  : new PracticeTeams({ root: simulatorRoot }).check(FORMAT, 'export', fs.readFileSync(path.resolve(values.team || ''), 'utf8'));
+if (team && !team.ok) throw new Error(team.error);
 
 function player(connection) {
   const socket = new WebSocket(`ws://127.0.0.1:${connection.port}/showdown/websocket?token=${connection.token}`);
@@ -36,15 +46,16 @@ function player(connection) {
     const lines = text.split('\n');
     if (text.includes('|challstr|')) socket.send(`|/trn ${connection.human},0,`);
     if (lines.some(line => line.startsWith(`|updateuser| ${connection.human}|1|`))) {
-      socket.send('|/utm null');
-      socket.send(`|/challenge ${connection.bot}, gen9randombattle`);
+      socket.send(`|/utm ${connection.team || 'null'}`);
+      socket.send(`|/challenge ${connection.bot}, ${FORMAT}`);
     }
+    if (text.includes('|popup|')) console.error(text);
     if (!lines[0].startsWith('>battle-')) return;
     const room = lines[0].slice(1);
     for (const line of lines) {
       if (line.startsWith('|request|') && line.length > 9) {
         const request = JSON.parse(line.slice(9));
-        if (!request.wait) socket.send(`${room}|/choose default|${request.rqid}`);
+        if (!request.wait) socket.send(`${room}|${request.teamPreview ? '/team 123456' : '/choose default'}|${request.rqid}`);
       }
       if (line.startsWith('|win|') || line === '|tie') {
         results.push(line);
@@ -53,7 +64,7 @@ function player(connection) {
       }
     }
   });
-  return { socket, battle, rematch() { socket.send('|/utm null'); socket.send(`|/challenge ${connection.bot}, gen9randombattle`); } };
+  return { socket, battle, rematch() { socket.send(`|/utm ${connection.team || 'null'}`); socket.send(`|/challenge ${connection.bot}, ${FORMAT}`); } };
 }
 
 async function finished(session) {
@@ -86,11 +97,12 @@ async function main() {
   });
   const timeout = setTimeout(() => { console.error('Timed out', session.status()); process.exit(1); }, 600000);
   const ready = new Promise(resolve => session.once('ready', resolve));
-  const started = await session.start({ opponent: 'foulplay', preset: values.preset });
+  const started = await session.start({ opponent: values.opponent, preset: values.preset, format: FORMAT,
+    ...(team ? { teams: { player: team.packed, bot: team.packed, botExport: team.exported } } : {}) });
   assert.equal(started.ok, true, started.error);
   const connection = await ready;
   assert.equal(session.status().state, 'ready');
-  console.log(`Practice ready (${values.url ? 'deployed API' : 'loopback API'}, ${session.status().threads} search thread(s)); playing two battles against Foul Play.`);
+  console.log(`Practice ready (${values.url ? 'deployed API' : 'loopback API'}, ${session.status().threads} search thread(s)); playing two ${FORMAT} battles against ${values.opponent}.`);
 
   const human = player(connection);
   const first = await human.battle();
