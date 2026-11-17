@@ -320,7 +320,7 @@ Source, license and build records: [`vendor/laplace/SOURCE.md`](../vendor/laplac
 
 ### Practice API
 
-Server setup, configuration, rate limits, deployment (Docker Compose with Caddy, or systemd) and the full protocol are in [api/README.md](../api/README.md). In short:
+Server setup, configuration, rate limits, the full protocol and a step-by-step hosting guide (systemd with Caddy, Google Cloud notes, or Docker Compose) are in [api/README.md](../api/README.md#host-it-on-a-server). In short:
 
 ```sh
 cd api && npm ci --omit=dev && npm run setup && npm start
@@ -328,7 +328,7 @@ cd api && npm ci --omit=dev && npm run setup && npm start
 
 `npm run setup` installs Foul Play into `api/runtime` with the same installer as the app's **Install Foul Play** button: it downloads and hash-checks everything into `runtime/staging`, builds the engine, runs the worker's `--check` and only then replaces `runtime/current`. A private Rust toolchain, if one was needed, is removed afterwards. The installed runtime is about 140 MB.
 
-To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, which is empty until a server is deployed; the Practice page then says the cloud is not set up and offers **This computer**. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
+To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (and `SHOWDOWN_PRACTICE_API_KEY` if the server has an `API_KEY`). Release builds read `CLOUD_API_URL` in `app/practice-engines.js`, currently the hosted server at `https://34-174-209-142.sslip.io`. If it is empty, the Practice page says the cloud is not set up and offers **This computer**. `SHOWDOWN_FOULPLAY_DIR` overrides where the local install lives (default: the profile's `foulplay` folder).
 
 ### Development setup
 
@@ -356,5 +356,5 @@ All of these use disposable profiles and private servers, never the player's acc
 
 ### Not yet verified
 
-- The Docker image build and Caddy certificate issuance (`api/deploy/`), and the in-app install on Windows and macOS. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
+- The Docker image build (`api/deploy/`), and the in-app install on Windows and macOS. The systemd and Caddy setup is verified on the hosted Google Cloud VM. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
 - Server sizing: a decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.

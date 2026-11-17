@@ -6,11 +6,13 @@ This document describes what Showdown Desktop is, how it is built, and why. It i
 1. [Summary](#1-summary)
 2. [Features](#2-features)
 3. [Architecture](#3-architecture)
-4. [Key decisions](#4-key-decisions)
-5. [Security and privacy](#5-security-and-privacy)
-6. [Testing](#6-testing)
-7. [Build, packaging and release](#7-build-packaging-and-release)
-8. [Appendix: visual design](#8-appendix-visual-design)
+4. [Feature details](#4-feature-details)
+5. [Key decisions](#5-key-decisions)
+6. [Security and privacy](#6-security-and-privacy)
+7. [Testing](#7-testing)
+8. [Build, packaging and release](#8-build-packaging-and-release)
+9. [Status, risks and open questions](#9-status-risks-and-open-questions)
+10. [Appendix: visual design](#10-appendix-visual-design)
 
 ## 1. Summary
 
@@ -72,9 +74,9 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 
 - **Summary:** agreement rate, a count of each verdict, and the biggest mistakes linked to their turns. Thresholds are starting values to tune.
 - **Viewer:** the replay player beside a turn list. Selecting a turn jumps playback there and shows its verdict.
-- **Engine:** Laplace by default, Foul Play as an option. The engine runs through the bot API (below).
+- **Engine:** Foul Play, through the practice API's planned analysis endpoint (below).
 - **Results** are cached with the replay note so a game is analysed once.
-- **Privacy:** only the battle log is sent to the bot API, with no account details. Analysing an online game never acts on the account.
+- **Privacy:** only the battle log is sent to the practice API, with no account details. Analysing an online game never acts on the account.
 
 ### Practice API (`api/`)
 - **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API, and the cloud server and the local copy run the same code (`api/server.js`). Only Foul Play is supported for now.
@@ -82,6 +84,7 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - **Optional local install.** **Install Foul Play** on the Practice page runs the pinned installer (`api/install.js`) with a step counter, progress bar and live output. It downloads a standalone Python, Foul Play and, if needed, a temporary Rust compiler, then builds the engine. Outdated installs offer **Update**; installed ones can be removed.
 - **Not bundled.** Foul Play (GPL-3.0) is downloaded on request, hash-checked against `api/lock.json`, and never shipped in the installer.
 - **Limits.** Anonymous access with per-network rate limits, a server-wide session cap and a thread cap; an optional API key ([api/README.md](../api/README.md)).
+- **Hosting.** The default cloud server is one Google Cloud VM at `https://34-174-209-142.sslip.io` (`CLOUD_API_URL`). The API runs as a systemd service on `127.0.0.1:8787` behind Caddy, which provides HTTPS; only ports 80 and 443 are open. It serves 8 battles at once with 2 search threads each, so **Full** runs with 2 threads in the cloud. Step-by-step hosting: [api/README.md](../api/README.md#host-it-on-a-server).
 - **Analysis endpoint (planned):** `POST /v1/analyze` with the battle log up to a decision, the player's side and the engine; it returns ranked choices and search shares. It is stateless and needs no simulator session.
 - Protocol, limits and deployment: [api/README.md](../api/README.md) and [bots.md](bots.md).
 
@@ -143,6 +146,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | Replay notes | userData `replays.json` | Versioned; a corrupt file is reported and never overwritten |
 | Showdown login, teams, preferences | Partition `persist:showdown` | Separate from launcher data |
 | Logs | userData | Fixed event names and numeric codes only |
+| Foul Play (optional local install) | userData `foulplay/` (`SHOWDOWN_FOULPLAY_DIR` overrides) | Built in `staging/`, swapped into `current/` after its self-check; removable from the Practice page |
 
 `SHOWDOWN_DESKTOP_USER_DATA` selects an alternate profile for isolated tests.
 
@@ -158,7 +162,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | `tests/` | Unit tests, Python runner tests, Electron desktop and live drivers |
 | `docs/` | This document and [bots.md](bots.md) |
 
-## 4. Features
+## 4. Feature details
 
 ### Launcher shell and Home
 
@@ -214,7 +218,8 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Practice
 
-- **Opponents and presets:** Gen 9 Random Battle against **Laplace** or **Foul Play**, on the private hosted battle service. Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default).
+- **Opponent and presets:** Gen 9 Random Battle against **Foul Play**, on a private simulator the app starts on the player's computer. Presets set search threads only: **Quiet** 1, **Balanced** 2, **Full** 8 (default). The cloud server caps threads (currently 2), and the page says so.
+- **Where Foul Play runs:** **Cloud** (default) needs nothing installed. Its status note shows whether the server is online, busy or unreachable. **This computer** offers **Install Foul Play** with a step counter, progress bar and current output, then **Update** when the pins change, and **Remove from this computer**. Installing or updating is refused during a local battle; quitting during an install asks first. The choice is remembered.
 - **Controls:** moves, switches, Terastallization, Forfeit, **Next battle** (rematch) and **Stop practice…**. Status shows starting, ready, thinking, turn, elapsed time and result.
 - **Account separation:** practice and online games stay loaded side by side, and the online account is never involved.
 - How the bots decide, every protocol layer, performance and deployment: [bots.md](bots.md).
@@ -243,23 +248,24 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | D6 | Import reviews conflicts and keeps existing notes by default | Overwrite or mirror the backup | Restoring must never silently lose notes |
 | D7 | Bots are a hosted API by default; local bots are an optional in-app install | Bundle bots with every release | Owner decision (2026-11-13): the bots are too large for the base release, and the hosted API serves everyone regardless of CPU. Players who want to can install and run them locally |
 | D7a | The simulator runs locally; only inference is remote, behind one API for cloud and local | Run whole battles on the server | Owner decision (2026-11-16): one interface whichever device computes the moves, a server that only searches, and a battle UI that never depends on the network. Foul Play only for now; anonymous access with rate limits |
+| D7b | Host the cloud API on one VM behind Caddy, named through sslip.io | Own domain; managed containers; Docker on the VM | Owner decision (2026-11-16): no domain to buy or manage, and a plain systemd service is simple to update with `git pull`. The hostname is derived from the static IP, so changing the IP means a new app build |
 | D8 | Practice on a private simulator with loopback enforced twice | Bot plays on the public server | Automated play on real accounts is impossible by construction ([bots.md §3.4](bots.md#34-network-confinement)) |
 | D9 | Presets are thread counts | Named difficulty levels | That is all they change; strength is not measured |
 | D10 | Every third-party input pinned by revision or hash | Track upstream | Reproducible builds and a recorded license position per component |
 
 Bot-internal decisions (thread pools, rejected-choice handling, pooling) are recorded in [bots.md](bots.md).
 
-## 5. Security and privacy
+## 6. Security and privacy
 
 - **No automated play on real accounts.** The app and its tests never search, challenge or play on the user's account. Live tests are guest-only and spectate.
 - **Least privilege per view.** Only launcher pages have a preload. Remote views are sandboxed and context-isolated and deny permissions; downloads and popups are blocked. The Showdown client is denied notifications; the launcher shows them itself.
 - **Validated IPC.** Every privileged request is validated in main. The renderer never supplies file paths (native dialogs choose them) or replay URLs (main resolves them from note IDs).
 - **Text, not HTML.** Imported and snapshot text is rendered as text.
 - **Private logs.** Fixed event names and numeric codes only: no usernames, credentials, replay URLs or note text.
-- **Practice API.** Session IDs are 256-bit capabilities and are never access-logged. The local API binds to 127.0.0.1 with a per-launch key and refuses browser upgrades. Choices from any API are checked against the move grammar twice (server and app) before reaching the simulator.
+- **Practice API.** Session IDs are 256-bit capabilities and are never access-logged. The local API binds to 127.0.0.1 with a per-launch key and refuses browser upgrades. Choices from any API are checked against the move grammar twice (server and app) before reaching the simulator. The hosted API listens only on loopback behind Caddy, which keeps no access log, and rate limits use the client address Caddy forwards.
 - **Explicit destructive actions.** Sign out, reset, discarding drafts and undoing imports all confirm first.
 
-## 6. Testing
+## 7. Testing
 
 Electron is pinned to 45.3.3. The dependency override upgrades only affected
 `minimatch` versions (7 through 11.0.0) to 11.0.1 for GHSA-g3hv-75wg-m249;
@@ -278,6 +284,12 @@ window sizes. These are development-PC samples, not cold installed-app startup,
 low-end hardware or sustained-memory guarantees. No installer was rebuilt and
 no hosted bot deployment was changed.
 
+November 16 practice API deployment: 157 unit tests (one optional skip) and
+`npm run check` passed. `tests/practice-api-live.cjs --url` played two full
+battles from a development PC against the hosted server over HTTPS (11 and 25
+turns, 38 decisions, median 248 ms per decision at 2 threads). The Electron
+practice suites were not rerun against the hosted server.
+
 | Command | Covers |
 | --- | --- |
 | `npm run check` | Syntax |
@@ -286,11 +298,11 @@ no hosted bot deployment was changed.
 | `npm run test:shell:live` | Guest, spectate-only drift check of the client hooks the shell depends on. Run before each release |
 | `npm run test:showdex:live`, `npm run test:replays:live` | Guest-only checks of a real Showdex build and a real public replay, in both themes and sizes |
 | `npm run smoke:packaged` | The unpacked package with a fresh profile, system-only PATH and the public client blocked |
-| Bot suites | Real games against Foul Play through a local and a separate API server, and the Laplace harness ([bots.md §8](bots.md#8-running-and-hosting)) |
+| Bot suites | Real games against Foul Play through a local API server, a separate API server or the hosted one (`--url`), and the Laplace harness ([bots.md §8](bots.md#8-running-and-hosting)) |
 
 No suite verifies a signed-in account. Those checks are manual and owner-only (section 9).
 
-## 7. Build, packaging and release
+## 8. Build, packaging and release
 
 **Run from source** (Node.js 24):
 
@@ -313,7 +325,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 
 - **Installer:** adds a Start menu shortcut but no desktop shortcut, and uses Electron's default icon until branding is decided.
 - **`app.asar`:** contains `app/`, `renderer/`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
-- **Bots are not in the base release** (D7); they install from the app on request. Until the installer exists, packaging still bundles the Laplace test runtime as below.
+- **Bots are not in the base release** (D7). The package carries only the practice API's JavaScript, `api/lock.json` and the worker script (unpacked from the archive); Foul Play itself installs from the Practice page on request. Packaging still bundles the Laplace test runtime as below, because the practice simulator and client come from it.
 - **Laplace test runtime:** ships outside the archive under `resources/practice` and `resources/practice-adapter`. Before- and after-pack hooks re-verify every file, and packaging fails on any drift. When signing arrives, exclude the locked Python and Torch binaries from re-signing so the integrity gate still passes.
 - **Dependency audit:** reports a moderate `minimatch` advisory through electron-builder. It is a development-only dependency and is absent from the app.
 
@@ -333,7 +345,8 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | Area | State |
 | --- | --- |
 | Shell, Home, client, replay notes, review, backup, Showdex, settings | Implemented; automated suites pass |
-| Practice bots | Implemented through the service and the harness; the Linux image and real HTTPS deployment are untested |
+| Practice (Foul Play) | Implemented: cloud and local engines, in-app install with progress and updates. Local install verified on Linux x64 only |
+| Hosted practice API | Live on one Google Cloud VM over HTTPS; two real battles verified end to end. Docker image untested |
 | Windows installer | Builds and passes packaged smoke tests; never tested on a clean machine |
 | Public release | Not started |
 
@@ -343,7 +356,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | --- | --- | --- |
 | Showdown client changes | Bridge reads or theme selectors break; a switch to Showdown's new Preact client would need a bridge rewrite | Fail-safe shell; `test:shell:live` before releases |
 | Licensing | AGPL/GPL obligations for the patched client, Foul Play and Showdex | Source and notices retained; owner review before release |
-| Service capacity | Fewer CPUs mean shallower searches; one replica; shared key | Measure the VM; private testers only; per-user credentials before any public service |
+| Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; **This computer** works without the server; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
 | Unproven demand | Users may not return | Invited alpha measures return use before more features |
 
 **Open decisions (owner)**
@@ -351,13 +364,14 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 - [ ] Project license, and distribution of the patched AGPL client, GPL Foul Play and Showdex.
 - [ ] Code signing and release branding.
 - [ ] Whether Showdex ships in packages.
-- [ ] How invited testers get service access.
+- [ ] Whether the hosted API stays anonymous, and whether it moves to a proper domain (the current hostname is tied to the VM's IP).
 
 **Verification outstanding**
 
 - [ ] Signed-in checks by the owner: session persistence, ratings, team selection, challenges, a real search becoming a battle, friends data, rail forfeit prompt, result bar.
 - [ ] Clean-machine install, upgrade and uninstall (release step 1).
-- [ ] Linux image and a real HTTPS deployment of the battle service.
+- [ ] The Docker image (`api/deploy/`), and the in-app Foul Play install on Windows and macOS.
+- [ ] The Electron practice suites against the hosted server, and its behavior with several players at once.
 
 **Not designed yet:** incoming challenges and PMs inside the launcher, a replacement for Showdown's own home screen, Practice view chrome, practice formats beyond Gen 9 Random Battle, macOS and Linux packages.
 
