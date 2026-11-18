@@ -13,17 +13,17 @@ const FRAME = `>${ROOM}\n|init|battle\n|title|Player vs. FoulPlay`;
 // Stands in for the Python worker: records stdin frames and lets a test emit events.
 function fakeWorkers() {
   const workers = [];
-  const launch = ({ threads }) => {
+  const launch = ({ threads, level, format }) => {
     const child = new EventEmitter();
     child.stdin = new PassThrough();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
     child.frames = [];
-    child.threads = threads;
+    Object.assign(child, { threads, level, format });
     child.killed = false;
     child.kill = () => { if (!child.killed) { child.killed = true; setImmediate(() => child.emit('exit', 0)); } };
     child.emitEvent = event => child.stdout.write(`${JSON.stringify(event)}\n`);
-    child.ready = () => child.emitEvent({ type: 'ready', protocol: 1, bot: 'foulplay', threads, searchMs: 100 });
+    child.ready = (fields = {}) => child.emitEvent({ type: 'ready', protocol: 1, bot: 'foulplay', level, format, threads, searchMs: 100, ...fields });
     let buffer = '';
     child.stdin.on('data', data => {
       buffer += data;
@@ -55,7 +55,9 @@ test('reports bots, presets capped to the server limit, and capacity', async t =
   const { client } = await start(t, { maxThreads: 2, maxSessions: 3 });
   const info = await client.info();
   assert.equal(info.api, 1);
-  assert.deepEqual(info.bots.map(bot => bot.id), ['foulplay']);
+  assert.deepEqual(info.bots.map(bot => [bot.id, bot.level]), [['foulplay', 'hard'], ['foulplay-medium', 'medium'], ['foulplay-casual', 'casual']]);
+  assert.deepEqual(info.bots[0].formats, ['gen9randombattle', 'gen9ou']);
+  assert.deepEqual(info.bots[1].formats, ['gen9randombattle']);
   assert.deepEqual(info.bots[0].presets, { quiet: 1, balanced: 2, full: 2 });
   assert.deepEqual(info.capacity, { active: 0, max: 3 });
 });
@@ -67,7 +69,9 @@ test('relays frames to the worker and choices back to the client', async t => {
   assert.equal(session.socket, `/v1/sessions/${session.id}/socket`);
   const socket = await client.connect(session.id);
   workers[0].ready();
-  assert.deepEqual(await socket.ready, { type: 'ready', bot: 'foulplay', threads: 2, searchMs: 100 });
+  assert.deepEqual(await socket.ready, { type: 'ready', bot: 'foulplay', level: 'hard', format: 'gen9randombattle', threads: 2, searchMs: 100 });
+  assert.equal(workers[0].level, 'hard');
+  assert.equal(workers[0].format, 'gen9randombattle');
 
   assert.equal(socket.send(FRAME), true);
   await once(workers[0], 'frames');
@@ -99,6 +103,87 @@ test('rejects unknown bots, presets and extra keys', async t => {
     assert.equal(response.status, 400);
     assert.equal((await response.json()).error.code, 'invalid-options');
   }
+});
+
+test('starts weaker levels with their own level', async t => {
+  const { client, workers } = await start(t);
+  const session = await client.createSession({ bot: 'foulplay-casual', preset: 'full' });
+  assert.equal(session.level, 'casual');
+  assert.equal(workers[0].level, 'casual');
+  const socket = await client.connect(session.id);
+  workers[0].ready({ searchMs: 20 });
+  assert.equal((await socket.ready).level, 'casual');
+});
+
+test('ends a session whose worker reports another level or format', async t => {
+  const { client, workers } = await start(t);
+  const session = await client.createSession({ bot: 'foulplay-medium', preset: 'full' });
+  const socket = await client.connect(session.id);
+  workers[0].ready({ level: 'hard' });
+  const [{ error }] = await once(socket, 'close');
+  assert.equal(error.code, 'engine-failed');
+});
+
+const TEAM = 'Great Tusk @ Booster Energy\nAbility: Protosynthesis\nTera Type: Steel\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Headlong Rush\n- Ice Spinner\n- Rapid Spin\n- Knock Off';
+const OU_ROOM = 'battle-gen9ou-4';
+
+test('starts an OU session with the bot team on the worker stdin only', async t => {
+  const logs = [];
+  const { client, workers, url } = await start(t, { log: (event, fields) => logs.push(JSON.stringify({ event, ...fields })) });
+  const session = await client.createSession({ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: TEAM });
+  assert.equal(session.format, 'gen9ou');
+  assert.equal(workers[0].format, 'gen9ou');
+  // Written as the worker starts, before this test could listen for it.
+  if (!workers[0].frames.length) await once(workers[0], 'frames');
+  assert.deepEqual(workers[0].frames, [{ type: 'team', data: TEAM }]);
+  const status = await (await fetch(`${url}/v1/sessions/${session.id}`)).text();
+  assert.doesNotMatch(status, /Tusk/);
+  assert.doesNotMatch(logs.join('\n'), /Tusk/);
+
+  const socket = await client.connect(session.id);
+  workers[0].ready();
+  assert.equal((await socket.ready).format, 'gen9ou');
+  const frame = `>${OU_ROOM}\n|init|battle`;
+  assert.equal(socket.send(frame), true);
+  await once(workers[0], 'frames');
+  assert.deepEqual(workers[0].frames.at(-1), { type: 'frame', data: frame });
+  const choice = nextMessage(socket, 'choice');
+  workers[0].emitEvent({ type: 'choice', room: OU_ROOM, turn: 1, choice: '/team 312456', rqid: '2', elapsedMs: 90 });
+  assert.equal((await choice).choice, '/team 312456');
+});
+
+test('refuses OU without a team, a team outside OU, and levels that do not play OU', async t => {
+  const { url } = await start(t, { maxSessionsPerClient: 10 });
+  const cases = [
+    [{ bot: 'foulplay', preset: 'full', format: 'gen9ou' }, 'invalid-team'],
+    [{ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: 'x\u0000y' }, 'invalid-team'],
+    [{ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: 'x'.repeat(9000) }, 'invalid-team'],
+    [{ bot: 'foulplay', preset: 'full', team: TEAM }, 'invalid-team'],
+    [{ bot: 'foulplay-medium', preset: 'full', format: 'gen9ou', team: TEAM }, 'invalid-format'],
+    [{ bot: 'foulplay', preset: 'full', format: 'gen9uu', team: TEAM }, 'invalid-format'],
+  ];
+  for (const [body, code] of cases) {
+    const response = await fetch(`${url}/v1/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal(response.status, 400, JSON.stringify(body));
+    assert.equal((await response.json()).error.code, code);
+  }
+});
+
+test('closes an OU session on Random Battle frames and reports an unreadable team', async t => {
+  const { client, workers } = await start(t, { maxSessionsPerClient: 2 });
+  const session = await client.createSession({ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: TEAM });
+  const socket = await client.connect(session.id);
+  workers[0].ready();
+  await socket.ready;
+  socket.socket.send(JSON.stringify({ type: 'frame', data: FRAME }));
+  const [{ error }] = await once(socket, 'close');
+  assert.equal(error.code, 'invalid-message');
+
+  const second = await client.createSession({ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: TEAM });
+  const socket2 = await client.connect(second.id);
+  workers[1].emitEvent({ type: 'error', code: 'invalid-team' });
+  const [{ error: teamError }] = await once(socket2, 'close');
+  assert.equal(teamError.code, 'invalid-team');
 });
 
 test('requires the API key when one is configured', async t => {

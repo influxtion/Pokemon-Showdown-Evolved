@@ -101,7 +101,11 @@ class PracticeView {
     contents.on('render-process-gone', loadFailed);
     contents.on('did-fail-load', (_event, code, _description, _url, main) => { if (main && code !== -3) loadFailed(); });
     const url = connection.clientUrl ? new URL(connection.clientUrl) : pathToFileURL(path.join(this.root, 'practice-client.html'));
-    if (!connection.clientUrl) for (const key of ['port', 'token', 'human', 'bot']) url.searchParams.set(key, String(connection[key]));
+    if (!connection.clientUrl) {
+      for (const key of ['port', 'token', 'human', 'bot']) url.searchParams.set(key, String(connection[key]));
+      // OU: the player's packed team. The view's storage partition is in memory only.
+      for (const key of ['format', 'team']) if (connection[key]) url.searchParams.set(key, String(connection[key]));
+    }
     contents.loadURL(url.href).catch(loadFailed);
     this.place();
   }

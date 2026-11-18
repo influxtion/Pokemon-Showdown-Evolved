@@ -3,7 +3,7 @@
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 
-const PAGES = ['index.html', 'play.html', 'stats.html', 'replays.html', 'practice.html', 'practice-battle.html', 'settings.html'];
+const PAGES = ['index.html', 'play.html', 'stats.html', 'replays.html', 'practice.html', 'practice-battle.html', 'settings.html', 'resources.html'];
 
 function launcherUrl(value, directory) {
   try {

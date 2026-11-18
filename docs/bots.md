@@ -15,7 +15,7 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
-Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers four opponents**, hardest first: **Foul Play** (Hard), whose moves come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Weaker versions of Foul Play are planned to fill the gap. Only Foul Play's card shows the cloud server's state. The rest of this document is about the two search bots. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
+Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers six opponents**, hardest first: **Foul Play** (Hard), then **Foul Play Medium** and **Foul Play Casual** (Medium), whose moves all come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Foul Play (Hard) also plays **Gen 9 OU** (`gen9ou`), with both teams chosen by the player ([section 5](#ou)). Only the Foul Play cards show the cloud server's state. The rest of this document is about the two search bots. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
 
 | | Foul Play | Laplace |
 | --- | --- | --- |
@@ -101,13 +101,13 @@ Four layers sit between the player and a decision. With the cloud server, only t
 | --- | --- |
 | `GET /healthz` | Process health only |
 | `GET /v1/info` | Bots, presets after the server's thread cap, limits and capacity |
-| `POST /v1/sessions` | Body `{"bot": "foulplay", "preset": "quiet" \| "balanced" \| "full"}` → session ID (random 256-bit hex) and thread count |
+| `POST /v1/sessions` | Body `{"bot", "preset", "format"?, "team"?}`: bot `foulplay`, `foulplay-medium` or `foulplay-casual`; preset `quiet`, `balanced` or `full`; format `gen9randombattle` (default) or `gen9ou` (Hard only), which needs `team`, Foul Play's own team as a Showdown export → session ID (random 256-bit hex), level, format and thread count |
 | `GET /v1/sessions/:id` | State, battles and decisions |
 | `DELETE /v1/sessions/:id` | Stop the worker and clean up |
 | `WS /v1/sessions/:id/socket` | Frames in (`{"type":"frame","data":…}`), `ready`, `battle`, `thinking`, `choice`, `end` and `error` out |
 
 - Anonymous by default; an `API_KEY` makes every `/v1` call and socket need `Authorization: Bearer <key>`. Test stand-ins on loopback always use a random key.
-- Only frames for a `battle-gen9randombattle-N` room are accepted, up to 256 KiB each. Bursts of 200 frames, then 40 per second. Requests with an `Origin` header (browsers) cannot open a socket.
+- Only frames for a battle room of the session's format (`battle-gen9randombattle-N` or `battle-gen9ou-N`) are accepted, up to 256 KiB each. Bursts of 200 frames, then 40 per second. Requests with an `Origin` header (browsers) cannot open a socket.
 - A choice must be `/choose move <id>`, optionally followed by ` terastallize`, or `/switch <1-6>`. The server and the launcher both check this before anything reaches the simulator.
 - Per client network: 1 concurrent session, and session creation in bursts of 6 refilling at 30 per hour. Server-wide: `MAX_SESSIONS` and `MAX_THREADS`. Sessions end after 2 hours, 15 minutes idle, 1 minute without a socket, 5,000 decisions, or when the socket closes. Full details are in [api/README.md](../api/README.md#rate-limits).
 
@@ -122,9 +122,9 @@ The simulator accepts a WebSocket only from `127.0.0.1`, with the exact `Host` h
 | Log in | server → bot | `\|challstr\|…` |
 | | bot → server | `\|/trn FoulPlay,0,` (bridge) or `\|/trn Laplace,0,` (harness) |
 | | server → bot | `\|updateuser\| FoulPlay\|1\|…` (the `1` means named); the bot is now ready |
-| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` and `\|/challenge FoulPlay, gen9randombattle` (sent by `vendor/laplace/client-bootstrap.js`) |
+| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` (OU: `\|/utm <player's packed team>`) and `\|/challenge FoulPlay, gen9randombattle` (or `gen9ou`), sent by `vendor/laplace/client-bootstrap.js` |
 | | server → bot | `\|pm\| Player\| FoulPlay\|/challenge gen9randombattle\|gen9randombattle\|…` |
-| | bot → server | `\|/utm null` then `\|/accept Player` |
+| | bot → server | `\|/utm null` (OU: `\|/utm <Foul Play's packed team>`) then `\|/accept Player` |
 | Battle start | server → both | `>battle-gen9randombattle-N`, `\|init\|battle`, `\|title\|Player vs. FoulPlay`, team and `\|request\|{JSON}` |
 | Decision | server → bot | `\|request\|{JSON}` with the legal options and request ID (`rqid`); `"wait": true` means no decision is due |
 | | bot → server | Foul Play: `battle-…\|/choose move <moveid>[ terastallize]\|<rqid>` or `\|/switch <slot>\|<rqid>` · Laplace (poke-env): `battle-…\|/choose move <moveid>[ terastallize]` or `\|/choose switch <species>` |
@@ -132,23 +132,23 @@ The simulator accepts a WebSocket only from `127.0.0.1`, with the exact `Host` h
 | Turn | server → both | Event lines (`\|move\|`, `\|switch\|`, `\|-damage\|`, `\|-terastallize\|` …) then `\|turn\|N` |
 | End | server → both | `\|win\|<name>` or `\|tie`, then the room closes (`\|deinit`) |
 
-The bridge accepts a challenge only if every field matches: sender `Player`, recipient `FoulPlay`, format `gen9randombattle`, and no battle in progress. It adopts only the battle room that opens after it accepts, and stops forwarding at `|win|` or `|tie`. Laplace additionally requires the battle room to appear within 15 s of accepting and its `|title|` to name exactly those two players. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped by the worker, so the battle timer stays off.
+The bridge accepts a challenge only if every field matches: sender `Player`, recipient `FoulPlay`, the session's format, and no battle in progress. OU battles open with team preview, where Foul Play answers `/team <order>`. It adopts only the battle room that opens after it accepts, and stops forwarding at `|win|` or `|tie`. Laplace additionally requires the battle room to appear within 15 s of accepting and its `|title|` to name exactly those two players. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped by the worker, so the battle timer stays off.
 
 ### 3.3 Bot process ↔ supervisor (stdio)
 
 Each bot process writes **one JSON object per line** to stdout. stderr carries upstream logs and is never parsed or logged.
 
-**Foul Play worker** (supervised by the API server). Arguments: `--source <absolute Foul Play path> --threads <1-16>`, or `--check` to verify the runtime and exit. stdin carries `{"type":"frame","data":…}` lines; `{"type":"stop"}` or closing stdin ends it.
+**Foul Play worker** (supervised by the API server). Arguments: `--source <absolute Foul Play path> --threads <1-16> --level hard|medium|casual --format gen9randombattle|gen9ou`, or `--check` to verify the runtime for a format and exit. In OU the first stdin line is `{"type":"team","data":<export>}`; then stdin carries `{"type":"frame","data":…}` lines; `{"type":"stop"}` or closing stdin ends it.
 
 | Event | Fields | Meaning |
 | --- | --- | --- |
-| `ready` | `protocol: 1, bot: "foulplay", format, threads, searchMs: 100` | Loaded. The server ends the session unless protocol, bot and threads match |
+| `ready` | `protocol: 1, bot: "foulplay", level, format, threads, searchMs` | Loaded. The server ends the session unless protocol, bot, level, format and threads match |
 | `battle` | `room` | `\|init\|battle` seen; Foul Play is playing this room |
 | `thinking` | `room, turn` | A decision is due |
 | `choice` | `room, turn, choice, rqid, elapsedMs` | Foul Play's move, already checked against the choice grammar |
 | `end` | `room, result` | `win`, `loss` or `tie`, from the bot's side |
-| `checked` | `protocol, engine` | `--check` only |
-| `error` | `code: "engine-failed"` | Fatal, including a rejected choice |
+| `checked` | `protocol, engine, format` | `--check` only |
+| `error` | `code: "engine-failed"` or `"invalid-team"` | Fatal, including a rejected choice or an OU team Foul Play cannot read |
 
 **Laplace runner** (supervised by `PracticeRuntime`, harness only). Arguments: `--port` 1024–65535, `--token` 32–128 hex characters, `--bot Laplace`, `--human Player` (optional 10-hex suffix), `--threads` 1, 2, 4 or 8, and `--check` to verify the runtime. Writing `stop` to stdin, closing stdin, SIGINT or SIGTERM ends it.
 
@@ -214,12 +214,39 @@ $$
 
 ### Worker (`api/worker/foulplay_worker.py`)
 
-- **Configuration:** `gen9randombattle`; search time 100 ms (team preview too); parallelism 1; threads from the preset, capped by the server's `MAX_THREADS` (Quiet 1, Balanced 2, Full 8 uncapped); no Smogon stats download, no log file, no saved replays.
+- **Configuration:** the session's format; search time from the level (Hard 100 ms, team preview too); parallelism 1; threads from the preset, capped by the server's `MAX_THREADS` (Quiet 1, Balanced 2, Full 8 uncapped); no Smogon stats download, no log file, no saved replays.
 - **No orphaned processes.** Upstream searches worlds in a `ProcessPoolExecutor`; the worker substitutes a `ThreadPoolExecutor`, so all search runs inside the one owned Python process.
 - **Connection.** Foul Play's websocket client is replaced by a stdio link. Upstream `pokemon_battle` runs unchanged, starting at the first `|init|battle` frame it receives. Rematches reuse the same worker. `hf`, `gg` and `/timer on` are dropped; only choices matching the grammar are emitted.
 - **Never silently weakened.** `[Invalid choice]` or `[Unavailable choice]` ends the session instead of falling back to random play.
 - **Telemetry and shutdown.** `thinking` on a non-wait `|request|`, and `choice` with elapsed ms (section 3.3). `stop` on stdin or a closed pipe exits immediately.
+- **No downloads.** Everything upstream would fetch during a battle (Random Battle sets; for OU, Smogon usage stats, Showdown sample sets and Foul Play's set and move data) is installed by `npm run setup` into Foul Play's own cache folders, so the network audit hook never has to refuse it.
 - Pins (source tarball, packages, engine, set data, Python, Rust) are recorded in `api/lock.json`. No claim is made about upstream ladder strength at this budget.
+
+### Levels
+
+Foul Play Medium and Foul Play Casual are the same worker with a smaller budget and a looser pick. Hard is upstream Foul Play unchanged. The worker applies a level by wrapping each battle mode's `search_params` (how many worlds) and replacing `select_move_from_mcts_results` (how a move is picked from the summed visit shares); everything else, including inference and sampling, is untouched.
+
+| Level | Search per world | Worlds per decision | Pick |
+| --- | --- | --- | --- |
+| Hard | 100 ms | Upstream: 4 × 50 ms early, else 2 | Weighted among moves with ≥ 75% of the best move's share (upstream) |
+| Medium | 40 ms | Upstream count | Weighted among moves with ≥ 50% of the best move's share |
+| Casual | 15 ms | 1: one guess about the opponent's team | As Hard, except 35% of the time the second- or third-best move, if it has ≥ 20% of the best move's share |
+
+The weaker levels only ever play moves the search itself rated: they never pick at random from all legal moves, so mistakes look like misreads, not nonsense. The levels are checked against each other with `tests/foulplay-levels-live.cjs` (section 8).
+
+*(2026-11-17)* On the private simulator, 100 Random Battles per pairing, 2 search threads each (as on the cloud server), no rejected choices:
+
+| Pairing | Result |
+| --- | --- |
+| Foul Play Casual vs. Heuristic | 83–17 |
+| Foul Play Medium vs. Foul Play Casual | 64–36 |
+| Foul Play (Hard) vs. Foul Play Medium | 66–34 |
+
+### OU
+
+Only Foul Play (Hard) plays OU. There are no built-in teams: on the Bots page the player picks both **their own team** and **Foul Play's team**, each from their Teambuilder's OU teams or as a pasted Showdown export; the same team may be used for both. The launcher reads Teambuilder teams from the Showdown client's storage in its main process and checks both teams with the practice simulator's own validator (`app/practice-teams.js`), so Play stays disabled until both are legal, with the reason shown next to the team at fault. The bridge then gives the bot its packed team in the simulator (`/utm`) and sends its export to the API, where the team goes straight to the worker's stdin; the worker turns it into Foul Play's team dictionary. Rematches keep both teams. Teams are held in memory for the session only and are never logged or stored by the launcher or the API. The page remembers which Teambuilder teams were last chosen (by name), never a pasted team.
+
+Foul Play's OU play relies on Smogon's monthly usage stats (`gen9ou-0`) and set data, pinned in `api/lock.json` and refreshed by hand with `npm run refresh-ou` ([api/README.md](../api/README.md#refreshing-the-ou-data)).
 
 ## 6. Laplace
 
@@ -358,7 +385,8 @@ On Linux, `npm run bots:setup -- --build-linux --python python3` builds the simu
 | Command | Covers |
 | --- | --- |
 | `npm test` | Includes the bridge (`tests/practice-session.test.js`) and the API server and client with a fake worker (`api/test/`) |
-| `npm run test:practice:api` | Two real games against Foul Play through a loopback copy of the API server, without Electron. `node tests/practice-api-live.cjs --url <server> [--key …]` runs the same games against a deployed server |
+| `npm run test:practice:api` | Two real games against Foul Play through a loopback copy of the API server, without Electron. `node tests/practice-api-live.cjs --url <server> [--key …]` runs the same games against a deployed server. `--opponent foulplay-casual` picks a level; `--format gen9ou --team tests/fixtures/ou-team.txt` plays OU |
+| `node tests/foulplay-levels-live.cjs --runtime api/runtime` | Level separation: plays Casual vs. Heuristic, Medium vs. Casual and Hard vs. Medium (20 games each by default, `--games`, `--pair a:b`) on private simulators and prints win rates. `--format gen9ou --team <export>` plays OU |
 | `npm run test:practice` | A real Foul Play battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup, against a loopback copy of the API server |
 | `npm run test:bots` | Runs the desktop suite above as a standalone check |
 | `tests/bots-games.py` (run with the Laplace runtime's Python) | Two complete Laplace harness games against a heuristic player; result agreement and pipe shutdown |

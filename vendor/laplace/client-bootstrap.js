@@ -7,12 +7,16 @@
   const token = hosted ? hosted[1] : query.get('token') || '';
   const human = hosted ? 'Player' : query.get('human') || '';
   const bot = hosted ? document.documentElement.dataset.practiceBot : query.get('bot') || '';
+  // OU brings the player's packed team; Random Battle has none.
+  const format = hosted ? 'gen9randombattle' : query.get('format') || 'gen9randombattle';
+  const team = hosted ? '' : query.get('team') || '';
   const guest = /^[a-z][a-z0-9]{2,17}$/i;
   const state = document.documentElement.dataset;
   state.practiceState = 'connecting';
   if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535 ||
       !/^[a-f0-9]{32,128}$/.test(token) || !guest.test(human) || !guest.test(bot) ||
-      human.toLowerCase() === bot.toLowerCase()) {
+      human.toLowerCase() === bot.toLowerCase() || !['gen9randombattle', 'gen9ou'].includes(format) ||
+      (format === 'gen9randombattle' ? team !== '' : !team || team.length > 8192 || /[\r\n]/.test(team))) {
     state.practiceState = 'failed';
     return;
   }
@@ -66,8 +70,9 @@
         battle = null;
         challengeDeadline = Date.now() + 15000;
         state.practiceState = 'ready';
-        client.send('/utm null');
-        client.send(`/challenge ${bot}, gen9randombattle`);
+        // A rematch sends the same team again.
+        client.send(`/utm ${team || 'null'}`);
+        client.send(`/challenge ${bot}, ${format}`);
         return true;
       };
       client.on('init:choosename', () => {
@@ -88,7 +93,7 @@
           return;
         }
         if (!battle && challengeDeadline) {
-          const room = Object.values(client.rooms).find(room => /^battle-gen9randombattle-/.test(room.id) &&
+          const room = Object.values(client.rooms).find(room => room.id.startsWith(`battle-${format}-`) &&
             !usedRooms.has(room.id) && room.side && room.battle);
           if (room) {
             battle = room;

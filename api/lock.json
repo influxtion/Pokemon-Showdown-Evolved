@@ -14,6 +14,25 @@
     "url": "https://raw.githubusercontent.com/pkmn/randbats/684abfaaba8e163532dfff73465c734e3432314a/LICENSE",
     "sha256": "082f3d2348caa9ce13794c12591b3c545f27e652c640edd9f0f794cbc47ff833"
   },
+  "ouData": {
+    "usageStats": {
+      "month": "2026-10",
+      "url": "https://www.smogon.com/stats/2026-10/chaos/gen9ou-0.json",
+      "sha256": "fb8a12cc494414b254be1407cd1b65f60c45ba7602233b26c4a174572d5e0c66"
+    },
+    "showdownSets": {
+      "url": "https://play.pokemonshowdown.com/data/sets/gen9ou.json",
+      "sha256": "c371c13170cff991a03add24a592d339ca0674ca28264a54b9126872e1c849c0"
+    },
+    "fullSets": {
+      "url": "https://data.foulplay.cc/gen9ou/pokemon_full_sets.json",
+      "sha256": "2cded9baab788132beb45f1250df838c005013f939f6c5a04e7f74967413b0c7"
+    },
+    "replayMoves": {
+      "url": "https://data.foulplay.cc/gen9ou/replay_moves.json",
+      "sha256": "5eec6edee0729dceb6df66ff1741a3c572d45fffb3f811e6e768eb5036b5d5d6"
+    }
+  },
   "packages": ["requests==2.33.0", "websockets==14.1", "python-dateutil==2.8.0", "certifi==2026.10.23", "charset-normalizer==3.5.2", "idna==3.20", "urllib3==2.8.0", "six==1.17.0"],
   "engine": {
     "package": "poke-engine",

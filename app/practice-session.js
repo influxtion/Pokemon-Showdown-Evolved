@@ -15,15 +15,21 @@ const { inspectRuntime } = require('./practice-manifest');
 const { verifyInWorker } = require('./practice-verification');
 const { childEnvironment, PRESETS } = require('./practice-runtime');
 const { InferenceClient } = require('../api/client');
-const { BOTS, FORMAT, ROOM } = require('../api/protocol');
+const { BOTS, FORMAT, MAX_TEAM, ROOM, roomFormat, isTeamText } = require('../api/protocol');
 const { LOCAL_BOTS, LocalBot, loadData } = require('./simple-bots');
 
 // What the Bots page shows, hardest first. `difficulty` is the group a bot is listed under; only
-// Foul Play searches, so only it uses the cloud and the computation presets.
+// the Foul Play levels search, so only they use the cloud and the computation presets.
+// `formats` lists where each is offered; in formats with teams the player brings both teams.
 const SIMPLE = { local: true, search: false, difficulty: 'easy', kind: 'Rule-based bot', formats: [FORMAT] };
+const SEARCH = { local: false, search: true, kind: 'Search bot' };
 const OPPONENTS = Object.freeze({
-  foulplay: Object.freeze({ ...BOTS.foulplay, local: false, search: true, difficulty: 'hard', kind: 'Search bot', formats: [FORMAT],
+  foulplay: Object.freeze({ ...BOTS.foulplay, ...SEARCH, difficulty: 'hard', formats: [FORMAT, 'gen9ou'],
     description: 'Searches possible futures every turn, guessing what your team could be holding.' }),
+  'foulplay-medium': Object.freeze({ ...BOTS['foulplay-medium'], ...SEARCH, difficulty: 'medium', formats: [FORMAT],
+    description: 'Foul Play with less time to think. Plays well, but does not always find the best move.' }),
+  'foulplay-casual': Object.freeze({ ...BOTS['foulplay-casual'], ...SEARCH, difficulty: 'medium', formats: [FORMAT],
+    description: 'Foul Play on a quick read. Settles on one guess about your team and sometimes plays its second choice.' }),
   heuristic: Object.freeze({ ...LOCAL_BOTS.heuristic, ...SIMPLE }),
   greedy: Object.freeze({ ...LOCAL_BOTS.greedy, ...SIMPLE }),
   random: Object.freeze({ ...LOCAL_BOTS.random, ...SIMPLE }),
@@ -69,6 +75,10 @@ class PracticeSession extends EventEmitter {
     this.preset = 'full';
     this.connection = null;
     this.battle = null;
+    this.format = FORMAT;
+    // In formats with teams: { player, bot } packed teams and the bot's export, in memory for this
+    // session only (rematches reuse them). Never logged or written anywhere.
+    this.teams = null;
     this.children = new Set();
     this.reset();
   }
@@ -91,7 +101,7 @@ class PracticeSession extends EventEmitter {
   }
 
   status() {
-    return { installed: this.installed(), state: this.state, opponent: this.bot.id, threads: this.threads,
+    return { installed: this.installed(), state: this.state, opponent: this.bot.id, format: this.format, threads: this.threads,
       opponents: Object.values(OPPONENTS).map(bot => ({ id: bot.id, name: bot.name, local: bot.local, search: bot.search,
         difficulty: bot.difficulty, kind: bot.kind, formats: bot.formats, description: bot.description })),
       error: this.error, preset: this.preset, battle: this.battle };
@@ -99,18 +109,30 @@ class PracticeSession extends EventEmitter {
 
   changed() { this.emit('change', this.status()); }
 
+  // `teams` ({ player, bot, botExport }) is required in formats where the player brings teams;
+  // the caller has validated both for the format already.
   async start(options) {
-    const { opponent = 'foulplay', preset = DEFAULT_PRESET } = options && typeof options === 'object' ? options : {};
+    const { opponent = 'foulplay', preset = DEFAULT_PRESET, format = FORMAT, teams = null } =
+      options && typeof options === 'object' ? options : {};
     if (typeof opponent !== 'string' || !Object.hasOwn(OPPONENTS, opponent)) return { ok: false, error: 'Choose a bot to play against.' };
     const bot = OPPONENTS[opponent];
+    if (typeof format !== 'string' || !bot.formats.includes(format)) return { ok: false, error: `${bot.name} does not play that format.` };
+    const withTeams = format !== FORMAT;
+    // Packed teams go into simulator commands, so they must be a single line.
+    const packed = team => typeof team === 'string' && team.length > 0 && team.length <= MAX_TEAM && !/[\r\n]/.test(team);
+    if (withTeams && !(teams && packed(teams.player) && packed(teams.bot) && isTeamText(teams.botExport))) {
+      return { ok: false, error: 'Choose both teams first.' };
+    }
     // Only Foul Play uses the computation setting.
     if (bot.search && !Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { bot, preset: bot.search ? preset : null, state: 'starting', error: '', battle: null });
+    Object.assign(this, { bot, format, preset: bot.search ? preset : null, state: 'starting', error: '', battle: null,
+      teams: withTeams ? { player: teams.player, bot: teams.bot, botExport: teams.botExport } : null });
     this.reset();
-    this.connection = { token: crypto.randomBytes(32).toString('hex'), human: HUMAN, bot: this.bot.account, port: null };
+    this.connection = { token: crypto.randomBytes(32).toString('hex'), human: HUMAN, bot: this.bot.account, port: null, format,
+      ...(withTeams ? { team: teams.player } : {}) };
     this.changed();
     this.timer = setTimeout(() => this.fail('timeout', generation), this.timeoutMs);
     this.timer.unref?.();
@@ -178,7 +200,8 @@ class PracticeSession extends EventEmitter {
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
     this.api = api;
-    const session = await api.createSession({ bot: this.bot.id, preset: this.preset });
+    const session = await api.createSession({ bot: this.bot.id, preset: this.preset, format: this.format,
+      ...(this.teams ? { team: this.teams.botExport } : {}) });
     if (generation !== this.generation) { api.deleteSession(session.id); return; }
     this.apiSession = session.id;
     this.threads = session.threads;
@@ -242,8 +265,8 @@ class PracticeSession extends EventEmitter {
         const parts = line.split('|');
         // |pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|...
         if (parts.length >= 6 && parts[1] === 'pm' && toId(parts[2]) === toId(HUMAN) && toId(parts[3]) === toId(this.bot.account) &&
-            parts[4] === `/challenge ${FORMAT}` && parts[5] === FORMAT && (!this.battle || this.battle.finished)) {
-          this.simulator.send('|/utm null');
+            parts[4] === `/challenge ${this.format}` && parts[5] === this.format && (!this.battle || this.battle.finished)) {
+          this.simulator.send(`|/utm ${this.teams ? this.teams.bot : 'null'}`);
           this.simulator.send(`|/accept ${HUMAN}`);
           this.accepted = true;
         }
@@ -251,7 +274,7 @@ class PracticeSession extends EventEmitter {
       return;
     }
     const room = lines[0].slice(1);
-    if (!ROOM.test(room)) return;
+    if (!ROOM.test(room) || roomFormat(room) !== this.format) return;
     // Adopt a battle room only right after accepting the player's challenge.
     if (lines.includes('|init|battle') && this.accepted) {
       this.accepted = false;
@@ -320,6 +343,7 @@ class PracticeSession extends EventEmitter {
     this.reset();
     this.connection = null;
     this.battle = null;
+    this.teams = null;
     this.state = 'idle';
     this.error = '';
     this.changed();

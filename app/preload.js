@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('desktop', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   getPractice: () => ipcRenderer.invoke('practice:status'),
   startPractice: (preset) => ipcRenderer.invoke('practice:start', preset),
+  getPracticeTeams: (format) => ipcRenderer.invoke('practice:teams', format),
+  checkPracticeTeam: (format, team) => ipcRenderer.invoke('practice:check-team', { format, team }),
   stopPractice: (confirmed) => ipcRenderer.invoke('practice:stop', confirmed === true),
   forfeitPractice: () => ipcRenderer.invoke('practice:forfeit'),
   showPractice: (bounds) => ipcRenderer.invoke('practice:show', bounds),

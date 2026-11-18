@@ -2,22 +2,28 @@
 
 The battle itself runs elsewhere (on the player's computer). The API server feeds this worker the
 bot's view of the battle, frame by frame, and relays back the choices Foul Play makes. Foul Play's
-own parser, inference, sampling and search run unchanged; only its connection is replaced.
+own parser, inference, sampling and search run unchanged; only its connection is replaced, and
+the weaker levels adjust how long it searches and how it picks among the moves it found.
+
+Arguments: --source <Foul Play checkout> [--threads 1-16] [--level hard|medium|casual]
+           [--format gen9randombattle|gen9ou] [--check]
 
 stdin, one JSON object per line:
+  {"type": "team", "data": "<Showdown export>"}   first line, OU only: the bot's own team
   {"type": "frame", "data": ">battle-gen9randombattle-1\\n|init|battle\\n..."}
   {"type": "stop"}                  (closing stdin also stops the worker)
 stdout, one JSON object per line:
-  {"type": "ready", "protocol": 1, "bot": "foulplay", "format": ..., "threads": N, "searchMs": 100}
+  {"type": "ready", "protocol": 1, "bot": "foulplay", "level": ..., "format": ..., "threads": N, "searchMs": 100}
   {"type": "battle", "room": R}
   {"type": "thinking", "room": R, "turn": T}
   {"type": "choice", "room": R, "turn": T, "choice": "/choose move tackle", "rqid": "3", "elapsedMs": 412}
   {"type": "end", "room": R, "result": "win" | "loss" | "tie"}     (from the bot's side)
   {"type": "error", "code": "..."}
-stderr carries upstream diagnostics and is never parsed.
+stderr carries upstream diagnostics and is never parsed. The team is never written anywhere.
 
 The worker never opens a network connection: an audit hook rejects any socket use that is not
-IPv4 loopback (Windows asyncio needs a loopback socket pair internally).
+IPv4 loopback (Windows asyncio needs a loopback socket pair internally). Everything Foul Play
+would download (set data, usage stats) is installed beforehand by install.js.
 """
 import argparse
 import asyncio
@@ -28,20 +34,44 @@ import json
 import logging
 import os
 from pathlib import Path
+import random
 import re
 import sys
 import threading
 import time
 
 PROTOCOL = 1
-FORMAT = "gen9randombattle"
+FORMATS = ("gen9randombattle", "gen9ou")
 BOT = "FoulPlay"
-SEARCH_MS = 100
 ENGINE_VERSION = "0.0.48"
 MAX_LINE = 1 << 20
-ROOM = re.compile(r"battle-gen9randombattle-\d{1,16}(?:-[a-z0-9]{1,32}pw)?")
-CHOICE = re.compile(r"/choose move [a-z0-9]{1,40}(?: terastallize)?|/switch [1-6]")
+MAX_TEAM = 8192
+CHOICE = re.compile(r"/choose move [a-z0-9]{1,40}(?: terastallize)?|/switch [1-6]|/team [1-6]{1,6}")
+GUEST = re.compile(r"[A-Za-z][A-Za-z0-9]{2,17}")
 LOOPBACK = "127.0.0.1"
+
+# How each level searches and picks. Hard is Foul Play exactly as upstream ships it.
+#   searchMs  time per sampled world
+#   worlds    sampled worlds per decision; None keeps Foul Play's own count
+#   keep      moves within this share of the best are candidates (upstream: 0.75)
+#   slip      chance of playing the second- or third-best candidate instead
+#   floor     a slip only picks a move with at least this share of the best move's
+LEVELS = {
+    "hard": {"searchMs": 100, "worlds": None, "keep": 0.75, "slip": 0.0, "floor": 1.0},
+    "medium": {"searchMs": 40, "worlds": None, "keep": 0.5, "slip": 0.0, "floor": 1.0},
+    "casual": {"searchMs": 15, "worlds": 1, "keep": 0.75, "slip": 0.35, "floor": 0.2},
+}
+# Files Foul Play reads for OU instead of downloading them (see install.js).
+OU_DATA = (
+    ("smogon_stats_cache", "gen9ou-0.json"),
+    ("pkmn_sets_cache", "gen9ou", "showdown_sets.json"),
+    ("pkmn_sets_cache", "gen9ou", "pokemon_full_sets.json"),
+    ("pkmn_sets_cache", "gen9ou", "replay_moves.json"),
+)
+
+
+def room_pattern(battle_format):
+    return re.compile(rf"battle-{battle_format}-\d{{1,16}}(?:-[a-z0-9]{{1,32}}pw)?")
 
 
 def loopback_only(event, args):
@@ -61,11 +91,59 @@ def arguments(argv=None):
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=1, choices=range(1, 17), metavar="1-16")
+    parser.add_argument("--level", default="hard", choices=tuple(LEVELS))
+    parser.add_argument("--format", default=FORMATS[0], choices=FORMATS)
+    # The account the bot plays as. The API always uses the default; tests pit two workers
+    # against each other under different names.
+    parser.add_argument("--account", default=BOT)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
     if not args.source.is_absolute() or not (args.source / "fp" / "run_battle.py").is_file():
         parser.error("--source must be the absolute path of a Foul Play checkout")
+    if not GUEST.fullmatch(args.account):
+        parser.error("--account must be a plain guest name")
     return args
+
+
+def data_files(source):
+    return [source.joinpath("fp", "data", *parts) for parts in OU_DATA]
+
+
+def apply_level(level):
+    """Weaker levels search less and pick less strictly. Hard leaves Foul Play untouched."""
+    settings = LEVELS[level]
+    if level == "hard":
+        return
+    import fp.search.main as search
+    from fp.modes.random_battle import RandomBattleMode
+    from fp.modes.standard_battle import StandardBattleMode
+
+    for mode in (RandomBattleMode, StandardBattleMode):
+        upstream = mode.search_params
+
+        def search_params(self, battle, upstream=upstream):
+            worlds, ms = upstream(self, battle)
+            return (settings["worlds"] or worlds), ms
+
+        mode.search_params = search_params
+
+    def select(mcts_results):
+        policy = {}
+        for result, chance, _index in mcts_results:
+            for option in result.side_one:
+                share = chance * option.visits / result.total_visits
+                policy[option.move_choice] = policy.get(option.move_choice, 0) + share
+        ranked = sorted(policy.items(), key=lambda item: item[1], reverse=True)
+        best = ranked[0][1]
+        if settings["slip"] and random.random() < settings["slip"]:
+            # A believable mistake: a move the search also liked, never one it nearly ignored.
+            near = [item for item in ranked[1:3] if item[1] >= best * settings["floor"]]
+            if near:
+                return random.choices(near, weights=[item[1] for item in near])[0][0]
+        candidates = [item for item in ranked if item[1] >= best * settings["keep"]]
+        return random.choices(candidates, weights=[item[1] for item in candidates])[0][0]
+
+    search.select_move_from_mcts_results = select
 
 
 def load(args):
@@ -76,28 +154,49 @@ def load(args):
 
     if version("poke-engine") != ENGINE_VERSION:
         raise RuntimeError("Unsupported poke-engine version")
-    if not (args.source / "fp" / "data" / "pkmn_sets_cache" / f"{FORMAT}.json").is_file():
+    if not (args.source / "fp" / "data" / "pkmn_sets_cache" / "gen9randombattle.json").is_file():
         raise RuntimeError("Random battle sets are missing")
+    if args.format == "gen9ou" and not all(path.is_file() for path in data_files(args.source)):
+        raise RuntimeError("OU set data is missing")
     # Keep every search inside this process so stopping it can never orphan workers.
     search.ProcessPoolExecutor = ThreadPoolExecutor
     config = FoulPlayConfig
-    config.username = config.user_id = BOT
-    config.pokemon_format = FORMAT
-    config.search_time_ms = config.team_preview_search_time_ms = SEARCH_MS
+    config.username = config.user_id = args.account
+    config.pokemon_format = args.format
+    config.search_time_ms = config.team_preview_search_time_ms = LEVELS[args.level]["searchMs"]
     config.parallelism = config.team_preview_search_parallelism = 1
     config.search_threads = args.threads
     config.smogon_stats = None
     config.log_to_file = False
     config.save_replay = SaveReplay.never
     apply_mods(config.format_spec)
+    apply_level(args.level)
+
+
+def read_team(source, text):
+    """The bot's own team, from a Showdown export, as Foul Play's team dictionary."""
+    sys.path.insert(0, str(source))
+    from fp.data import pokedex
+    from fp.teams.team_converter import export_to_dict
+
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_TEAM:
+        raise ValueError("No team")
+    team = export_to_dict(text.replace("\r\n", "\n"))
+    if not 1 <= len(team) <= 6:
+        raise ValueError("A team has one to six Pokemon")
+    for member in team:
+        if member["species"] not in pokedex or not 1 <= len(member["moves"]) <= 4:
+            raise ValueError("Unreadable team")
+    return team
 
 
 class Link:
     """Stands in for Foul Play's websocket client. Frames arrive from stdin, choices leave on stdout."""
 
-    def __init__(self, frames, emit):
+    def __init__(self, frames, emit, room):
         self.frames = frames
         self.emit = emit
+        self.pattern = room
         self.room = None
         self.turn = 0
         self.thinking_since = None
@@ -113,7 +212,7 @@ class Link:
         while True:
             frame = await self.next_frame()
             lines = frame.split("\n")
-            if lines[0].startswith(">") and ROOM.fullmatch(lines[0][1:]) and "|init|battle" in lines:
+            if lines[0].startswith(">") and self.pattern.fullmatch(lines[0][1:]) and "|init|battle" in lines:
                 self.room, self.turn, self.pending = lines[0][1:], 0, [frame]
                 return self.room
 
@@ -140,12 +239,18 @@ class Link:
         return frame
 
     async def send_message(self, room, messages):
-        if room != self.room or not messages or not CHOICE.fullmatch(messages[0]):
+        if room != self.room or not messages:
+            return
+        # Team preview sends "/team 213456|<rqid>" as one message; every other choice sends the
+        # rqid separately.
+        choice, _, embedded = messages[0].partition("|")
+        if not CHOICE.fullmatch(choice):
             return  # hf, gg, /timer on and anything else are not needed off the public server.
-        rqid = messages[1] if len(messages) > 1 and re.fullmatch(r"\d{1,9}", messages[1]) else None
+        rqid = embedded or (messages[1] if len(messages) > 1 else "")
+        rqid = rqid if re.fullmatch(r"\d{1,9}", rqid) else None
         elapsed = round((time.monotonic() - (self.thinking_since or time.monotonic())) * 1000)
         self.thinking_since = None
-        self.emit("choice", room=room, turn=self.turn or 1, choice=messages[0], rqid=rqid, elapsedMs=max(0, elapsed))
+        self.emit("choice", room=room, turn=self.turn or 1, choice=choice, rqid=rqid, elapsedMs=max(0, elapsed))
 
     async def leave_battle(self, battle_tag):
         return
@@ -154,8 +259,7 @@ class Link:
         return
 
 
-def read_stdin(loop, frames):
-    stdin = sys.stdin.buffer
+def read_stdin(loop, frames, stdin):
     while True:
         try:
             line = stdin.readline(MAX_LINE + 2)
@@ -174,14 +278,27 @@ def read_stdin(loop, frames):
     loop.call_soon_threadsafe(frames.put_nowait, None)
 
 
-async def serve(args, emit):
+def first_team(stdin):
+    line = stdin.readline(MAX_LINE + 2)
+    try:
+        message = json.loads(line)
+    except ValueError:
+        message = None
+    if not isinstance(message, dict) or message.get("type") != "team":
+        raise ValueError("Expected the bot's team first")
+    return message.get("data")
+
+
+async def serve(args, emit, team):
     load(args)
     from fp.run_battle import pokemon_battle
 
     frames = asyncio.Queue()
-    threading.Thread(target=read_stdin, args=(asyncio.get_running_loop(), frames), daemon=True).start()
-    emit("ready", protocol=PROTOCOL, bot="foulplay", format=FORMAT, threads=args.threads, searchMs=SEARCH_MS)
-    link = Link(frames, emit)
+    stdin = sys.stdin.buffer
+    threading.Thread(target=read_stdin, args=(asyncio.get_running_loop(), frames, stdin), daemon=True).start()
+    emit("ready", protocol=PROTOCOL, bot="foulplay", level=args.level, format=args.format, threads=args.threads,
+         searchMs=LEVELS[args.level]["searchMs"])
+    link = Link(frames, emit, room_pattern(args.format))
     while True:
         try:
             room = await link.wait_for_battle()
@@ -189,10 +306,11 @@ async def serve(args, emit):
             return
         emit("battle", room=room)
         try:
-            winner = await pokemon_battle(link, FORMAT, None)
+            # Foul Play keeps notes on its own team dictionary; every battle gets a fresh copy.
+            winner = await pokemon_battle(link, args.format, json.loads(json.dumps(team)) if team else None)
         except EOFError:
             return
-        emit("end", room=room, result="win" if winner == BOT else "tie" if winner is None else "loss")
+        emit("end", room=room, result="win" if winner == args.account else "tie" if winner is None else "loss")
         link.room = None
 
 
@@ -203,6 +321,17 @@ def check(args):
 
     if poke_engine.monte_carlo_tree_search(poke_engine.State(), 20, threads=1).total_visits <= 0:
         raise RuntimeError("Engine search returned no visits")
+    if args.format == "gen9ou":
+        # Proves the installed OU data loads without a download.
+        from fp.data.sets import SmogonSets, TeamDatasets
+        from fp.format_spec import FormatSpec
+
+        spec = FormatSpec.from_format_string("gen9ou")
+        smogon, sets = SmogonSets(), TeamDatasets()
+        smogon.initialize(spec, {"greattusk", "kingambit"})
+        sets.initialize(spec, {"greattusk", "kingambit"})
+        if not smogon.all_pkmn_counts or not sets.pkmn_sets.get("greattusk"):
+            raise RuntimeError("OU set data did not load")
 
 
 def main():
@@ -220,9 +349,16 @@ def main():
         try:
             if args.check:
                 check(args)
-                emit("checked", protocol=PROTOCOL, engine=ENGINE_VERSION)
+                emit("checked", protocol=PROTOCOL, engine=ENGINE_VERSION, format=args.format)
                 return 0
-            asyncio.run(serve(args, emit))
+            team = None
+            if args.format != "gen9randombattle":
+                try:
+                    team = read_team(args.source, first_team(sys.stdin.buffer))
+                except Exception:
+                    emit("error", code="invalid-team")
+                    return 1
+            asyncio.run(serve(args, emit, team))
         except Exception:
             import traceback
             traceback.print_exc()

@@ -36,12 +36,19 @@ async function fakeSimulator(t) {
 
 function fakeWorkers() {
   const workers = [];
-  const launch = ({ threads }) => {
-    const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), frames: [] });
+  const launch = ({ threads, level, format }) => {
+    const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), frames: [],
+      level, format, lines: [] });
     child.kill = () => setImmediate(() => child.emit('exit', 0));
     child.send = event => child.stdout.write(`${JSON.stringify(event)}\n`);
-    child.stdin.on('data', data => { for (const line of String(data).trim().split('\n')) child.frames.push(JSON.parse(line).data); });
-    setImmediate(() => child.send({ type: 'ready', protocol: 1, bot: 'foulplay', threads, searchMs: 100 }));
+    child.stdin.on('data', data => {
+      for (const line of String(data).trim().split('\n')) {
+        const value = JSON.parse(line);
+        child.lines.push(value);
+        if (value.type === 'frame') child.frames.push(value.data);
+      }
+    });
+    setImmediate(() => child.send({ type: 'ready', protocol: 1, bot: 'foulplay', level, format, threads, searchMs: 100 }));
     workers.push(child);
     return child;
   };
@@ -173,15 +180,66 @@ test('Foul Play uses the full preset when the page sends none', async t => {
   assert.equal(session.status().preset, 'full');
 });
 
-test('lists Foul Play first, then the simple bots, hardest first', async t => {
+test('lists the Foul Play levels first, then the simple bots, hardest first', async t => {
   const { session } = await setup(t);
   const opponents = session.status().opponents;
-  assert.deepEqual(opponents.map(bot => bot.difficulty), ['hard', 'easy', 'easy', 'easy']);
-  assert.deepEqual(opponents.map(bot => bot.kind), ['Search bot', 'Rule-based bot', 'Rule-based bot', 'Rule-based bot']);
-  assert.ok(opponents.every(bot => bot.formats.length === 1 && bot.formats[0] === 'gen9randombattle'));
-  assert.deepEqual(opponents.map(bot => bot.id), ['foulplay', 'heuristic', 'greedy', 'random']);
-  assert.deepEqual(opponents.map(bot => bot.local), [false, true, true, true]);
-  assert.deepEqual(opponents.map(bot => bot.search), [true, false, false, false]);
+  assert.deepEqual(opponents.map(bot => bot.id), ['foulplay', 'foulplay-medium', 'foulplay-casual', 'heuristic', 'greedy', 'random']);
+  assert.deepEqual(opponents.map(bot => bot.name).slice(0, 3), ['Foul Play', 'Foul Play Medium', 'Foul Play Casual']);
+  assert.deepEqual(opponents.map(bot => bot.difficulty), ['hard', 'medium', 'medium', 'easy', 'easy', 'easy']);
+  assert.deepEqual(opponents.map(bot => bot.kind), ['Search bot', 'Search bot', 'Search bot', 'Rule-based bot', 'Rule-based bot', 'Rule-based bot']);
+  assert.deepEqual(opponents[0].formats, ['gen9randombattle', 'gen9ou']);
+  assert.ok(opponents.slice(1).every(bot => bot.formats.length === 1 && bot.formats[0] === 'gen9randombattle'));
+  assert.deepEqual(opponents.map(bot => bot.local), [false, false, false, true, true, true]);
+  assert.deepEqual(opponents.map(bot => bot.search), [true, true, true, false, false, false]);
+});
+
+test('starts a weaker level on the cloud with its own level', async t => {
+  const { session, workers } = await setup(t);
+  assert.deepEqual(await session.start({ opponent: 'foulplay-casual' }), { ok: true });
+  assert.equal(workers[0].level, 'casual');
+  assert.equal(workers[0].format, 'gen9randombattle');
+  assert.match((await (session.stop(), session.start({ opponent: 'foulplay-medium', format: 'gen9ou' }))).error, /does not play/);
+});
+
+const OU_ROOM = 'battle-gen9ou-3';
+const TEAMS = { player: 'Great Tusk||BoosterEnergy|Protosynthesis|HeadlongRush|Jolly|,252,,,4,252|||||',
+  bot: 'Kingambit||Leftovers|SupremeOverlord|SuckerPunch|Adamant|252,252,,,4,|||||',
+  botExport: 'Kingambit @ Leftovers\nAbility: Supreme Overlord\n- Sucker Punch' };
+
+test('OU: sends the bot team to the engine, gives it to the bot in the simulator and keeps both for a rematch', async t => {
+  const { session, sim, workers } = await setup(t);
+  assert.match((await session.start({ opponent: 'foulplay', format: 'gen9ou' })).error, /both teams/);
+  assert.match((await session.start({ opponent: 'foulplay', format: 'gen9ou', teams: { ...TEAMS, bot: 'a\n/forfeit' } })).error, /both teams/);
+  const ready = once(session, 'ready');
+  assert.deepEqual(await session.start({ opponent: 'foulplay', format: 'gen9ou', teams: TEAMS }), { ok: true });
+  const [connection] = await ready;
+  assert.equal(connection.format, 'gen9ou');
+  assert.equal(connection.team, TEAMS.player);
+  assert.equal(workers[0].format, 'gen9ou');
+  assert.deepEqual(workers[0].lines[0], { type: 'team', data: TEAMS.botExport });
+  assert.equal(session.status().format, 'gen9ou');
+  assert.doesNotMatch(JSON.stringify(session.status()), /Kingambit|Tusk/);
+
+  sim.socket.send('|pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|||');
+  sim.socket.send('|pm| Player| FoulPlay|/challenge gen9ou|gen9ou|||');
+  await until(() => sim.received.includes('|/accept Player'), 'accept');
+  assert.equal(sim.received.filter(text => text.startsWith('|/accept')).length, 1);
+  assert.ok(sim.received.includes(`|/utm ${TEAMS.bot}`));
+  sim.socket.send('>battle-gen9randombattle-5\n|init|battle');
+  sim.socket.send(`>${OU_ROOM}\n|init|battle`);
+  await until(() => workers[0].frames.length === 1, 'frame forwarded');
+  assert.equal(workers[0].frames[0], `>${OU_ROOM}\n|init|battle`);
+  workers[0].send({ type: 'choice', room: OU_ROOM, turn: 1, choice: '/team 213456', rqid: '1', elapsedMs: 50 });
+  await until(() => sim.received.includes(`${OU_ROOM}|/team 213456|1`), 'team order sent');
+
+  sim.socket.send(`>${OU_ROOM}\n|win|FoulPlay`);
+  await until(() => session.status().battle?.finished, 'finished');
+  sim.received.length = 0;
+  sim.socket.send('|pm| Player| FoulPlay|/challenge gen9ou|gen9ou|||');
+  await until(() => sim.received.includes('|/accept Player'), 'rematch accepted');
+  assert.ok(sim.received.includes(`|/utm ${TEAMS.bot}`));
+  session.stop();
+  assert.equal(session.teams, null);
 });
 
 test('plays a simple bot on this computer, with no cloud session', async t => {

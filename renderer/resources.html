@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; connect-src 'none'; style-src 'self' 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Info &amp; Resources · Showdown Desktop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Main">
+    <div class="rail-brand">
+      <span class="rail-logo" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h3.5M10 8h3.5"/><circle cx="8" cy="8" r="2"/></svg></span>
+      <span class="rail-brand-text"><strong>Showdown</strong><span>Desktop</span></span>
+    </div>
+    <div class="rail-nav">
+      <a class="nav-item" href="index.html" title="Home">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/></svg>
+        <span class="nav-text">Home</span>
+      </a>
+      <a class="nav-item" href="play.html" data-nav="teambuilder" title="Teambuilder">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 13l.5-3L10.5 3l2.5 2.5L6 12.5z"/></svg>
+        <span class="nav-text">Teambuilder</span>
+      </a>
+      <a class="nav-item" href="play.html" data-nav="community" title="Community">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2.5"/><path d="M1.5 13c0-2.2 2-3.5 4.5-3.5s4.5 1.3 4.5 3.5M10.5 3.8a2.5 2.5 0 0 1 0 4.4M12.5 9.9c1.2.6 2 1.6 2 3.1"/></svg>
+        <span class="nav-text">Community</span>
+      </a>
+      <a class="nav-item" href="practice.html" title="Bots">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M6 9v.5M10 9v.5"/></svg>
+        <span class="nav-text">Bots</span>
+      </a>
+      <a class="nav-item" href="stats.html" title="Stats">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg>
+        <span class="nav-text">Stats</span>
+      </a>
+      <a class="nav-item" href="replays.html" title="Replay notes">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+        <span class="nav-text">Replays</span>
+      </a>
+      <a class="nav-item nav-item--end" href="settings.html" title="Settings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/></svg>
+        <span class="nav-text">Settings</span>
+      </a>
+    </div>
+    <div class="rail-foot">
+      <div class="rail-user" data-nav="account" hidden>
+        <span class="rail-avatar" data-nav="avatar" aria-hidden="true"></span>
+        <span class="rail-user-text"><strong data-nav="me"></strong><span>v0.2.0-dev</span></span>
+        <a href="play.html" data-nav="sign-in" title="Sign in" hidden>Sign in</a>
+      </div>
+      <span class="rail-version">v0.2.0-dev</span>
+    </div>
+  </nav>
+
+  <div class="main">
+    <nav class="tabstrip" aria-label="Open rooms">
+      <div class="rail-rooms" data-nav="rooms"></div>
+    </nav>
+    <header class="topbar">
+      <h1>Info &amp; Resources</h1>
+    </header>
+
+    <main class="content">
+      <div class="res">
+        <nav class="res-toc" aria-label="On this page">
+          <span class="res-toc-head">On this page</span>
+          <a href="#start">Getting started</a>
+          <a href="#tiers">Formats and tiers</a>
+          <a href="#clauses">Clauses</a>
+          <a href="#commands">Chat commands</a>
+          <a href="#ranks">Ranks</a>
+          <a href="#shortcuts">Keyboard shortcuts</a>
+          <a href="#help">Getting help</a>
+        </nav>
+
+        <div class="res-body">
+          <section class="res-intro">
+            <h2 class="res-title">Everything you need to know to play</h2>
+            <p>How Showdown works, what the format names mean, the rules each battle follows, and the chat commands worth knowing.</p>
+          </section>
+
+          <section class="res-section" id="start" aria-labelledby="start-title">
+            <h2 id="start-title">Getting started</h2>
+            <ol class="res-steps">
+              <li>
+                <strong>Pick a name.</strong>
+                <span>You can battle as a guest right away. Choose a name to keep it, and register it to protect it with a password and save your ladder rating.</span>
+              </li>
+              <li>
+                <strong>Start with Random Battle.</strong>
+                <span>Both players get six random Pokémon with ready-made sets, so you can play without building a team. It's the quickest way to learn matchups.</span>
+              </li>
+              <li>
+                <strong>Build a team.</strong>
+                <span>Most formats need your own team. Open the Teambuilder from the icon bar, choose a format, and add up to six Pokémon. Anything that breaks the format's rules is flagged before you battle.</span>
+              </li>
+              <li>
+                <strong>Battle and climb.</strong>
+                <span>Pick a format on Home and press Battle to find an opponent around your rating. Each format has its own ladder, rating and leaderboard.</span>
+              </li>
+              <li>
+                <strong>Practice without stakes.</strong>
+                <span>The Bots page lets you play against computer opponents. Those games never affect your rating.</span>
+              </li>
+            </ol>
+            <div class="res-links">
+              <a href="https://www.smogon.com/forums/threads/3676132/">Beginner's guide to Pokémon Showdown</a>
+              <a href="https://www.smogon.com/dp/articles/intro_comp_pokemon">An introduction to competitive Pokémon</a>
+              <a href="https://www.smogon.com/articles/getting-started">Next steps for competitive battling</a>
+            </div>
+          </section>
+
+          <section class="res-section" id="tiers" aria-labelledby="tiers-title">
+            <h2 id="tiers-title">Formats and tiers</h2>
+            <p class="res-lead">Smogon sorts Pokémon into tiers by how often they're used. A Pokémon can be used in its own tier and any tier above it, so lower tiers ban everything stronger and stay balanced.</p>
+            <div class="res-table-wrap">
+              <table class="res-table">
+                <thead><tr><th scope="col">Tier</th><th scope="col">Name</th><th scope="col">What it means</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">AG</th><td>Anything Goes</td><td>Almost no rules. Every Pokémon, item and move is allowed.</td></tr>
+                  <tr><th scope="row">Ubers</th><td>Ubers</td><td>The legendaries and other Pokémon too strong for OU.</td></tr>
+                  <tr><th scope="row">OU</th><td>OverUsed</td><td>The standard competitive tier and the most played. The Pokémon used most in competitive battles.</td></tr>
+                  <tr><th scope="row">UU</th><td>UnderUsed</td><td>Pokémon not used enough to be OU. OU and Ubers Pokémon are banned.</td></tr>
+                  <tr><th scope="row">RU</th><td>RarelyUsed</td><td>The next step down, banning everything in UU and above.</td></tr>
+                  <tr><th scope="row">NU</th><td>NeverUsed</td><td>Below RU, banning everything in RU and above.</td></tr>
+                  <tr><th scope="row">PU</th><td>PU</td><td>Below NU. The lowest tier Smogon ranks by usage.</td></tr>
+                  <tr><th scope="row">ZU</th><td>ZeroUsed</td><td>A community tier for the Pokémon left over below PU.</td></tr>
+                  <tr><th scope="row">BL</th><td>Borderline</td><td>Too strong for the tier below but not used enough for the tier above, such as UUBL. Banned from the lower tier.</td></tr>
+                  <tr><th scope="row">LC</th><td>Little Cup</td><td>Only first-stage Pokémon that can still evolve, at level 5.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3 class="res-sub">Other popular formats</h3>
+            <dl class="res-defs">
+              <div><dt>Random Battle</dt><dd>Six random Pokémon with sets chosen for you. No team needed.</dd></div>
+              <div><dt>Doubles OU</dt><dd>Two Pokémon on each side at once, with its own tier list.</dd></div>
+              <div><dt>VGC</dt><dd>The official Pokémon video game championship rules: doubles, bring six and pick four, level 50.</dd></div>
+              <div><dt>Battle Stadium Singles</dt><dd>The in-game ranked singles rules: bring six and pick three, level 50.</dd></div>
+              <div><dt>National Dex</dt><dd>OU-style battles that allow Pokémon and items not in the current games.</dd></div>
+              <div><dt>Monotype</dt><dd>Every Pokémon on your team shares one type.</dd></div>
+              <div><dt>1v1</dt><dd>Bring three Pokémon and use one. The battle ends when one side faints.</dd></div>
+            </dl>
+            <div class="res-links">
+              <a href="https://www.smogon.com/sm/articles/sm_tiers">How the tiers are decided</a>
+              <a href="https://www.smogon.com/dex/ss/formats/">Rules for each format</a>
+            </div>
+          </section>
+
+          <section class="res-section" id="clauses" aria-labelledby="clauses-title">
+            <h2 id="clauses-title">Clauses</h2>
+            <p class="res-lead">Clauses are the extra rules a format adds on top of its ban list. The rules for each battle are listed at the top of the battle log when it starts.</p>
+            <dl class="res-defs">
+              <div><dt>Species Clause</dt><dd>A team can't have two of the same Pokémon.</dd></div>
+              <div><dt>Sleep Clause</dt><dd>You can only put one of your opponent's Pokémon to sleep at a time. Further sleep moves fail while it's asleep.</dd></div>
+              <div><dt>OHKO Clause</dt><dd>One-hit KO moves such as Fissure, Horn Drill, Guillotine and Sheer Cold are banned.</dd></div>
+              <div><dt>Evasion Clause</dt><dd>Moves that raise evasion, such as Double Team and Minimize, are banned. Many formats also ban evasion items and abilities.</dd></div>
+              <div><dt>Moody Clause</dt><dd>The ability Moody is banned.</dd></div>
+              <div><dt>Endless Battle Clause</dt><dd>Strategies that stop a battle from ever ending are banned, and every battle ends at turn 1000.</dd></div>
+              <div><dt>Team Preview</dt><dd>Both players see each other's six Pokémon before the battle and choose their lead.</dd></div>
+              <div><dt>Item Clause</dt><dd>Used in doubles formats such as VGC: no two Pokémon can hold the same item.</dd></div>
+            </dl>
+            <div class="res-links">
+              <a href="https://www.smogon.com/ss/articles/clauses">More about clauses</a>
+            </div>
+          </section>
+
+          <section class="res-section" id="commands" aria-labelledby="commands-title">
+            <h2 id="commands-title">Chat commands</h2>
+            <p class="res-lead">Type these in any chat, battle or private message. Words in capitals are what you fill in. In a battle you're playing, start a data command with <code>!</code> instead of <code>/</code> to show the result to everyone.</p>
+
+            <h3 class="res-sub">People and messages</h3>
+            <div class="res-table-wrap">
+              <table class="res-table res-table--cmd">
+                <tbody>
+                  <tr><th scope="row"><code>/msg USER, MESSAGE</code></th><td>Send a private message. <code>/pm</code> works too.</td></tr>
+                  <tr><th scope="row"><code>/r MESSAGE</code></th><td>Reply to the last person who messaged you.</td></tr>
+                  <tr><th scope="row"><code>/whois USER</code></th><td>See a user's rank and the rooms they're in.</td></tr>
+                  <tr><th scope="row"><code>/rank USER</code></th><td>See a user's ratings on every ladder they've played.</td></tr>
+                  <tr><th scope="row"><code>/ignore USER</code></th><td>Hide someone's messages. <code>/unignore USER</code> undoes it.</td></tr>
+                  <tr><th scope="row"><code>/away</code> and <code>/back</code></th><td>Mark yourself away or back.</td></tr>
+                  <tr><th scope="row"><code>/join ROOM</code></th><td>Join a chat room. <code>/leave</code> leaves the current one.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 class="res-sub">Pokémon data</h3>
+            <div class="res-table-wrap">
+              <table class="res-table res-table--cmd">
+                <tbody>
+                  <tr><th scope="row"><code>/dt NAME</code></th><td>Stats and details for a Pokémon, move, item, ability or nature.</td></tr>
+                  <tr><th scope="row"><code>/weakness POKÉMON</code></th><td>What a Pokémon or type is weak and resistant to.</td></tr>
+                  <tr><th scope="row"><code>/effectiveness MOVE, POKÉMON</code></th><td>How effective a move or type is against a Pokémon.</td></tr>
+                  <tr><th scope="row"><code>/coverage MOVE, MOVE…</code></th><td>The type coverage of a set of moves.</td></tr>
+                  <tr><th scope="row"><code>/learn POKÉMON, MOVE</code></th><td>Whether a Pokémon can learn a move, and how.</td></tr>
+                  <tr><th scope="row"><code>/ds TERMS</code></th><td>Search Pokémon by type, tier, move, ability or stats, for example <code>/ds fire, ou, fast</code>.</td></tr>
+                  <tr><th scope="row"><code>/ms TERMS</code></th><td>Search moves the same way, for example <code>/ms ground, physical, priority</code>.</td></tr>
+                  <tr><th scope="row"><code>/randbats POKÉMON</code></th><td>The sets a Pokémon can get in Random Battle.</td></tr>
+                  <tr><th scope="row"><code>/smogdex POKÉMON</code></th><td>A link to the Pokémon's Smogon analysis.</td></tr>
+                  <tr><th scope="row"><code>/statcalc</code></th><td>Work out a stat from base stat, EVs, IVs and nature.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 class="res-sub">Battles</h3>
+            <div class="res-table-wrap">
+              <table class="res-table res-table--cmd">
+                <tbody>
+                  <tr><th scope="row"><code>/challenge USER, FORMAT</code></th><td>Challenge someone to a battle in a format.</td></tr>
+                  <tr><th scope="row"><code>/timer on</code></th><td>Start the battle timer so a player who stalls loses.</td></tr>
+                  <tr><th scope="row"><code>/forfeit</code></th><td>Give up the battle.</td></tr>
+                  <tr><th scope="row"><code>/savereplay</code></th><td>Upload the battle as a replay you can share.</td></tr>
+                  <tr><th scope="row"><code>/help COMMAND</code></th><td>Explain any command. <code>/help</code> alone lists the common ones.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="res-section" id="ranks" aria-labelledby="ranks-title">
+            <h2 id="ranks-title">Ranks</h2>
+            <p class="res-lead">The symbol before a name shows a user's rank, globally or in the current room. Staff are volunteers who keep chat friendly. <code>/groups</code> lists every rank.</p>
+            <div class="res-table-wrap">
+              <table class="res-table res-table--ranks">
+                <tbody>
+                  <tr><th scope="row"><span class="res-rank">+</span></th><td>Voice</td><td>Trusted users who can broadcast commands to the room.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">%</span></th><td>Driver</td><td>Staff who can warn and mute users.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">@</span></th><td>Moderator</td><td>Staff who can also ban users from a room.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">#</span></th><td>Room Owner</td><td>Runs a room and appoints its staff.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">~</span></th><td>Administrator</td><td>Runs the server.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">*</span></th><td>Bot</td><td>An automated account that helps run a room.</td></tr>
+                  <tr><th scope="row"><span class="res-rank">☆</span></th><td>Player</td><td>One of the two players in a battle room.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="res-section" id="shortcuts" aria-labelledby="shortcuts-title">
+            <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+            <p class="res-lead">These work anywhere in the app, including inside battles.</p>
+            <dl class="res-keys">
+              <div><dt><kbd>Ctrl</kbd> <kbd>Tab</kbd></dt><dd>Next tab</dd></div>
+              <div><dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Tab</kbd></dt><dd>Previous tab</dd></div>
+              <div><dt><kbd>Ctrl</kbd> <kbd>1</kbd>–<kbd>8</kbd></dt><dd>That tab, counted from the left</dd></div>
+              <div><dt><kbd>Ctrl</kbd> <kbd>9</kbd></dt><dd>The last tab</dd></div>
+              <div><dt><kbd>Ctrl</kbd> <kbd>W</kbd></dt><dd>Close the open tab</dd></div>
+            </dl>
+          </section>
+
+          <section class="res-section" id="help" aria-labelledby="help-title">
+            <h2 id="help-title">Getting help</h2>
+            <div class="res-help">
+              <div class="res-help-item">
+                <h3>Ask a question</h3>
+                <p>The Help room has staff and experienced players who answer questions live.</p>
+                <button class="btn" type="button" data-room="help">Open the Help room</button>
+              </div>
+              <div class="res-help-item">
+                <h3>Report a user</h3>
+                <p>Open a help ticket to report someone breaking the rules. Staff reply in a private room.</p>
+                <button class="btn" type="button" data-room="view-help-request">Open a help ticket</button>
+              </div>
+            </div>
+            <p class="res-note" id="help-status" role="status" aria-live="polite" hidden></p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="nav.js"></script>
+<script src="resources.js"></script>
+</body>
+</html>

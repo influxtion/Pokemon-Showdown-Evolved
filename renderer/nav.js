@@ -26,11 +26,11 @@
     community: svg('<circle cx="6" cy="6" r="2.5"/><path d="M1.5 13c0-2.2 2-3.5 4.5-3.5s4.5 1.3 4.5 3.5M10.5 3.8a2.5 2.5 0 0 1 0 4.4M12.5 9.9c1.2.6 2 1.6 2 3.1"/>', ' stroke-linecap="round"'),
     ladder: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
     battles: svg('<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>', round),
-    plus: svg('<path d="M8 3v10M3 8h10"/>', ' stroke-linecap="round"'),
     message: svg('<path d="M2 4h12v8H2zM2 4l6 5 6-5"/>', round),
     // Two crossed swords: blades, crossguards and grips.
     swords: svg('<path d="M2.5 2.5h2.5l6 6M11 11l2.5 2.5M9.5 12.5l3-3M13.5 2.5H11l-6 6M5 11l-2.5 2.5M3.5 9.5l3 3"/>', ' stroke-linecap="round" stroke-linejoin="round"'),
     other: svg('<rect x="3" y="3" width="10" height="10" rx="1.5"/>'),
+    resources: svg('<path d="M3 3.5h3.5A1.5 1.5 0 0 1 8 5v8a1.5 1.5 0 0 0-1.5-1.5H3zM13 3.5H9.5A1.5 1.5 0 0 0 8 5v8a1.5 1.5 0 0 1 1.5-1.5H13z"/>', round),
     home: svg('<path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/>', round),
     stats: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
     replays: svg('<path d="M4 2.5h8v11l-4-3-4 3z"/>', round),
@@ -158,6 +158,10 @@
     community: { title: 'Community', kind: 'community', action: 'show-menu', args: { tab: 'community' } },
   };
 
+  // The client's Community view, or its room list, which belongs to Community.
+  const communityShown = (session) => Boolean(session && session.ready &&
+    ((session.current === '' && session.menuTab === 'community') || session.current === 'rooms'));
+
   // The client is showing its own main menu, which has no tab: Home stands in for it.
   const onMainMenu = (session) => Boolean(session && session.ready && session.current === '' && session.menuTab === 'battle');
 
@@ -182,23 +186,17 @@
     return 'Challenge cancelled';
   }
 
-  async function joinRooms() {
-    await act('join', { room: 'rooms' });
-    if (onPlay) pollNow();
-    else go('play.html');
-  }
-
   async function openTab(name) {
     await act(TABS[name].action, TABS[name].args);
     if (onPlay) pollNow();
     else go('play.html');
   }
 
-  // How a tab closes, or null when it cannot: Home and Community always stay.
+  // How a tab closes, or null when it cannot: Home always stays.
   // The close button, a middle click and Ctrl+W all go through these.
   const rowCloser = ({ closable, pm, id }) => (!closable ? null : pm ? () => closeConversation(pm) : () => closeRoom(id));
-  const pageCloser = (file) => (file === 'index.html' ? null : PAGES[file].room ? () => closeRoom(file)
-    : file === BATTLE_PAGE ? closePracticeBattle : () => closePage(file));
+  const pageCloser = (file) => (file === 'index.html' ? null : file === 'community' ? closeCommunity
+    : PAGES[file].room ? () => closeRoom(file) : file === BATTLE_PAGE ? closePracticeBattle : () => closePage(file));
 
   // A middle click anywhere on a closable tab closes it, as in a browser.
   function closeOnMiddleClick(node, close) {
@@ -248,15 +246,6 @@
       });
       node.append(close);
     }
-    if (tab === 'community') {
-      const join = make('button', 'rail-icon-btn');
-      join.type = 'button';
-      join.setAttribute('aria-label', 'Join a room');
-      join.title = 'Join a room';
-      join.append(icon(ICONS.plus));
-      join.addEventListener('click', joinRooms);
-      node.append(join);
-    }
     return node;
   }
 
@@ -267,7 +256,9 @@
 
   // Launcher pages are small tabs ahead of the room tabs. Home is always first; the others
   // appear once opened from the icon bar and stay until closed or the app restarts.
-  // Teambuilder is the client's own room, so its tab follows that room being open.
+  // Teambuilder is the client's own room, so its tab follows that room being open. Community
+  // is the client's main menu in its Community view: opened from the icon bar, it stays
+  // until closed, like a launcher page.
   const PAGES = {
     'index.html': { title: 'Home', kind: 'home' },
     'stats.html': { title: 'Stats', kind: 'stats' },
@@ -275,7 +266,9 @@
     'practice.html': { title: 'Bots', kind: 'practice' },
     'practice-battle.html': { title: 'Bot battle', kind: 'battle' },
     'settings.html': { title: 'Settings', kind: 'settings' },
+    'resources.html': { title: 'Info & Resources', kind: 'resources' },
     teambuilder: { title: 'Teambuilder', kind: 'teambuilder', room: true },
+    community: { title: 'Community', kind: 'community', room: true },
   };
   const isPage = (file) => Object.prototype.hasOwnProperty.call(PAGES, file);
   const pagesKey = 'nav.pages';
@@ -283,6 +276,7 @@
   // The practice battle's tab exists while a practice session does: starting one opens it,
   // and closing it ends the session (after a confirmation while the battle is still on).
   const BATTLE_PAGE = 'practice-battle.html';
+  const RESOURCES_ROOM = 'resources';
 
   function savedPages() {
     try {
@@ -318,6 +312,25 @@
     }
     lastKey = null;
     if (lastSession) render(lastSession);
+  }
+
+  // Closing Community while it is showing returns the client to its Battle view, which Home
+  // stands in for, so Home opens.
+  async function closeCommunity() {
+    const at = pages.indexOf('community');
+    if (at >= 0) {
+      pages.splice(at, 1);
+      savePages();
+    }
+    const shown = onPlay && lastSession && communityShown(lastSession);
+    if (shown) {
+      await act('show-menu', { tab: 'battle' });
+      location.href = 'index.html';
+      return true;
+    }
+    lastKey = null;
+    if (lastSession) render(lastSession);
+    return true;
   }
 
   async function closePracticeBattle() {
@@ -499,10 +512,6 @@
     const rooms = session.rooms;
     const current = typeof session.current === 'string' ? session.current : '';
     const me = session.me || '';
-    const community = session.menuTab === 'community';
-    const tabRow = (tab, isCurrent, unread) => ({
-      title: TABS[tab].title, kind: TABS[tab].kind, tab, unread, current: onPlay && isCurrent,
-    });
     // The friends pages are one place however the server titles them ("[Friends] Sent").
     const friendsPage = (r) => /^view-friends(-|$)/.test(r.id);
     const roomRow = (r) => ({
@@ -511,12 +520,10 @@
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
-    // Community, then every open room in the client's order. The Teambuilder room is a
-    // small page tab, so it never gets a row of its own.
-    const rows = [
-      tabRow('community', (current === '' && community) || current === 'rooms', false),
-      ...rooms.filter((r) => r.id !== 'teambuilder').map(roomRow),
-    ];
+    // Every open room in the client's order. The Teambuilder room is a small page tab, so it
+    // never gets a row of its own, and the client's resources room gives way to the launcher's
+    // Info & Resources page (see update).
+    const rows = rooms.filter((r) => r.id !== 'teambuilder' && r.id !== RESOURCES_ROOM).map(roomRow);
     // Conversations and challenges, from the client's private message windows.
     const messages = (Array.isArray(session.messages) ? session.messages : []).map((m) => ({
       title: m.name, sub: messageSub(m), kind: 'message',
@@ -535,13 +542,20 @@
       else if (!open && at >= 0) pages.splice(at, 1);
       if (open !== at >= 0) savePages();
     }
-    const railTeambuilder = $('teambuilder');
-    if (railTeambuilder) {
-      if (teambuilding) railTeambuilder.setAttribute('aria-current', 'page');
-      else railTeambuilder.removeAttribute('aria-current');
+    // The Community tab appears whenever its view shows, however the client got there.
+    const inCommunity = onPlay && communityShown(session);
+    if (inCommunity && !pages.includes('community')) {
+      pages.push('community');
+      savePages();
+    }
+    for (const [name, on] of [['teambuilder', teambuilding], ['community', inCommunity]]) {
+      const button = $(name);
+      if (!button) continue;
+      if (on) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
     }
     const pageRows = ['index.html', ...pages].map((file) => ({
-      file, current: PAGES[file].room ? teambuilding : !onPlay && file === thisPage,
+      file, current: file === 'teambuilder' ? teambuilding : file === 'community' ? inCommunity : !onPlay && file === thisPage,
     }));
     lastSession = session;
     strip = [
@@ -588,11 +602,17 @@
     }, { passive: false });
   }
 
-  // The icon bar's Teambuilder entry opens the client's Teambuilder room.
+  // The icon bar's Teambuilder and Community entries open those views in the client.
   if ($('teambuilder')) {
     $('teambuilder').addEventListener('click', (event) => {
       event.preventDefault();
       if (!(onPlay && lastSession && lastSession.current === 'teambuilder')) openTab('teambuilder');
+    });
+  }
+  if ($('community')) {
+    $('community').addEventListener('click', (event) => {
+      event.preventDefault();
+      if (!(onPlay && communityShown(lastSession))) openTab('community');
     });
   }
 
@@ -672,6 +692,15 @@
     if (session.ready) {
       try { sessionStorage.setItem(lastSessionKey, JSON.stringify(session)); } catch {}
     }
+    // The client's Info & Resources room is fetched from the server; the launcher has its own
+    // page with the same help written out, so the room is closed and that page opens instead.
+    if (session.ready && session.rooms.some((r) => r.id === RESOURCES_ROOM)) {
+      await act('leave-room', { room: RESOURCES_ROOM });
+      if (thisPage !== 'resources.html') {
+        location.href = 'resources.html';
+        return session;
+      }
+    }
     if (session.ready && battleStarted(session) && !onPlay) {
       location.href = 'play.html';
       return session;
@@ -722,8 +751,8 @@
     });
   }
 
-  // Ctrl+W closes the open tab the way its close button does. Home and Community
-  // have no close button, so nothing happens on them.
+  // Ctrl+W closes the open tab the way its close button does. Home has no close
+  // button, so nothing happens on it.
   function closeTab() {
     return queued(() => {
       const tab = strip.find((t) => t.current);

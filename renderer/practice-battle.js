@@ -39,7 +39,7 @@
     try {
       const value = await window.desktop.getPractice();
       NAME = value.opponents?.find(bot => bot.id === value.opponent)?.name || 'the bot';
-      subtitle.textContent = `vs. ${NAME} · Gen 9 Random Battle`;
+      subtitle.textContent = `vs. ${NAME} · ${({ gen9ou: 'Gen 9 OU' })[value.format] || 'Gen 9 Random Battle'}`;
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
       const finished = Boolean(running && value.battle?.finished);
@@ -62,6 +62,8 @@
       else if (running && value.battle?.thinking) text = `${NAME} is thinking · turn ${value.battle.turn || 1}`;
       else if (finished) text = ({ win: 'You won', loss: `${NAME} won`, tie: 'Battle tied' })[value.battle.result] || 'Battle finished';
       else if (running && value.battle?.turn) text = `Turn ${value.battle.turn} · last search ${((value.battle.elapsedMs || 0) / 1000).toFixed(1)}s`;
+      // OU opens on team preview: the battle exists, but no turn has started.
+      else if (running && value.battle && value.format === 'gen9ou') text = 'Team preview';
       else if (running) text = 'Connecting…';
       else if (value.state === 'failed' || value.clientError) text = 'Practice stopped';
       status.textContent = text;
