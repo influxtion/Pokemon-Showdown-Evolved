@@ -2,8 +2,9 @@
 
 // The Bots page: format tabs, then one collapsible group of cards per difficulty, hardest first.
 // Each card starts a practice battle against its bot. The simple bots run on this computer; the
-// Foul Play levels need the cloud. In OU the player also picks both teams, each from the
-// Teambuilder or pasted; Play waits until both are legal.
+// Foul Play levels play on the cloud server unless the player opts in: the "Foul Play on this
+// computer" panel downloads Foul Play and then lets them choose where it runs. In OU the player
+// also picks both teams, each from the Teambuilder or pasted; Play waits until both are legal.
 (() => {
   const $ = id => document.getElementById(id);
   const status = $('practice-status');
@@ -38,6 +39,7 @@
     bot: '<rect x="3.5" y="7.5" width="17" height="12" rx="3"/><path d="M12 7.5V4M9 13v1M15 13v1"/>',
   };
   const CLOUD = '<path d="M4.5 12.5h7a2.75 2.75 0 0 0 .4-5.47A4 4 0 0 0 4.2 6.4 3.05 3.05 0 0 0 4.5 12.5z"/>';
+  const COMPUTER = '<rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 13.5h4M8 11v2.5"/>';
   const CHEVRON = '<path d="M3 4.5l3 3 3-3"/>';
 
   const remembered = key => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } };
@@ -253,6 +255,7 @@
     const foot = element('div', 'bot-card-foot');
     if (!bot.local) {
       const cloud = element('span', 'bot-card-cloud');
+      cloud.dataset.icon = 'cloud';
       cloud.append(svg(CLOUD, '0 0 16 16', { 'stroke-width': '1.4' }), element('span', 'bot-card-cloud-text'));
       foot.append(cloud);
     }
@@ -305,18 +308,124 @@
 
   let last = null;
 
+  // ---- Foul Play on this computer (opt-in) --------------------------------------------------
+
+  const local = {
+    panel: $('practice-local'), note: $('bots-local-note'), progress: $('bots-local-progress'), fill: $('bots-local-fill'),
+    bar: document.querySelector('.bots-local-bar'), step: $('bots-local-step'), where: $('bots-local-where'),
+    download: $('bots-local-download'), cancel: $('bots-local-cancel'), remove: $('bots-local-remove'),
+  };
+  let localBusy = false;
+  let localError = '';
+  const ABOUT = 'Want to skip the queue or have a strong PC? Download Foul Play and play locally without our cloud servers.';
+
+  function showLocal(value) {
+    const state = value.local;
+    // Only shown next to the Foul Play cards, and only where Foul Play can run.
+    const foulPlayShown = Boolean(groups.querySelector('.bot-card[data-bot^="foulplay"]'));
+    local.panel.hidden = !state || !state.supported || !foulPlayShown;
+    if (local.panel.hidden) return;
+    const active = value.state === 'ready' || value.state === 'starting';
+    const localBattle = active && value.engine === 'local';
+    let note = ABOUT;
+    let tone = '';
+    if (state.installing) {
+      note = 'Downloading Foul Play. You can keep using the app; the cloud server stays available meanwhile.';
+    } else if (localError || state.error) {
+      note = `The download did not finish: ${localError || state.error}`;
+      tone = 'err';
+    } else if (state.installed && !state.current) {
+      note = 'An update for Foul Play on this computer is available.';
+    } else if (state.installed) {
+      note = `Downloaded${state.revision ? ` (Foul Play ${state.revision})` : ''}. On this computer it searches with up to ` +
+        `${state.threads} thread${state.threads === 1 ? '' : 's'}, at low priority so your battle stays smooth.`;
+    }
+    local.note.textContent = note;
+    local.note.className = `bots-local-note${tone ? ` bots-local-note--${tone}` : ''}`;
+
+    const progress = state.progress;
+    local.progress.hidden = !state.installing;
+    if (state.installing) {
+      const percent = Math.round(Math.max(0, Math.min(1, progress?.fraction || 0)) * 100);
+      local.fill.style.width = `${percent}%`;
+      local.bar.setAttribute('aria-valuenow', String(percent));
+      local.step.textContent = progress ? `${progress.label} · ${percent}%` : 'Starting…';
+    }
+
+    local.where.hidden = !state.installed || state.installing;
+    const choice = runsLocally(value) ? 'local' : 'cloud';
+    for (const button of local.where.querySelectorAll('button')) {
+      button.setAttribute('aria-checked', String(button.dataset.engine === choice));
+      button.tabIndex = button.dataset.engine === choice ? 0 : -1;
+      button.disabled = localBusy || active;
+    }
+    local.download.hidden = state.installing || (state.installed && state.current);
+    local.download.textContent = state.installed ? 'Update' : localError || state.error ? 'Try again' : 'Download';
+    local.download.disabled = localBusy || localBattle;
+    local.cancel.hidden = !state.installing;
+    local.remove.hidden = !state.installed || state.installing;
+    local.remove.disabled = localBusy || localBattle;
+  }
+
+  async function localAction(run) {
+    if (localBusy) return;
+    localBusy = true;
+    localError = '';
+    if (last) showLocal(last);
+    try {
+      const result = await run();
+      if (result && !result.ok && !result.cancelled && result.error) localError = result.error;
+    } catch {
+      localError = 'Something went wrong. Try again.';
+    } finally {
+      localBusy = false;
+      await refresh();
+    }
+  }
+
+  local.download.addEventListener('click', () => localAction(() => window.desktop.installLocalPractice()));
+  local.cancel.addEventListener('click', () => localAction(() => window.desktop.cancelLocalPracticeInstall()));
+  local.remove.addEventListener('click', () => localAction(() => window.desktop.removeLocalPractice()));
+  const choose = engine => localAction(async () => {
+    const result = await window.desktop.setSetting('practiceEngine', engine);
+    return result?.ok ? { ok: true } : { ok: false, error: result?.error || 'The choice could not be saved.' };
+  });
+  for (const button of local.where.querySelectorAll('button')) {
+    button.addEventListener('click', () => { if (button.getAttribute('aria-checked') !== 'true') choose(button.dataset.engine); });
+    // Arrow keys move between the two options, as in any radio group.
+    button.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      const other = local.where.querySelector(`button:not([data-engine="${button.dataset.engine}"])`);
+      other.focus();
+      choose(other.dataset.engine);
+    });
+  }
+
+  // Where Foul Play will run for the next battle, and what its cards say about it.
+  const runsLocally = value => value.engineChoice === 'local' && Boolean(value.local?.installed);
+  function engineState(value) {
+    if (!runsLocally(value)) return { ...cloudState(value.cloud), icon: 'cloud' };
+    if (value.local.installing) return { ready: false, text: 'Updating on this computer…', tone: 'warn', icon: 'computer' };
+    return { ready: true, text: 'This computer', icon: 'computer' };
+  }
+
   function updatePlay() {
     if (!last) return;
     const value = last;
     const active = value.state === 'ready' || value.state === 'starting';
     const list = Array.isArray(value.opponents) ? value.opponents : [];
-    const cloud = cloudState(value.cloud);
+    const cloud = engineState(value);
     const needsTeams = TEAM_FORMATS.includes(format);
     for (const article of groups.querySelectorAll('.bot-card')) {
       const bot = list.find(item => item.id === article.dataset.bot);
       const note = article.querySelector('.bot-card-cloud');
       if (note) {
         note.className = `bot-card-cloud${cloud.tone ? ` bot-card-cloud--${cloud.tone}` : ''}`;
+        if (note.dataset.icon !== cloud.icon) {
+          note.dataset.icon = cloud.icon;
+          note.firstElementChild.replaceWith(svg(cloud.icon === 'computer' ? COMPUTER : CLOUD, '0 0 16 16', { 'stroke-width': '1.4' }));
+        }
         note.querySelector('.bot-card-cloud-text').textContent = cloud.text;
       }
       const play = article.querySelector('.bot-play');
@@ -334,6 +443,7 @@
       const active = value.state === 'ready' || value.state === 'starting';
       build(Array.isArray(value.opponents) ? value.opponents : []);
       updatePlay();
+      showLocal(value);
 
       // The battle plays in its own tab; while it runs, this page only leads back to it.
       running.hidden = !active;

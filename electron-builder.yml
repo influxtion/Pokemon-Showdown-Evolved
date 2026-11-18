@@ -3,6 +3,9 @@ productName: Showdown Desktop
 directories:
   output: out/windows
 asar: true
+# Python reads the Foul Play worker directly, so it cannot live inside app.asar.
+asarUnpack:
+  - api/worker/**/*
 beforePack: scripts/verify-practice-package.js
 afterPack: scripts/verify-practice-package-after.js
 extraResources:
@@ -17,10 +20,15 @@ extraResources:
 files:
   - app/**/*
   - renderer/**/*
-  # Practice plays in the cloud: only the API client ships. The Foul Play installer, server and
-  # worker (GPL-3.0 derived) are the cloud server's source and never go in the app.
+  # Foul Play plays on the cloud server by default. For players who opt in to running it on their
+  # computer, the installer, its pins, the local server and the worker script ship too (checked by
+  # scripts/verify-practice-package.js); Foul Play itself is downloaded only when they ask.
   - api/client.js
   - api/protocol.js
+  - api/install.js
+  - api/server.js
+  - api/lock.json
+  - api/worker/foulplay_worker.py
   - vendor/showdex/LICENSE
   - vendor/showdex/SOURCE.md
   - vendor/showdex/manifest.json

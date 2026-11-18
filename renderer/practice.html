@@ -84,6 +84,26 @@
             <a class="btn btn-primary" href="practice-battle.html" id="practice-go" hidden>Go to battle</a>
           </div>
 
+          <section class="bots-local" id="practice-local" aria-labelledby="bots-local-title" hidden>
+            <div class="bots-local-text">
+              <h3 id="bots-local-title">Foul Play on this computer</h3>
+              <p class="bots-local-note" id="bots-local-note" role="status"></p>
+              <div class="bots-local-progress" id="bots-local-progress" hidden>
+                <div class="bots-local-bar" role="progressbar" aria-labelledby="bots-local-step" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="bots-local-fill"></span></div>
+                <span class="bots-local-step" id="bots-local-step"></span>
+              </div>
+            </div>
+            <div class="bots-local-actions">
+              <div class="bots-local-where" id="bots-local-where" role="radiogroup" aria-label="Where Foul Play runs" hidden>
+                <button type="button" role="radio" data-engine="cloud" aria-checked="true">Cloud server</button>
+                <button type="button" role="radio" data-engine="local" aria-checked="false">This computer</button>
+              </div>
+              <button type="button" class="btn" id="bots-local-download">Download</button>
+              <button type="button" class="btn" id="bots-local-cancel" hidden>Cancel</button>
+              <button type="button" class="btn" id="bots-local-remove" hidden>Remove</button>
+            </div>
+          </section>
+
           <div class="bots-groups">
             <section class="bots-group" id="practice-teams" hidden>
               <h3><button type="button" class="bots-group-toggle" id="bots-group-teams" aria-controls="bots-teams" aria-expanded="true"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>Teams</button></h3>

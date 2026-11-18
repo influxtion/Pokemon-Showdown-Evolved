@@ -2,8 +2,9 @@
 
 // Installs the pinned Foul Play runtime: a standalone Python, Foul Play's source, its Python
 // packages, poke-engine compiled with Terastallization, and the set data and usage stats Foul Play
-// reads for Random Battle and OU, on the API server (`npm run setup`). The worker never downloads
-// anything itself. `npm run refresh-ou` moves the OU pins to the newest published data, by hand.
+// reads for Random Battle and OU. The same code runs on the API server (`npm run setup`) and in the
+// desktop app, when a player opts in to running Foul Play on their computer. The worker never
+// downloads anything itself. `npm run refresh-ou` moves the OU pins to the newest published data, by hand.
 //
 // Layout under `dir`:
 //   current/            the runtime the server uses (python/, foul-play/, install.json)

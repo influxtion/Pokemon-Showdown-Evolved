@@ -11,7 +11,7 @@ const { Replays } = require('./replays');
 const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
 const { PracticeSession } = require('./practice-session');
-const { CloudEngine } = require('./practice-engines');
+const { CloudEngine, LocalEngine } = require('./practice-engines');
 const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
 const { PracticeTeams, FORMATS: TEAM_FORMATS } = require('./practice-teams');
@@ -54,8 +54,10 @@ let replayReview = null;
 let practice = null;
 let practiceView = null;
 let practiceTeams = null;
-// The cloud server that computes Foul Play's moves. Lives for the whole app, independent of windows.
+// Where Foul Play's moves are computed: the cloud server (default), or Foul Play downloaded onto
+// this computer if the player opted in. Both live for the whole app, independent of windows.
 let cloudEngine = null;
+let localEngine = null;
 // The battle stylesheet inserted into the Showdown client, kept by key so the Battle screen
 // setting can remove or re-add it live. Changes run in order, so a quick toggle cannot insert
 // it twice; a new document starts without it.
@@ -284,8 +286,8 @@ function createWindow() {
     : path.join(__dirname, '..', 'vendor', 'laplace', 'dist');
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
     : path.join(__dirname, '..', 'scripts', 'laplace');
-  // The simulator runs here; only the bot's moves come from the cloud server.
-  const target = () => cloudEngine.target();
+  // The simulator runs here; only Foul Play's moves come from the cloud or the local engine.
+  const target = engine => (engine === 'local' ? localEngine : cloudEngine).target();
   try {
     const botConfig = !app.isPackaged ? readBotConfig(process.env.SHOWDOWN_BOT_CONFIG || path.join(__dirname, '../out/bots/config.json')) : null;
     if (botConfig) practiceRoot = botConfig.root;
@@ -305,7 +307,7 @@ function createWindow() {
   practice.on('failure', code => {
     logger.write('practice-failed', { start: 1, exited: 2, timeout: 3, client: 4, integrity: 5, engine: 6 }[code] || 0);
     // Show the cloud server's real state right away instead of at the next periodic check.
-    if (code === 'engine') cloudEngine?.refresh();
+    if (code === 'engine' && practice?.engine === 'cloud') cloudEngine?.refresh();
   });
   practice.on('change', state => { if (state.state === 'failed' || state.state === 'idle') practiceView?.close(); });
   let windowSaveTimer;
@@ -365,6 +367,11 @@ function createWindow() {
     (async () => {
       if (maintenance) return;
       if (replayDirty && !(await confirmDiscardReplay())) return;
+      if (localEngine?.installing) {
+        const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep downloading', 'Cancel download and close'],
+          defaultId: 0, cancelId: 0, message: 'Foul Play is still downloading.', detail: 'Closing cancels the download. You can start it again later on the Bots page.' });
+        if (result.response !== 1) return;
+      }
       if (settings.get('confirmOnClose') && practice?.battle && !practice.battle.finished) {
         const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep playing', 'Close app'],
           defaultId: 0, cancelId: 0, message: 'Close during practice?', detail: 'The practice battle will end.' });
@@ -413,7 +420,8 @@ const isBattleFrame = event => isPracticeFrame(event, ['/practice-battle.html'])
 ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
   const clientState = await practiceView.status();
-  return { ...practice.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status() };
+  return { ...practice.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status(),
+    local: localEngine.status(), engineChoice: settings.get('practiceEngine') };
 });
 // A team the Bots page picked: a Teambuilder team ({ source: 'teambuilder', index, name }) or a
 // pasted export ({ source: 'paste', text }). Teambuilder teams are read here, never sent by the page.
@@ -445,12 +453,45 @@ ipcMain.handle('practice:check-team', async (event, value) => {
 ipcMain.handle('practice:start', async (event, options) => {
   if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
   const { opponent, preset, format } = options;
-  if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset });
+  // Foul Play runs where the player chose on the Bots page; the cloud unless they opted in to local.
+  const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
+  if (engine === 'local' && !localEngine.inspect().installed) {
+    return { ok: false, error: 'Foul Play is not on this computer any more. Download it again, or switch to the cloud server.' };
+  }
+  if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset, engine });
   if (!Object.hasOwn(TEAM_FORMATS, format) || !options.teams || typeof options.teams !== 'object') return { ok: false, error: 'Choose both teams first.' };
   const [player, bot] = await Promise.all([practiceTeam(format, options.teams.player), practiceTeam(format, options.teams.bot)]);
   if (!player.ok) return { ok: false, error: `Your team: ${player.error}`, side: 'player' };
   if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
-  return practice.start({ opponent, preset, format, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
+  return practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
+});
+// Local Foul Play, opt-in. Downloading runs for minutes; the Bots page follows it through practice:status.
+const localBattleOn = () => practice.engine === 'local' && ['starting', 'ready'].includes(practice.state);
+ipcMain.handle('practice:install-local', event => {
+  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
+  if (localEngine.installing) return { ok: true };
+  // Updating replaces the runtime and restarts the local server, which would end a local battle.
+  if (localBattleOn()) return { ok: false, error: 'End the practice battle first.' };
+  localEngine.install().then(result => logger.write(result.ok ? 'foulplay-installed' : result.cancelled ? 'foulplay-install-cancelled' : 'foulplay-install-failed'));
+  return { ok: true };
+});
+ipcMain.handle('practice:cancel-install', event => {
+  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
+  return localEngine.cancel();
+});
+ipcMain.handle('practice:remove-local', async event => {
+  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
+  if (localBattleOn()) return { ok: false, error: 'End the practice battle first.' };
+  const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep', 'Remove'], defaultId: 0, cancelId: 0,
+    message: 'Remove Foul Play from this computer?', detail: 'Foul Play will play on the cloud server again. You can download it again later.' });
+  if (result.response !== 1) return { ok: false, cancelled: true };
+  try {
+    const removed = await localEngine.remove();
+    if (removed.ok && settings.get('practiceEngine') === 'local') settings.set('practiceEngine', 'cloud');
+    return removed;
+  } catch {
+    return { ok: false, error: 'Foul Play could not be removed. Close other apps using it and try again.' };
+  }
 });
 // Closing the battle's tab ends practice, and that tab can be closed from any launcher page.
 // A battle still on is forfeited by stopping, so the launcher confirms first in its own popup
@@ -906,6 +947,8 @@ app.whenReady().then(async () => {
   replays = new Replays(app.getPath('userData'));
   replayImports = new ReplayImports(replays);
   cloudEngine = new CloudEngine();
+  localEngine = new LocalEngine({ dir: process.env.SHOWDOWN_FOULPLAY_DIR || path.join(app.getPath('userData'), 'foulplay') });
+  app.on('will-quit', () => { localEngine?.dispose(); });
   try {
     showdexBundle = await showdex.registerAssets(electronSession.fromPartition(CLIENT_PARTITION));
   } catch {

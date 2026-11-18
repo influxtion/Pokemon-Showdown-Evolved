@@ -82,13 +82,13 @@ async function setup(t, { target } = {}) {
     spawned.push(child);
     return child;
   };
-  let requested = 0;
+  const engines = [];
   const local = fakeBots();
   const session = new PracticeSession({ root: '/runtime', scripts: '/scripts', spawnChild, installed: () => true, createBot: local.createBot,
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }),
-    target: target || (async () => { requested++; return { url }; }) });
+    target: target || (async engine => { engines.push(engine); return { url }; }) });
   t.after(() => session.stop());
-  return { sim, session, workers: fake.workers, spawned, requested: () => requested, api, bots: local.bots };
+  return { sim, session, workers: fake.workers, spawned, requested: () => engines.length, engines, api, bots: local.bots };
 }
 
 test('starts the simulator and an engine session, then logs the bot in', async t => {
@@ -157,11 +157,23 @@ test('fails when the engine connection drops mid-battle', async t => {
   assert.match(session.status().error, /Foul Play stopped/);
 });
 
-test('rejects other opponents and presets', async t => {
+test('rejects other opponents, presets and engines', async t => {
   const { session } = await setup(t);
   assert.match((await session.start({ opponent: 'laplace', preset: 'full' })).error, /Choose a bot/);
   assert.equal((await session.start({ opponent: 'foulplay', preset: 'max' })).ok, false);
+  assert.match((await session.start({ opponent: 'foulplay', preset: 'quiet', engine: 'laptop' })).error, /where Foul Play should run/);
   assert.equal(session.status().state, 'idle');
+});
+
+test('Foul Play uses the cloud by default and this computer only when asked', async t => {
+  const { session, engines } = await setup(t);
+  await session.start({ opponent: 'foulplay', preset: 'quiet' });
+  assert.deepEqual(engines, ['cloud']);
+  assert.equal(session.status().engine, 'cloud');
+  session.stop();
+  await session.start({ opponent: 'foulplay-medium', preset: 'quiet', engine: 'local' });
+  assert.deepEqual(engines, ['cloud', 'local']);
+  assert.equal(session.status().engine, 'local');
 });
 
 test('stop ends the API session and kills the simulator', async t => {

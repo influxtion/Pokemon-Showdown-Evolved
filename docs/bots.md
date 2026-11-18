@@ -37,7 +37,7 @@ Presets set the engine's search threads and nothing else: **Quiet** 1, **Balance
 
 ## 2. Where the bots run
 
-The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`) on the cloud server, a host deployed from `api/` ([api/README.md](../api/README.md)). Foul Play never runs inside the app, and the app ships only the API client (`api/client.js`, `api/protocol.js`). Tests run the same server on loopback as a stand-in for the cloud.
+The **simulator always runs on the player's computer**, started by the launcher for each practice session. Only the bot's decisions are computed elsewhere, by the **practice API** (`api/server.js`): by default on the cloud server, a host deployed from `api/` ([api/README.md](../api/README.md)). A player can opt in to running Foul Play on their own computer: the Bots page downloads it with the same installer the server uses (`api/install.js`), and the app then runs the same API server on 127.0.0.1 with a private key, at below-normal priority. Nothing is downloaded unless the player asks. Tests run the same server on loopback as a stand-in for the cloud.
 
 For every session the launcher's `PracticeSession` (`app/practice-session.js`):
 

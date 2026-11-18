@@ -2,8 +2,9 @@
 
 // One practice session: the Showdown simulator runs on this computer. The bridge logs in to it as
 // the bot, accepts the player's challenge and hands the bot's battle-room frames to whoever plays
-// the bot's seat: the cloud practice inference API for Foul Play (see api/), or one of the simple
-// bots in app/simple-bots.js, which run right here. Choices come back the same way for both.
+// the bot's seat: the practice inference API for Foul Play (see api/), on the cloud server or, if
+// the player opted in and downloaded it, on this computer; or one of the simple bots in
+// app/simple-bots.js, which run right here. Choices come back the same way for all of them.
 
 const path = require('node:path');
 const os = require('node:os');
@@ -49,10 +50,14 @@ const ERRORS = Object.freeze({
   bot: 'The bot stopped unexpectedly. Start a new session to try again.',
 });
 
+// Where Foul Play's moves are computed: the cloud server, or the opt-in copy on this computer.
+const ENGINES = Object.freeze(['cloud', 'local']);
+
 const toId = name => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 class PracticeSession extends EventEmitter {
-  // target() resolves to { url, key } for the API that computes the bot's moves.
+  // target(engine) resolves to { url, key } for the API that computes Foul Play's moves, where
+  // engine is 'cloud' (the default) or 'local' (Foul Play downloaded onto this computer).
   constructor({ root, scripts, target, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
     installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient,
     createBot = kind => new LocalBot({ kind, data: loadData(path.join(this.root, 'server')) }) }) {
@@ -73,6 +78,7 @@ class PracticeSession extends EventEmitter {
     this.state = 'idle';
     this.error = '';
     this.preset = 'full';
+    this.engine = 'cloud';
     this.connection = null;
     this.battle = null;
     this.format = FORMAT;
@@ -101,7 +107,8 @@ class PracticeSession extends EventEmitter {
   }
 
   status() {
-    return { installed: this.installed(), state: this.state, opponent: this.bot.id, format: this.format, threads: this.threads,
+    return { installed: this.installed(), state: this.state, opponent: this.bot.id, format: this.format, engine: this.engine,
+      threads: this.threads,
       opponents: Object.values(OPPONENTS).map(bot => ({ id: bot.id, name: bot.name, local: bot.local, search: bot.search,
         difficulty: bot.difficulty, kind: bot.kind, formats: bot.formats, description: bot.description })),
       error: this.error, preset: this.preset, battle: this.battle };
@@ -112,7 +119,7 @@ class PracticeSession extends EventEmitter {
   // `teams` ({ player, bot, botExport }) is required in formats where the player brings teams;
   // the caller has validated both for the format already.
   async start(options) {
-    const { opponent = 'foulplay', preset = DEFAULT_PRESET, format = FORMAT, teams = null } =
+    const { opponent = 'foulplay', preset = DEFAULT_PRESET, format = FORMAT, teams = null, engine = 'cloud' } =
       options && typeof options === 'object' ? options : {};
     if (typeof opponent !== 'string' || !Object.hasOwn(OPPONENTS, opponent)) return { ok: false, error: 'Choose a bot to play against.' };
     const bot = OPPONENTS[opponent];
@@ -125,10 +132,12 @@ class PracticeSession extends EventEmitter {
     }
     // Only Foul Play uses the computation setting.
     if (bot.search && !Object.hasOwn(PRESETS, preset)) return { ok: false, error: 'Choose a supported computation setting.' };
+    if (!ENGINES.includes(engine)) return { ok: false, error: 'Choose where Foul Play should run.' };
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { bot, format, preset: bot.search ? preset : null, state: 'starting', error: '', battle: null,
+    Object.assign(this, { bot, format, preset: bot.search ? preset : null, engine: bot.search ? engine : 'cloud',
+      state: 'starting', error: '', battle: null,
       teams: withTeams ? { player: teams.player, bot: teams.bot, botExport: teams.botExport } : null });
     this.reset();
     this.connection = { token: crypto.randomBytes(32).toString('hex'), human: HUMAN, bot: this.bot.account, port: null, format,
@@ -196,7 +205,7 @@ class PracticeSession extends EventEmitter {
 
   async startEngine(generation) {
     if (this.bot.local) return this.startLocalBot(generation);
-    const target = await this.target();
+    const target = await this.target(this.engine);
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
     this.api = api;

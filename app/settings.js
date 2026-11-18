@@ -7,7 +7,9 @@ const { randomUUID } = require('node:crypto');
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
 // Keys older versions saved that no longer mean anything; dropped on load so those files still open.
-const RETIRED_KEYS = new Set(['practiceEngine']);
+const RETIRED_KEYS = new Set([]);
+// Where Foul Play runs: 'cloud' (the default) or 'local', once the player has downloaded it.
+const PRACTICE_ENGINES = new Set(['cloud', 'local']);
 // Home layouts: 'classic' is Showdown's main menu modernised, 'modern' the focused redesign.
 // null means the player has not chosen yet, so Home asks once with a welcome.
 const HOME_LAYOUTS = new Set(['classic', 'modern']);
@@ -16,7 +18,7 @@ const HOME_LAYOUTS = new Set(['classic', 'modern']);
 const BATTLE_STYLES = new Set(['launcher', 'showdown']);
 const DEFAULTS = Object.freeze({
   theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null,
-  battleStyle: 'launcher',
+  battleStyle: 'launcher', practiceEngine: 'cloud',
 });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
@@ -26,6 +28,7 @@ function valid(key, value) {
   if (key === 'startPage') return START_PAGES.has(value);
   if (key === 'homeLayout') return value === null || HOME_LAYOUTS.has(value);
   if (key === 'battleStyle') return BATTLE_STYLES.has(value);
+  if (key === 'practiceEngine') return PRACTICE_ENGINES.has(value);
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';
@@ -107,4 +110,4 @@ class Settings {
   }
 }
 
-module.exports = { Settings, THEMES, START_PAGES, HOME_LAYOUTS, BATTLE_STYLES, DEFAULTS };
+module.exports = { Settings, THEMES, START_PAGES, HOME_LAYOUTS, BATTLE_STYLES, PRACTICE_ENGINES, DEFAULTS };

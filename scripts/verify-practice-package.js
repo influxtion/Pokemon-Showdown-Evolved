@@ -67,14 +67,22 @@ async function verifyPracticePackage(context) {
   console.log(`Practice runtime verified for packaging: ${identity}`);
 }
 
-// Practice is cloud only: of api/, just the client and protocol ship. Nothing from Foul Play
-// (the installer, API server or GPL-derived worker) may end up in the package.
-const SHIPPED_API = ['client.js', 'protocol.js'];
+// Of api/, the app ships what playing Foul Play needs: the client and protocol (cloud and local),
+// and, for players who opt in to running Foul Play on their computer, the installer, its pins, the
+// local server and the worker script. The worker is unpacked from app.asar so Python can read it.
+// Foul Play itself is never in the package: it is downloaded only when the player asks.
+// Nothing else from api/ (its runtime, tests or deploy files) may ship.
+const SHIPPED_API = ['client.js', 'protocol.js', 'install.js', 'server.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
+const UNPACKED_API = ['worker', 'worker/foulplay_worker.py'];
 
-function verifyCloudOnly(resources) {
-  if (fs.existsSync(path.join(resources, 'app.asar.unpacked', 'api'))) {
-    throw new Error('The package contains unpacked api/ files; release builds must not ship the Foul Play worker.');
-  }
+function listFiles(dir, prefix = '') {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+    return entry.isDirectory() ? [name, ...listFiles(path.join(dir, entry.name), name)] : [name];
+  });
+}
+
+function verifyApiFiles(resources) {
   const asar = require('@electron/asar');
   const api = asar.listPackage(path.join(resources, 'app.asar'))
     .map(entry => entry.replace(/\\/g, '/'))
@@ -83,7 +91,12 @@ function verifyCloudOnly(resources) {
   const unexpected = api.filter(name => !SHIPPED_API.includes(name));
   if (unexpected.length) throw new Error(`The package must ship only api/${SHIPPED_API.join(', api/')}; found api/${unexpected.join(', api/')}.`);
   const missing = SHIPPED_API.filter(name => !api.includes(name));
-  if (missing.length) throw new Error(`The package is missing api/${missing.join(', api/')}, which the cloud practice engine needs.`);
+  if (missing.length) throw new Error(`The package is missing api/${missing.join(', api/')}, which Foul Play needs.`);
+  const unpackedDir = path.join(resources, 'app.asar.unpacked', 'api');
+  const unpacked = fs.existsSync(unpackedDir) ? listFiles(unpackedDir) : [];
+  if (unpacked.length !== UNPACKED_API.length || UNPACKED_API.some(name => !unpacked.includes(name))) {
+    throw new Error(`Only api/worker/foulplay_worker.py may be unpacked from app.asar; found ${unpacked.join(', ') || 'nothing'}.`);
+  }
 }
 
 async function verifyCopiedPracticePackage(context) {
@@ -96,7 +109,7 @@ async function verifyCopiedPracticePackage(context) {
   const adapters = path.join(resources, 'practice-adapter');
   verifyAdapters(adapters, manifest);
   if (fs.readdirSync(adapters).length !== ADAPTER_FILES.length) throw new Error('Copied Practice adapter has unexpected files.');
-  verifyCloudOnly(resources);
+  verifyApiFiles(resources);
   console.log(`Copied Practice runtime and adapters verified: ${identity}`);
 }
 

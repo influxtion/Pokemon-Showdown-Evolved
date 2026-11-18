@@ -36,13 +36,14 @@ test('defaults, validation and all settings persist across restarts', (t) => {
   assert.equal(settings.set('startPage', 'replays'), true);
   assert.equal(settings.set('confirmOnClose', false), true);
   assert.equal(settings.set('showdexEnabled', true), true);
-  assert.equal(settings.set('practiceEngine', 'cloud'), false, 'retired keys cannot be set');
   assert.equal(settings.set('homeLayout', 'classic'), true);
   assert.equal(settings.set('battleStyle', 'classic'), false);
   assert.equal(settings.set('battleStyle', null), false);
   assert.equal(settings.set('battleStyle', 'showdown'), true);
+  assert.equal(settings.set('practiceEngine', 'laptop'), false);
+  assert.equal(settings.set('practiceEngine', 'local'), true);
   const expected = { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true, homeLayout: 'classic',
-    battleStyle: 'showdown' };
+    battleStyle: 'showdown', practiceEngine: 'local' };
   assert.deepEqual(new Settings(dir).snapshot(), expected);
   assert.deepEqual(disk(dir), expected);
   const snapshot = settings.snapshot();
@@ -54,7 +55,7 @@ test('legacy theme-only settings gain new defaults and reset persists defaults',
   const dir = fixture(t);
   fs.writeFileSync(path.join(dir, 'settings.json'), '{"theme":"light"}');
   const settings = new Settings(dir);
-  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher' });
+  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud' });
   assert.deepEqual(settings.reset(), DEFAULTS);
   assert.deepEqual(disk(dir), DEFAULTS);
 });
@@ -93,16 +94,15 @@ test('invalid settings are preserved before a new file is saved', (t) => {
   assert.equal(disk(dir).theme, 'light');
 });
 
-test('settings saved by older versions with the retired practice engine still load', (t) => {
+test('the practice engine defaults to the cloud and keeps an opt-in to local play', (t) => {
   const dir = fixture(t);
+  assert.equal(new Settings(dir).get('practiceEngine'), 'cloud');
   for (const engine of ['cloud', 'local']) {
     fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ ...DEFAULTS, theme: 'dark', practiceEngine: engine }));
     const settings = new Settings(dir);
     assert.equal(settings.loadError, null);
-    assert.deepEqual(settings.snapshot(), { ...DEFAULTS, theme: 'dark' });
+    assert.deepEqual(settings.snapshot(), { ...DEFAULTS, theme: 'dark', practiceEngine: engine });
     assert.equal(fs.readdirSync(dir).some((file) => file.startsWith('settings.json.corrupt-')), false);
-    settings.set('theme', 'light');
-    assert.deepEqual(disk(dir), { ...DEFAULTS, theme: 'light' }, 'the next save drops the retired key');
   }
 });
 
@@ -123,7 +123,7 @@ test('failed write or rename preserves previous settings on disk and in memory',
     const settings = new Settings(dir, fileSystem);
     assert.throws(() => settings.set('theme', 'light'), /failed/);
     assert.equal(settings.get('theme'), 'dark');
-    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher' });
+    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud' });
     assert.equal(fs.readdirSync(dir).some((file) => file.includes('.tmp-')), false);
   }
 });

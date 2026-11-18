@@ -1,7 +1,8 @@
 'use strict';
 
-// Practice inference API, hosted in the cloud. Clients (the desktop app) run the battle themselves
-// and stream the bot's view of it here; the server only computes the bot's moves.
+// Practice inference API. It runs in the cloud and, for players who opt in to local play, inside
+// the desktop app on 127.0.0.1. Clients run the battle themselves and stream the bot's view of it
+// here; the server only computes the bot's moves.
 //
 //   GET    /healthz                       liveness
 //   GET    /v1/info                       bots, presets, limits and current capacity
@@ -95,10 +96,15 @@ function workerEnvironment() {
   return env;
 }
 
-function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT }) {
+// `lowPriority` is for the copy inside the desktop app, so a search never starves the player's
+// own battle client and the rest of their computer.
+function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT, lowPriority = false }) {
   const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads),
     '--level', level, '--format', format],
     { cwd: path.dirname(runtime.worker), env: workerEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  if (lowPriority && child.pid) {
+    try { os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* Best effort. */ }
+  }
   return child;
 }
 
@@ -131,6 +137,7 @@ function createApiServer({
   frameBurst = 200,
   maxFrameBytes = 256 * 1024,
   trustProxy = false,
+  lowPriority = false,
   launch = spawnWorker,
   now = Date.now,
   log = () => {},
@@ -236,7 +243,7 @@ function createApiServer({
   function startWorker(session, paths, team) {
     let child;
     try {
-      child = launch({ runtime: paths, threads: session.threads, level: BOTS[session.bot].level, format: session.format });
+      child = launch({ runtime: paths, threads: session.threads, level: BOTS[session.bot].level, format: session.format, lowPriority });
     } catch { return end(session, 'engine-failed'); }
     session.worker = child;
     if (team) child.stdin?.write(`${JSON.stringify({ type: 'team', data: team })}\n`);
