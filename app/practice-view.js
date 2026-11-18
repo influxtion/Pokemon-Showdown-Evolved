@@ -28,10 +28,14 @@ function allowRequest(details, root, connection) {
 }
 
 class PracticeView {
-  constructor({ window, root, css, background, onFailure = () => {}, View = WebContentsView }) {
+  // `battleCss()` returns the battle-room stylesheet while the launcher battle style is on, else ''.
+  constructor({ window, root, css, battleCss = () => '', background, onFailure = () => {}, View = WebContentsView }) {
     this.window = window;
     this.root = root;
     this.css = css;
+    this.battleCss = battleCss;
+    this.battleCssKey = null;
+    this.battleCssQueue = Promise.resolve();
     this.background = background;
     this.View = View;
     this.onFailure = onFailure;
@@ -64,6 +68,7 @@ class PracticeView {
     contents.on('dom-ready', () => {
       if (this.view === view) {
         contents.insertCSS(this.css, { cssOrigin: 'user' }).catch(() => {});
+        this.applyBattleCss({ reloaded: true });
         // Artwork can finish much later than the usable battle document.
         pollHealth();
       }
@@ -116,6 +121,23 @@ class PracticeView {
 
   status() { return { state: this.state, error: this.error }; }
 
+  // Adds or removes the battle-room stylesheet to match the Battle screen setting, in order.
+  applyBattleCss({ reloaded = false } = {}) {
+    const view = this.view;
+    this.battleCssQueue = this.battleCssQueue.then(async () => {
+      if (reloaded) this.battleCssKey = null;
+      if (!view || this.view !== view || view.webContents.isDestroyed()) return;
+      const css = this.battleCss();
+      if (css && !this.battleCssKey) {
+        this.battleCssKey = await view.webContents.insertCSS(css, { cssOrigin: 'user' });
+      } else if (!css && this.battleCssKey) {
+        const key = this.battleCssKey;
+        this.battleCssKey = null;
+        await view.webContents.removeInsertedCSS(key);
+      }
+    }).catch(() => {});
+  }
+
   place() {
     if (!this.view || this.view.webContents.isDestroyed()) return;
     if (this.bounds && this.bounds.width > 0 && this.bounds.height > 0) this.view.setBounds(this.bounds);
@@ -124,6 +146,7 @@ class PracticeView {
   }
 
   close() {
+    this.battleCssKey = null;
     clearTimeout(this.healthTimer);
     this.healthTimer = null;
     this.state = 'idle';

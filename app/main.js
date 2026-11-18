@@ -30,6 +30,10 @@ let showdexLoadFailed = false;
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-messages.css', 'client-rooms.css', 'client-friends.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
+// The restyled battle room, injected only while Settings > Battle screen is the launcher style,
+// so switching to Showdown's own battle UI takes effect at once without reloading a battle.
+const BATTLE_CSS = fs.readFileSync(path.join(__dirname, 'client-battle-room.css'), 'utf8');
+const launcherBattles = () => settings.get('battleStyle') !== 'showdown';
 const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
 // Window and view fills shown before pages paint; match --bg-app in each theme.
@@ -50,6 +54,24 @@ let practice = null;
 let practiceView = null;
 // The cloud server that computes Foul Play's moves. Lives for the whole app, independent of windows.
 let cloudEngine = null;
+// The battle stylesheet inserted into the Showdown client, kept by key so the Battle screen
+// setting can remove or re-add it live. Changes run in order, so a quick toggle cannot insert
+// it twice; a new document starts without it.
+let clientBattleCssKey = null;
+let clientBattleCssQueue = Promise.resolve();
+function applyClientBattleCss(contents, { reloaded = false } = {}) {
+  clientBattleCssQueue = clientBattleCssQueue.then(async () => {
+    if (reloaded) clientBattleCssKey = null;
+    if (!contents || contents.isDestroyed()) return;
+    if (launcherBattles() && !clientBattleCssKey) {
+      clientBattleCssKey = await contents.insertCSS(BATTLE_CSS, { cssOrigin: 'user' });
+    } else if (!launcherBattles() && clientBattleCssKey) {
+      const key = clientBattleCssKey;
+      clientBattleCssKey = null;
+      await contents.removeInsertedCSS(key);
+    }
+  }).catch(() => {});
+}
 let choosingReplayImport = false;
 let undoingReplayImport = false;
 let replayDirty = false;
@@ -167,6 +189,7 @@ function ensureClient() {
   // Re-applied on every load; the stylesheet follows prefers-color-scheme, which tracks nativeTheme.
   contents.on('dom-ready', () => {
     contents.insertCSS(CLIENT_CSS, { cssOrigin: 'user' }).catch(() => {});
+    applyClientBattleCss(contents, { reloaded: true });
     bridge.installFormatModal();
     bridge.installTeamsView();
     bridge.installTeamEditor();
@@ -273,6 +296,7 @@ function createWindow() {
     practice.error = 'Battle configuration could not load. Check the practice runtime setup.';
   }
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
+    battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),
     background: background(), onFailure: token => practice?.clientFailed(token) });
   practice.on('ready', connection => { logger.write('practice-ready'); practiceView?.open(connection); });
   practice.on('failure', code => {
@@ -714,12 +738,19 @@ ipcMain.handle('showdex:status', async (event) => {
   };
 });
 
+// Battle screen setting: applies to the open client and practice battle at once.
+function applyBattleStyle() {
+  if (client && !client.webContents.isDestroyed() && !client.webContents.isLoading()) applyClientBattleCss(client.webContents);
+  practiceView?.applyBattleCss();
+}
+
 ipcMain.handle('settings:set', (event, key, value) => {
   if (!isLauncherFrame(event)) return { ok: false, error: 'Access denied.' };
   if (maintenance) return { ok: false, error: 'Another operation is in progress.' };
   try {
     if (!settings.set(key, value)) return { ok: false, error: 'Invalid setting.' };
     nativeTheme.themeSource = settings.get('theme');
+    if (key === 'battleStyle') applyBattleStyle();
     return { ok: true, settings: settings.snapshot() };
   } catch {
     logger.write('settings-save-failed');

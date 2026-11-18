@@ -1,0 +1,696 @@
+/* Battle rooms, styled after the "A · Cobalt Cards" mockup: the field, the controls and the
+   log as separate cards on the app background; a header row with the gimmick toggles and the
+   timer as pills; type-tinted move tiles with a type chip and PP; switch cards with an HP bar;
+   card statbars on the field; turn pills in the log.
+
+   Applies to online battles (while the bridge sets sd-launcher-shell) and practice battles
+   (the practice client sets data-practice-state on <html>). Everything keeps the client's
+   markup, so it covers every generation and game type: moves (normal, Z, Max, Struggle),
+   switches, team preview, doubles/triples targets, Shift, and the Mega Evolution, Mega X/Y,
+   Z-Power, Ultra Burst, Dynamax and Terastallize toggles (all label.megaevo).
+
+   Layout rules (card positions, grids, the header row) apply only in the client's full layout:
+   at least 830px wide (no .small-layout) and 571px tall. Narrower or shorter windows keep the
+   client's own compact layouts with the colours and type below.
+
+   These rules are user-origin. Chromium paints a native button face over a background that
+   only a user-origin rule sets, so every restyled button also gets appearance: none. */
+
+:is(html.sd-launcher-shell, html[data-practice-state]) .ps-room {
+
+  /* ----- Type colours ----- */
+
+  .type-Normal { --sd-type: #a8a77a; --sd-type-ink: #15180f; }
+  .type-Fire { --sd-type: #ee8130; --sd-type-ink: #1f0e02; }
+  .type-Water { --sd-type: #6390f0; --sd-type-ink: #050f26; }
+  .type-Electric { --sd-type: #f7d02c; --sd-type-ink: #231b00; }
+  .type-Grass { --sd-type: #7ac74c; --sd-type-ink: #0d1d04; }
+  .type-Ice { --sd-type: #96d9d6; --sd-type-ink: #062221; }
+  .type-Fighting { --sd-type: #c22e28; --sd-type-ink: #ffffff; }
+  .type-Poison { --sd-type: #a33ea1; --sd-type-ink: #ffffff; }
+  .type-Ground { --sd-type: #c99a3d; --sd-type-ink: #1d1606; }
+  .type-Flying { --sd-type: #a98ff3; --sd-type-ink: #160b33; }
+  .type-Psychic { --sd-type: #f95587; --sd-type-ink: #2a0412; }
+  .type-Bug { --sd-type: #a6b91a; --sd-type-ink: #171b00; }
+  .type-Rock { --sd-type: #a8904a; --sd-type-ink: #1d1606; }
+  .type-Ghost { --sd-type: #735797; --sd-type-ink: #ffffff; }
+  .type-Dragon { --sd-type: #4f60d8; --sd-type-ink: #ffffff; }
+  .type-Dark { --sd-type: #705746; --sd-type-ink: #ffffff; }
+  .type-Steel { --sd-type: #9a9ab4; --sd-type-ink: #111126; }
+  .type-Fairy { --sd-type: #d685ad; --sd-type-ink: #2a0a1a; }
+  .type-Stellar { --sd-type: #40b5a5; --sd-type-ink: #04211d; }
+
+  .battle-log,
+  .battle-log-add,
+  .battle-controls {
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+  }
+
+  /* ----- Field ----- */
+
+  .battle {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: 0 0 0 1px var(--sd-border-strong) !important;
+  }
+  .battle .turn {
+    padding: 4px 10px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--sd-bar) !important;
+    color: #ffffff !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    text-shadow: none !important;
+  }
+
+  /* Statbars: the client builds strong(name) + .hpbar(.hptext, .hptextborder, .prevhp > .hp,
+     .status) and positions the card. The bar stays 151px wide, as the client sizes the HP
+     fill in pixels of that width. */
+  /* No card behind the name and bar: they sit on the field, with a thin light outline on the
+     text (as upstream) so they stay readable on any background art and in either theme. */
+  .statbar {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    --sd-statbar-ink: #15223a;
+    --sd-statbar-halo: 1px 1px 0 #ffffff, -1px 1px 0 #ffffff, 1px -1px 0 #ffffff, -1px -1px 0 #ffffff;
+  }
+  .statbar strong {
+    margin: 0 0 4px !important;
+    text-align: left !important;
+    color: var(--sd-statbar-ink) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 16px !important;
+    text-shadow: var(--sd-statbar-halo) !important;
+    white-space: nowrap !important;
+  }
+  .statbar strong small {
+    color: var(--sd-statbar-ink) !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+  }
+  .statbar .hpbar {
+    height: 8px !important;
+    padding: 0 !important;
+    border: 1px solid #15223a !important;
+    border-radius: 0 !important;
+    background: #e6ecf5 !important;
+  }
+  /* The declaration order of the hp* and prevhp* rules is significant, as upstream. .prevhp is
+     the client's lost-HP trail during the damage animation; at rest .hp covers it. */
+  .statbar .hpbar .hp {
+    height: 8px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #2fa35a !important;
+  }
+  .statbar .hpbar .hp-yellow {
+    background: #e0a31a !important;
+  }
+  .statbar .hpbar .hp-red {
+    background: #d64545 !important;
+  }
+  .statbar .hpbar .prevhp {
+    height: 8px !important;
+    border-radius: 0 !important;
+    background: color-mix(in srgb, #2fa35a 40%, #e6ecf5) !important;
+  }
+  .statbar .hpbar .prevhp-yellow {
+    background: color-mix(in srgb, #e0a31a 40%, #e6ecf5) !important;
+  }
+  .statbar .hpbar .prevhp-red {
+    background: color-mix(in srgb, #d64545 40%, #e6ecf5) !important;
+  }
+  /* HP % under the bar on the left; status and boost tags on the right. */
+  .statbar .hpbar .hptext,
+  .rstatbar .hpbar .hptext,
+  .lstatbar .hpbar .hptext {
+    top: 12px !important;
+    left: 0 !important;
+    right: auto !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--sd-statbar-ink) !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 14px !important;
+    text-align: left !important;
+    text-shadow: var(--sd-statbar-halo) !important;
+  }
+  .statbar .hpbar .hptextborder {
+    display: none !important;
+  }
+  .statbar .status {
+    min-height: 14px !important;
+    padding: 6px 0 0 36px !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+    text-align: right !important;
+  }
+  .statbar .status span {
+    border-radius: 0 !important;
+    font-weight: 600 !important;
+  }
+
+  /* ----- Controls card ----- */
+
+  .battle-controls {
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+  }
+  .battle-controls p {
+    font-size: 13px !important;
+  }
+  .battle-controls em {
+    color: var(--sd-text-2) !important;
+    font-style: normal !important;
+  }
+  .battle-controls .whatdo {
+    color: var(--sd-text) !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+  }
+  .battle-controls .whatdo strong {
+    font-weight: 600 !important;
+  }
+  .battle-controls .whatdo small {
+    border-color: var(--sd-border-strong) !important;
+    border-radius: 0 !important;
+    color: var(--sd-text-2) !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+  }
+  .battle-controls .whatdo small.weak {
+    border-color: #b8860b !important;
+    color: #b8860b !important;
+  }
+  .battle-controls .whatdo small.critical {
+    border-color: #d64545 !important;
+    color: #d64545 !important;
+  }
+  .battle-options .button,
+  .battle-controls .button {
+    font-family: inherit !important;
+    font-size: 12px !important;
+  }
+
+  /* Timer: a cobalt-tinted pill. Running and critical keep their warning colours. */
+  .battle-controls .timerbutton {
+    appearance: none !important;
+    padding: 6px 10px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-panel)) !important;
+    box-shadow: none !important;
+    color: var(--sd-bar) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-shadow: none !important;
+  }
+  .battle-controls .timerbutton-on {
+    color: #b42318 !important;
+  }
+  .battle-controls .timerbutton-critical {
+    background: #d64545 !important;
+    color: #ffffff !important;
+  }
+
+  /* "Attack", "Switch" and "Shift" section labels */
+  :is(.moveselect, .switchselect, .shiftselect) button {
+    appearance: none !important;
+    padding: 0 !important;
+    color: var(--sd-text-2) !important;
+    font-family: inherit !important;
+    font-size: 11px !important;
+    font-style: normal !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    text-shadow: none !important;
+  }
+
+  /* Move tiles: tinted with the move's type (Z and Max moves carry the same type-* class);
+     Struggle and empty slots have no type and stay plain. */
+  .movebutton {
+    appearance: none !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-panel) !important;
+    box-shadow: none !important;
+    color: var(--sd-text) !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-shadow: none !important;
+  }
+  .movemenu .movebutton[class*="type-"]:not(:disabled) {
+    border-color: color-mix(in srgb, var(--sd-type, var(--sd-border)) 40%, var(--sd-panel)) !important;
+    background: color-mix(in srgb, var(--sd-type, transparent) 14%, var(--sd-panel)) !important;
+  }
+  .movemenu .movebutton:not(:disabled):hover {
+    border-color: var(--sd-type, var(--sd-accent)) !important;
+    background: color-mix(in srgb, var(--sd-type, var(--sd-accent)) 22%, var(--sd-panel)) !important;
+  }
+  .movemenu .movebutton:not(:disabled):is(:active, .pressed) {
+    background: color-mix(in srgb, var(--sd-type, var(--sd-accent)) 32%, var(--sd-panel)) !important;
+  }
+  .movebutton:disabled {
+    border-color: var(--sd-border) !important;
+    background: var(--sd-subtle) !important;
+    color: var(--sd-text-2) !important;
+  }
+  .movebutton:focus-visible {
+    outline: 2px solid var(--sd-accent) !important;
+    outline-offset: 1px !important;
+  }
+  .movebutton small {
+    color: var(--sd-text-2) !important;
+    font-weight: 400 !important;
+  }
+  /* Type and PP keep Showdown's 8pt size: a small label bottom-left, PP bottom-right. */
+  .movebutton small.type {
+    padding: 0 4px !important;
+    border-radius: 0 !important;
+    background: var(--sd-type, var(--sd-subtle)) !important;
+    color: var(--sd-type-ink, var(--sd-text)) !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    line-height: 13px !important;
+  }
+  .movebutton small.pp {
+    color: var(--sd-text-2) !important;
+    font-size: 11px !important;
+    line-height: 13px !important;
+  }
+  /* Dark keeps the tile blue (a tint of a warm type turns grey on the navy panel) and marks
+     the type with a top edge, as in the Steel Blue mockup. */
+  @media (prefers-color-scheme: dark) {
+    .movemenu .movebutton[class*="type-"]:not(:disabled) {
+      border-color: var(--sd-border-strong) !important;
+      border-top: 3px solid var(--sd-type, var(--sd-border-strong)) !important;
+      background: var(--sd-hover) !important;
+    }
+    .movemenu .movebutton:not(:disabled):hover {
+      border-color: var(--sd-accent) !important;
+      border-top-color: var(--sd-type, var(--sd-accent)) !important;
+      background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-hover)) !important;
+    }
+    .movemenu .movebutton:not(:disabled):is(:active, .pressed) {
+      background: color-mix(in srgb, var(--sd-accent) 30%, var(--sd-hover)) !important;
+    }
+  }
+
+  /* Switch, target and team preview cards */
+  :is(.switchmenu, .allyparty) button {
+    appearance: none !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-panel) !important;
+    box-shadow: none !important;
+    color: var(--sd-text) !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-shadow: none !important;
+  }
+  :is(.switchmenu, .allyparty) button:not(:disabled):not(.disabled):hover {
+    border-color: var(--sd-accent) !important;
+    background: var(--sd-hover) !important;
+  }
+  :is(.switchmenu, .allyparty) button:not(:disabled):not(.disabled):is(:active, .pressed) {
+    background: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-panel)) !important;
+  }
+  :is(.switchmenu, .allyparty) button:focus-visible {
+    outline: 2px solid var(--sd-accent) !important;
+    outline-offset: 1px !important;
+  }
+  :is(.switchmenu, .allyparty) button:is(:disabled, .disabled) {
+    border-color: var(--sd-border) !important;
+    background: var(--sd-subtle) !important;
+    color: var(--sd-text-2) !important;
+  }
+  .switchmenu button[value$=",active"] {
+    border-color: var(--sd-accent) !important;
+    color: var(--sd-text) !important;
+  }
+  .switchmenu button[value$=",fainted"] {
+    opacity: 0.55 !important;
+  }
+  :is(.switchmenu, .allyparty) button .picon {
+    opacity: 1 !important;
+  }
+  :is(.switchmenu, .allyparty) button .hpbar {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--sd-app) !important;
+    opacity: 1 !important;
+    overflow: hidden !important;
+  }
+  /* The declaration order of these three hpbar* rules is significant, as upstream. */
+  :is(.switchmenu, .allyparty) button .hpbar span {
+    height: 4px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #2fa35a !important;
+  }
+  :is(.switchmenu, .allyparty) button .hpbar-yellow span {
+    background: #e0a31a !important;
+  }
+  :is(.switchmenu, .allyparty) button .hpbar-red span {
+    background: #d64545 !important;
+  }
+  :is(.switchmenu, .allyparty) button .status {
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Gimmick toggles: pills like the mockup's Terastallize. Checked shows the accent. */
+  .megaevo {
+    appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 6px 10px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-subtle) !important;
+    background-image: none !important;
+    color: var(--sd-text) !important;
+    font-family: Inter, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 16px !important;
+    text-shadow: none !important;
+    white-space: nowrap !important;
+  }
+  .megaevo br {
+    display: none !important;
+  }
+  .megaevo:hover {
+    border-color: var(--sd-accent) !important;
+    background: var(--sd-hover) !important;
+  }
+  .megaevo:has(:checked) {
+    border-color: var(--sd-accent) !important;
+    background: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-panel)) !important;
+    background-image: none !important;
+    color: var(--sd-text) !important;
+  }
+  .megaevo input[type="checkbox"] {
+    margin: 0 !important;
+    accent-color: var(--sd-accent);
+  }
+  .megaevo img {
+    vertical-align: middle !important;
+  }
+  .movewarning {
+    color: var(--sd-text-2) !important;
+    font-size: 12px !important;
+  }
+
+  /* ----- Log card ----- */
+
+  .battle-log,
+  .battle-log-add {
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+  }
+  .battle-log {
+    overflow-x: hidden !important;
+  }
+  .battle-log .inner {
+    padding: 12px 16px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+  .battle-log .battle-history small {
+    color: var(--sd-text-2) !important;
+    font-size: 12px !important;
+  }
+  .battle-log .battle-history strong {
+    font-weight: 600 !important;
+  }
+  .battle-log .rated {
+    font-family: inherit !important;
+  }
+  /* Turn markers: a cobalt pill with a rule running to the right edge. */
+  .battle-log h2.battle-history {
+    position: relative !important;
+    width: max-content !important;
+    margin: 12px 0 4px !important;
+    padding: 2px 10px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-panel)) !important;
+    color: var(--sd-bar) !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 18px !important;
+    text-shadow: none !important;
+  }
+  .battle-log h2.battle-history::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: calc(100% + 10px) !important;
+    width: 2000px !important;
+    height: 1px !important;
+    background: var(--sd-border) !important;
+  }
+  .chatbox textarea.textbox {
+    padding: 8px 12px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-input) !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room :is(.battle-log h2.battle-history, .battle-controls .timerbutton) {
+    color: var(--sd-text) !important;
+  }
+}
+
+/* ----- Card layout (the client's full layout only) ----- */
+
+@media (min-height: 571px) {
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room:not(.small-layout):not(.tiny-layout) {
+    background: var(--sd-app) !important;
+
+    .battle {
+      top: 24px !important;
+      left: 24px !important;
+    }
+
+    /* The client sets the controls' top inline; the card sits 16px under the field. */
+    .battle-controls {
+      top: 400px !important;
+      left: 24px !important;
+      width: 640px !important;
+      box-sizing: border-box !important;
+      padding: 16px !important;
+      border: 1px solid var(--sd-border) !important;
+      border-radius: 0 !important;
+    }
+
+    .battle-log {
+      top: 24px !important;
+      left: 684px !important;
+      right: 24px !important;
+      bottom: 81px !important;
+      border: 1px solid var(--sd-border) !important;
+      border-bottom: 0 !important;
+      border-radius: 0 !important;
+    }
+    .battle-log-add {
+      left: 684px !important;
+      right: 24px !important;
+      bottom: 24px !important;
+      min-height: 57px !important;
+      box-sizing: border-box !important;
+      padding: 12px 16px !important;
+      border: 1px solid var(--sd-border) !important;
+      border-radius: 0 !important;
+    }
+    .battle-userlist {
+      top: 25px !important;
+      left: 685px !important;
+    }
+  }
+
+  /* Practice battles have no message box, so the log card runs to the bottom margin. */
+  html[data-practice-state] .ps-room:not(.small-layout):not(.tiny-layout) .battle-log {
+    bottom: 24px !important;
+    border-bottom: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+  }
+
+  /* Controls: header row, then tile grids. */
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room .battle-controls {
+    .controls {
+      position: static !important;
+    }
+    .whatdo {
+      min-height: 30px !important;
+      margin: 0 0 12px !important;
+      padding: 0 !important;
+      line-height: 30px !important;
+    }
+    .controls:has(.megaevo-box) .whatdo {
+      padding-right: 340px !important;
+    }
+    .whatdo .timerbutton {
+      float: none !important;
+      position: absolute !important;
+      top: 16px !important;
+      right: 16px !important;
+      width: 96px !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+    }
+    /* Mega, Z, Ultra Burst, Dynamax and Tera toggles join the header, left of the timer. */
+    .megaevo-box {
+      position: absolute !important;
+      top: 16px !important;
+      right: 120px !important;
+      display: flex !important;
+      gap: 8px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      text-align: left !important;
+    }
+
+    :is(.moveselect, .switchselect, .shiftselect) button {
+      margin: 0 0 12px !important;
+    }
+    :is(.switchselect, .shiftselect) {
+      margin-top: 12px !important;
+    }
+
+    /* Moves: four columns. Z and Max moves sit in a wrapper that the toggle shows or hides
+       with an inline display: none, so only a shown wrapper becomes a grid. */
+    .movemenu,
+    .movemenu > [class^="movebuttons-"]:not([style*="none"]) {
+      display: grid !important;
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 4px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .movemenu > :is([class^="movebuttons-"], .megaevo-box, .movewarning) {
+      grid-column: 1 / -1 !important;
+    }
+    .movemenu > div[style*="clear"] {
+      display: none !important;
+    }
+    /* Showdown's move button: 40px tall, the name centred on the first line, type and PP
+       on the second. Only the width follows the four-column grid. */
+    .movebutton {
+      float: none !important;
+      width: auto !important;
+      height: 40px !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 3px 6px 0 !important;
+      line-height: 16px !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+    .movebutton small.type {
+      float: left !important;
+      margin-top: 2px !important;
+    }
+    .movebutton small.pp {
+      float: right !important;
+      margin-top: 2px !important;
+      padding-top: 0 !important;
+    }
+
+    /* Switches, targets and team preview: six columns of cards. The HP bar keeps the
+       client's 92px scale, centred in the card. */
+    .switchmenu {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)) !important;
+      gap: 8px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .switchmenu + .switchmenu {
+      margin-top: 8px !important;
+    }
+    .switchmenu > div[style*="clear"],
+    .switchmenu > br {
+      display: none !important;
+    }
+    .switchmenu > :is(em, .movewarning) {
+      grid-column: 1 / -1 !important;
+    }
+    .switchmenu button {
+      float: none !important;
+      width: auto !important;
+      min-height: 64px !important;
+      margin: 0 !important;
+      padding: 8px 10px 26px !important;
+      line-height: 18px !important;
+      text-align: left !important;
+      white-space: nowrap !important;
+      text-overflow: ellipsis !important;
+    }
+    /* The 40x30 icon drawn at 0.6 scale, so the name has room as in the mockup. */
+    .switchmenu button .picon {
+      margin: -6px -12px -6px -6px !important;
+      transform: scale(0.6) !important;
+      transform-origin: left center !important;
+    }
+    .switchmenu button {
+      padding-left: 8px !important;
+      padding-right: 6px !important;
+      overflow: hidden !important;
+    }
+    .switchmenu button .hpbar {
+      left: calc(50% - 46px) !important;
+      right: auto !important;
+      bottom: 20px !important;
+      width: 92px !important;
+      height: 4px !important;
+    }
+    .switchmenu button .status {
+      right: 8px !important;
+      bottom: 6px !important;
+      width: 6px !important;
+      height: 6px !important;
+    }
+    .switchmenu button:is([value$=",active"], [value$=",fainted"], [value$=",trapped"])::after {
+      position: absolute !important;
+      left: 10px !important;
+      bottom: 4px !important;
+      color: var(--sd-text-2) !important;
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 14px !important;
+    }
+    .switchmenu button[value$=",active"]::after { content: "Active" !important; }
+    .switchmenu button[value$=",fainted"]::after { content: "Fainted" !important; }
+    .switchmenu button[value$=",trapped"]::after { content: "Trapped" !important; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room * {
+    transition: none !important;
+  }
+}

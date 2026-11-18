@@ -3,6 +3,7 @@
 const controls = {
   theme: document.getElementById('theme'),
   homeLayout: document.getElementById('home-layout'),
+  battleStyle: document.getElementById('battle-style'),
   startPage: document.getElementById('start-page'),
   confirmOnClose: document.getElementById('confirm-on-close'),
   notifyMessages: document.getElementById('notify-messages'),
@@ -19,6 +20,7 @@ function show(values) {
   saved = values;
   controls.theme.value = values.theme;
   controls.homeLayout.value = values.homeLayout || '';
+  controls.battleStyle.value = values.battleStyle;
   controls.startPage.value = values.startPage;
   controls.confirmOnClose.checked = values.confirmOnClose;
   controls.notifyMessages.checked = values.notifyMessages;
@@ -61,6 +63,7 @@ async function save(key, value) {
 
 controls.theme.addEventListener('change', () => save('theme', controls.theme.value));
 controls.homeLayout.addEventListener('change', () => save('homeLayout', controls.homeLayout.value));
+controls.battleStyle.addEventListener('change', () => save('battleStyle', controls.battleStyle.value));
 controls.startPage.addEventListener('change', () => save('startPage', controls.startPage.value));
 controls.confirmOnClose.addEventListener('change', () => save('confirmOnClose', controls.confirmOnClose.checked));
 controls.notifyMessages.addEventListener('change', () => save('notifyMessages', controls.notifyMessages.checked));
