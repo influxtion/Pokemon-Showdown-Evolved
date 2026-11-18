@@ -1,7 +1,7 @@
 'use strict';
 
-// Info & Resources: the help is written into the page. The two help buttons open rooms in
-// the Showdown client, so they need it running and the user signed in for a ticket.
+// Info & Resources: help written into the page. The two help buttons open client rooms, so they
+// need the client running and the user signed in.
 (() => {
   const status = document.getElementById('help-status');
   for (const button of document.querySelectorAll('[data-room]')) {

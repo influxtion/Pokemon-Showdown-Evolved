@@ -1,15 +1,14 @@
 'use strict';
 
-// Installs the pinned Foul Play runtime: a standalone Python, Foul Play's source, its Python
-// packages, poke-engine compiled with Terastallization, and the set data and usage stats Foul Play
-// reads for Random Battle and OU. The same code runs on the API server (`npm run setup`) and in the
-// desktop app, when a player opts in to running Foul Play on their computer. The worker never
-// downloads anything itself. `npm run refresh-ou` moves the OU pins to the newest published data, by hand.
+// Installs the pinned Foul Play runtime: standalone Python, Foul Play's source and packages,
+// poke-engine built with Terastallization, and Random Battle and OU data. Used by the API server
+// (`npm run setup`) and by the app when a player opts in. The worker never downloads anything.
+// `npm run refresh-ou` moves the OU pins to the newest data, by hand.
 //
 // Layout under `dir`:
-//   current/            the runtime the server uses (python/, foul-play/, install.json)
-//   staging/            a build in progress; renamed to current/ only once it passes its check
-//   toolchain/          a private Rust toolchain, only if none was found; removed after a build
+//   current/    the runtime in use (python/, foul-play/, install.json)
+//   staging/    a build in progress; becomes current/ once it passes its check
+//   toolchain/  a private Rust toolchain if none was found; removed after a build
 
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -22,7 +21,7 @@ const lock = require('./lock.json');
 // Changes whenever any pin changes, so an older install is reported as needing an update.
 const LOCK_VERSION = crypto.createHash('sha256').update(JSON.stringify(lock)).digest('hex').slice(0, 16);
 const WORKER = path.join(__dirname, 'worker', 'foulplay_worker.py');
-// Git Bash puts GNU tar first on PATH, and it reads `C:\...` as a remote host; Windows' bsdtar does not.
+// Use Windows' bsdtar: Git Bash's GNU tar comes first on PATH and reads `C:\...` as a remote host.
 const TAR = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 // Roughly how many crates cargo compiles for poke-engine; only used to move the progress bar.
 const ENGINE_CRATES = 40;
@@ -40,8 +39,8 @@ const STEPS = Object.freeze([
 const TOTAL_WEIGHT = STEPS.reduce((sum, step) => sum + step.weight, 0);
 // Formats the worker checks after a build; each must load without a download.
 const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou']);
-// Where Foul Play looks for each OU file, relative to fp/data. Usage stats are stored without
-// their "info" header, as Foul Play caches them.
+// Where Foul Play looks for each OU file, relative to fp/data. Usage stats drop their "info"
+// header, as Foul Play's cache does.
 const OU_FILES = Object.freeze({
   usageStats: ['smogon_stats_cache', 'gen9ou-0.json'],
   showdownSets: ['pkmn_sets_cache', 'gen9ou', 'showdown_sets.json'],
@@ -66,8 +65,8 @@ function paths(dir, worker = WORKER) {
     manifest: path.join(current, 'install.json'), worker };
 }
 
-// What is installed under `dir`, without running anything. `worker` overrides where the worker
-// script is read from (a packaged app keeps it outside its archive).
+// What is installed under `dir`, without running anything. `worker` overrides the worker path
+// (a packaged app keeps it outside app.asar).
 function inspect(dir, worker = WORKER) {
   const where = paths(dir, worker);
   let manifest = null;
@@ -300,9 +299,8 @@ async function installOuData(dataDir, downloads, { signal, onFraction = () => {}
   }
 }
 
-// `npm run refresh-ou`: points the OU pins in lock.json at the newest published usage stats
-// and the current set data. Run it by hand, check the result, then commit lock.json and run
-// `npm run setup` on the server.
+// `npm run refresh-ou`: points lock.json's OU pins at the newest usage stats and current set data.
+// Check the result, commit lock.json, then run `npm run setup` on the server.
 async function refreshOuData({ fetcher = fetch, now = new Date(), lockFile = path.join(__dirname, 'lock.json'), onLog = () => {} } = {}) {
   const hash = async url => {
     const response = await fetcher(url, { redirect: 'follow' });

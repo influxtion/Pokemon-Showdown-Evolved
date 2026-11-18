@@ -1,20 +1,17 @@
 'use strict';
 
-// Simple practice bots: Random, Greedy and Heuristic. They run in the app, against the simulator on
-// this computer, with no cloud server. Each one reads the bot seat's battle frames, keeps a small
-// picture of the battle, and answers every |request| with a choice built from that request, so the
-// choice is always legal.
+// Simple practice bots (Random, Greedy, Heuristic), run in the app against the local simulator.
+// Each reads the bot seat's frames, tracks the battle, and answers every |request| with a choice
+// built from it, so the choice is always legal. Data comes from the shipped simulator (MIT);
+// nothing comes from Foul Play.
 //
-// Move, species and type data come from the Pokemon Showdown simulator the app already ships
-// (MIT). Nothing here comes from Foul Play.
+//   random     a random usable move; sometimes a random switch.
+//   greedy     the biggest estimated hit; never switches by choice.
+//   heuristic  take a KO, leave bad matchups, set a hazard and status once, heal when low,
+//              set up when safe, otherwise attack.
 //
-//   random     a random usable move; now and then a random switch.
-//   greedy     the move with the biggest estimated immediate damage; never switches by choice.
-//   heuristic  simple rules: take a KO, switch out of bad matchups, set a hazard and status once,
-//              heal when low, set up when safe, otherwise attack.
-//
-// Damage is a quick estimate (standard formula with stats, boosts, STAB, type effectiveness and an
-// average roll); abilities and items are ignored apart from Levitate.
+// Damage is estimated (stats, boosts, STAB, effectiveness, average roll); abilities and items are
+// ignored except Levitate.
 
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
@@ -217,7 +214,7 @@ function foeView(data, mon) {
     teraType: mon.tera, terastallized: Boolean(mon.tera) };
 }
 
-// What the picker sees: both active Pokemon, the bot's party by request slot, and the opponent's hazards.
+// What the picker sees: both actives, the bot's party by request slot, and the foe's hazards.
 function battleView(data, tracker, request) {
   const mine = request.side?.id === 'p1' || request.side?.id === 'p2' ? request.side.id : 'p2';
   const theirs = mine === 'p1' ? 'p2' : 'p1';
@@ -236,7 +233,7 @@ function battleView(data, tracker, request) {
 
 // ---------- Legal options ----------
 
-// Usable moves (by id and request position) and switch slots from a |request|, and whether Tera is available.
+// Usable moves (id and request position), switch slots and Tera availability from a |request|.
 function legalOptions(request) {
   const forced = Boolean(request.forceSwitch?.[0]);
   const active = forced ? {} : request.active?.[0] || {};
@@ -305,7 +302,7 @@ function damageShare(data, attacker, defender, moveId, tera = false) {
   return Math.min(1, estimateDamage(data, attacker, defender, moveId, tera) / defender.hp);
 }
 
-// How hard `foe` can hit `mon`: its best revealed attack, or an 80-power STAB move of its better attacking stat.
+// How hard `foe` hits `mon`: its best revealed attack, or an 80-power STAB move off its better attack.
 function threat(data, foe, mon) {
   if (!foe || !mon || mon.hp <= 0) return 0;
   let best = 0;
@@ -466,8 +463,8 @@ function command(option, request) {
 
 // ---------- Bot seat ----------
 
-// Plays the bot's seat. Same shape as the cloud API socket that PracticeSession uses for Foul Play:
-// send(frame) in; 'choice' { room, choice, rqid, elapsedMs } and 'close' { error } out.
+// Plays the bot's seat, shaped like the cloud API socket: send(frame) in; 'choice' { room,
+// choice, rqid, elapsedMs } and 'close' { error } out.
 class LocalBot extends EventEmitter {
   constructor({ kind, data, rng = Math.random, delayMs = DECIDE_DELAY_MS }) {
     super();

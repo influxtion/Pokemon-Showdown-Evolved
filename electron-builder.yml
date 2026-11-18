@@ -3,6 +3,14 @@ productName: Showdown Desktop
 directories:
   output: out/windows
 asar: true
+# runAsNode stays on: the practice simulator runs as an ELECTRON_RUN_AS_NODE child.
+electronFuses:
+  runAsNode: true
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 # Python reads the Foul Play worker directly, so it cannot live inside app.asar.
 asarUnpack:
   - api/worker/**/*

@@ -1,10 +1,7 @@
-/* Teambuilder room: the client's own markup, recoloured and retyped in place.
-
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. The
-   set editor is laid out by the client with fixed sizes and absolute positions, and it
-   draws each sprite as the .setchart background image. So this file changes surfaces,
-   type and controls only: no sizes or positions inside .setchart, and never the
-   `background` shorthand on it. */
+/* Teambuilder room, recoloured and retyped in place. Applies under sd-launcher-shell. The
+   client lays out the set editor with fixed sizes and positions and draws each sprite as the
+   .setchart background, so: no sizes or positions inside .setchart, and never the `background`
+   shorthand on it. */
 html.sd-launcher-shell #room-teambuilder {
   background: var(--sd-app) !important;
   color: var(--sd-text) !important;
@@ -36,9 +33,8 @@ html.sd-launcher-shell #room-teambuilder {
   }
 
   /* ----- Team list -----
-     installTeamsView() in showdown.js adds .sd-tb-head (title, actions, search), folder
-     counts, .sd-tb-groups (cards by format) and .sd-tb-banner around the client's markup.
-     The head and the folder chips sit above the scrolling team pane. */
+     installTeamsView() adds .sd-tb-head (title, actions, search), folder counts, .sd-tb-groups
+     (cards by format) and .sd-tb-banner. The head and chips sit above the scrolling pane. */
   --tb-pad: 32px;
   --tb-head: 96px;
   --tb-top: 152px;
@@ -388,8 +384,8 @@ html.sd-launcher-shell #room-teambuilder {
   .teamlist .team small em {
     display: none !important;
   }
-  /* Icons keep the client's 40x30 sprite box, since the sheet offset is inline; the slot
-     frame is an outline so it adds no size. */
+  /* Icons keep the client's 40x30 sprite box (inline sheet offset); the frame is an outline, so
+     it adds no size. */
   .teamlist .team .picon,
   .sd-tb-slot {
     box-sizing: content-box !important;
@@ -574,9 +570,9 @@ html.sd-launcher-shell #room-teambuilder {
   }
 
   /* ----- Team editor -----
-     installTeamEditor() in showdown.js tags .teamwrapper with data-sd-mode (team, set or
-     export), adds .sd-te-head and decorates each set. The client positions the editor's
-     parts absolutely and scales the wrapper on narrow windows; here they are a column. */
+     installTeamEditor() tags .teamwrapper with data-sd-mode (team, set or export), adds
+     .sd-te-head and decorates each set. The client positions parts absolutely and scales the
+     wrapper on narrow windows; here they form a column. */
 
   --t: var(--sd-text-2);
   .sd-t-Normal { --t: #a8a77a; }
@@ -1659,9 +1655,8 @@ html.sd-launcher-shell #room-teambuilder {
   }
 
   /* ----- Field picker modal -----
-     In the set view the client's results pane (search results, or the stats and details
-     forms) sits inside .sd-te-modal: the frame draws the header and the pane is placed
-     over the frame's body, since the client renders into the pane and scrolls it. */
+     In set view the client's results pane sits in .sd-te-modal, placed over the frame's body,
+     since the client renders into and scrolls that pane. */
 
   .sd-te-backdrop,
   .sd-te-modal {

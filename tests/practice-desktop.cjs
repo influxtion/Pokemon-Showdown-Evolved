@@ -149,9 +149,10 @@ async function smoke() {
   await until(async () => (await status()).installed, 'practice runtime ready');
   assert.equal((await status()).state, 'idle');
   fs.mkdirSync(captures, { recursive: true });
-  // Practice is cloud only: no engine choice on the page and no local install API in the bridge.
-  assert.equal(await run("document.querySelector('input[name=\"practice-engine\"], #practice-install') === null"), true, 'no local option on the page');
-  assert.equal(await run("['installLocalPractice', 'cancelLocalPracticeInstall', 'removeLocalPractice'].some(name => name in window.desktop)"), false, 'no local install API');
+  // The cloud is the default; local Foul Play is an opt-in that nothing downloads unasked.
+  const initial = await status();
+  assert.equal(initial.engineChoice, 'cloud', 'cloud engine by default');
+  assert.equal(initial.local.installing, false, 'no download until the player asks');
   await capture(renderer, 'setup');
   assert.equal((await call('startPractice', selection)).ok, true);
   // The battle plays in its own tab; the setup page never shows the battle client.

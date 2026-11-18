@@ -1,9 +1,6 @@
-/* Ladder room: the client's own markup, restyled in place. Its buttons, search and refresh
-   keep working because nothing is moved or replaced.
-
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. The
-   room has two views with no class to tell them apart: the format list (the only one with
-   <ul> children) and a format's rankings (the only one with a <table>). */
+/* Ladder room, restyled in place; nothing moves, so its controls keep working. Applies under
+   sd-launcher-shell. Its two views have no class: the format list has <ul> children, a format's
+   rankings a <table>. */
 html.sd-launcher-shell #room-ladder {
   background: var(--sd-app) !important;
 

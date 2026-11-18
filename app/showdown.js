@@ -1,9 +1,8 @@
 'use strict';
 
-// Reads state from, and sends a fixed set of actions to, the official client's page.
-// The functions below are serialized and run inside play.pokemonshowdown.com, so they may
-// only use that page's globals (app, Storage, BattleFormats, Dex). Arguments are passed
-// as JSON, never spliced into code as strings.
+// Reads state from, and sends fixed actions to, the official client page. The functions below
+// run inside play.pokemonshowdown.com, so they use only its globals (app, Storage, BattleFormats,
+// Dex). Arguments travel as JSON, never spliced into code.
 
 const { net } = require('electron');
 const { boundedJson } = require('./bounded-json');
@@ -18,9 +17,8 @@ const RATINGS_TTL = 2 * 60 * 1000;
 const FRIENDS_TTL = 30 * 1000;
 const FRIENDS_FAILURE_TTL = 5 * 1000;
 const FRIENDS_TIMEOUT = 4500;
-// Home's snapshot waits at most this long for ratings and friends. A slower answer (a stale
-// cache, a slow profile fetch, a friends query the server never answers) finishes in the
-// background and reaches Home on its next read; until then Home shows the last known values.
+// Longest Home's snapshot waits for ratings and friends. Slower answers finish in the background
+// and show on the next read; until then Home keeps the last values.
 const SNAPSHOT_NETWORK_WAIT = 150;
 
 const isId = (value) => typeof value === 'string' && ID.test(value);
@@ -31,9 +29,8 @@ function readClient() {
     return { ready: false };
   }
   const text = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
-  // Showdown's 2D sprites (the gen 5 style, as its "BW sprites" option shows them), not the
-  // 3D Pokémon HOME renders the Teambuilder uses for recent generations. Asking for them
-  // through a gen 5 dex gives sprites/gen5 for every Pokémon, including newer ones.
+  // Showdown's 2D gen 5 sprites, not the 3D Pokémon HOME renders. A gen 5 dex returns
+  // sprites/gen5 for every Pokémon, newer ones included.
   const dex2d = typeof Dex !== 'undefined' && Dex && typeof Dex.forGen === 'function' ? Dex.forGen(5) : undefined;
   const sprite = (set) => {
     try {
@@ -43,9 +40,8 @@ function readClient() {
       return null;
     }
   };
-  // Unpacking every team for its sprites is the costly part of this read, and it runs in the
-  // page that also runs battles. Sprites depend only on a team's packed text, so they are
-  // remembered by it; only new or edited teams are unpacked, and removed teams are dropped.
+  // Unpacking teams for sprites is costly and runs in the battle page, so sprites are cached by
+  // packed text: only new or edited teams are unpacked.
   const known = window.__sdTeamSprites2d instanceof Map ? window.__sdTeamSprites2d : new Map();
   const seen = new Map();
   const teams = (Storage.teams || []).map((t, index) => {
@@ -63,8 +59,7 @@ function readClient() {
   });
   window.__sdTeamSprites2d = seen;
   const rd = app.roomsData || {};
-  // A paragraph as runs of plain text and links, so Home can show the whole post without
-  // ever inserting the page's HTML. Links keep only their text and resolved address.
+  // A paragraph as plain-text runs and links, so Home never inserts the page's HTML.
   const runs = (p) => {
     const out = [];
     const walk = (node) => {
@@ -105,11 +100,9 @@ function readClient() {
   };
 }
 
-// Open rooms for the rail and the Home "return to battle" banner. Cheap enough to poll.
-// It also decides whether the launcher may replace the client's own header and tabs: the
-// "sd-launcher-shell" class (see client-shell.css) is set only after a complete read by a
-// client that still has the room controls the rail drives. If Showdown changes, the class
-// is withdrawn and the client's own navigation comes back.
+// Open rooms for the rail and Home's "return to battle" banner; cheap enough to poll. Also sets
+// "sd-launcher-shell" (client-shell.css) only after a complete read by a client that still has
+// the room controls the rail drives; otherwise the client's own navigation returns.
 function readSession() {
   const root = window.document && document.documentElement;
   const setShell = (on) => { if (root && root.classList) root.classList.toggle('sd-launcher-shell', on); };
@@ -164,8 +157,8 @@ function readSession() {
       popups: app.popups ? app.popups.length : 0,
       shell: capable,
     };
-    // The rail replaces the client's tabs, so show one room at a time. This is a runtime
-    // flag only; the user's saved layout preference is left alone.
+    // The rail replaces the client's tabs, so show one room at a time. Runtime flag only; the saved
+    // layout preference is untouched.
     if (capable && !app.singlePanelMode) {
       app.singlePanelMode = true;
       app.updateLayout();
@@ -178,9 +171,8 @@ function readSession() {
   }
 }
 
-// Private messages and challenges live in the main menu as one .pm-window per user; the
-// client hides a closed one rather than removing it. Each window's .challenge form says
-// which way a challenge goes by its buttons, which are the client's own.
+// Each user's PMs and challenges live in a main-menu .pm-window, hidden rather than removed when
+// closed. The .challenge form's buttons show which way a challenge goes.
 function readMessages(menu) {
   const box = menu && menu.$pmBox && menu.$pmBox[0];
   if (!box || typeof box.querySelectorAll !== 'function') return [];
@@ -321,8 +313,8 @@ function readFriends(expectedUserid, timeout) {
   });
 }
 
-// Drives the main menu's own search form so login prompts, team checks and cancel all
-// behave exactly as if the user had clicked Battle! in the client.
+// Drives the main menu's own search form, so login prompts, team checks and cancel behave as if
+// the user clicked Battle! in the client.
 function search(format, teamIndex) {
   const menu = app.rooms[''];
   app.focusRoom('');
@@ -330,8 +322,7 @@ function search(format, teamIndex) {
   if (!$form.length) return false;
   $form.find('button[name=format]').replaceWith(menu.renderFormats(format));
   $form.find('button[name=team]').replaceWith(menu.renderTeams(format, teamIndex));
-  // renderTeams coerces an empty index to 0. Preserve "no team selected" so
-  // the client's own search handler can show its missing-team prompt.
+  // renderTeams coerces an empty index to 0; keep "no team" so the client shows its missing-team prompt.
   if (teamIndex === null && !BattleFormats[format].team) {
     $form.find('button[name=team]').val('');
   }
@@ -346,8 +337,7 @@ function cancelSearch() {
   return true;
 }
 
-// The client opens the user's message window with the challenge form in it; show that
-// conversation full size rather than the bare main menu, which the launcher hands to Home.
+// Opens the user's message window with the challenge form, full size rather than the bare main menu.
 function challenge(name, format) {
   app.rooms[''].challenge(name, format);
   const userid = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -375,10 +365,9 @@ function focusRoom(roomid) {
   return true;
 }
 
-// A battle the user is still playing must be forfeited to close. Its tab asks in the launcher
-// ('needs-forfeit'), so closing never brings the battle back on screen just to show the
-// client's popup; once confirmed, forfeit sends the client's own /forfeit and leaves the room.
-// Other rooms go through the client's own leave path ('needs-client' when it shows a popup).
+// A battle the user is still playing must be forfeited to close. The launcher asks ('needs-forfeit'),
+// then forfeit sends the client's own /forfeit and leaves. Other rooms use the client's leave path
+// ('needs-client' when it shows a popup).
 function leaveRoom(roomid, forfeit) {
   const room = app.rooms[roomid];
   if (!room) return true;
@@ -421,9 +410,8 @@ function login() {
   return true;
 }
 
-// Opens the friends pages straight away. Joining the page room creates and focuses it at once
-// (the client asks the server for its content), instead of showing the main menu until the
-// server's reply to /friends arrives. An already open friends page is simply focused.
+// Opens the friends page at once: joining its room creates and focuses it while the server
+// fills it in. An open friends page is just focused.
 function friends() {
   const open = Object.keys(app.rooms).find((id) => /^view-friends(-|$)/.test(id));
   if (open) {
@@ -463,10 +451,9 @@ function loadShowdex(entry) {
   return true;
 }
 
-// Turns the client's format picker into a centered modal (styled in client-battle.css).
-// The popup itself stays the client's own, so search, stars and selection keep working;
-// this only adds a header and a backdrop that closes it, so a click beside the modal
-// cannot also press whatever sits behind it, such as the Battle button.
+// Shows the client's format picker as a centered modal (client-battle.css). The popup stays the
+// client's own; this adds a header and a backdrop, so a click beside it can't press the Battle
+// button behind.
 function installFormatModal() {
   if (window.__SD_FORMAT_MODAL || !document.body) return true;
   window.__SD_FORMAT_MODAL = true;
@@ -517,11 +504,9 @@ function installFormatModal() {
   return true;
 }
 
-// Rebuilds the Teambuilder's team list into the launcher's layout (styled in
-// client-teambuilder.css): a header with the list's actions and search, folder chips, team
-// cards grouped by format, and a storage notice. It only moves, labels and adds elements
-// around the client's own markup after each render. Buttons keep their name and value, so
-// the client's click dispatch, drag and drop and search still drive everything.
+// Rebuilds the Teambuilder's team list in the launcher's layout (client-teambuilder.css): header,
+// folder chips, cards by format and a storage notice. It only moves, labels and adds elements
+// after each render; buttons keep their name and value, so the client's handlers still work.
 function installTeamsView() {
   if (window.__SD_TEAMS_VIEW || !document.body) return true;
   window.__SD_TEAMS_VIEW = true;
@@ -646,8 +631,8 @@ function installTeamsView() {
     list.dataset.sd = '1';
     const room = window.app && app.rooms && app.rooms.teambuilder;
     if (!room || !window.Storage) return;
-    // While searching, the old head still holds the focused search box. The client's
-    // re-render looks it up by ID and finds that one first, so take the focus from it.
+    // The old head still holds the focused search box, which the client's re-render would find
+    // first by ID; take the focus from it.
     const active = document.activeElement;
     const typing = active && active.id === 'teamSearchBar' && !pane.contains(active);
     const caret = typing ? active.selectionStart : 0;
@@ -708,8 +693,7 @@ function installTeamsView() {
       if (value === '+' || value === '++') continue;
       if (value === '/') chip.replaceChildren(document.createTextNode('No folder'));
       if (value !== 'all' && !value.endsWith('/')) {
-        // Format folders are labelled without their generation, which the hidden group
-        // headings used to give; spell it out on the chip.
+        // Folder chips drop the generation that hidden group headings gave; spell it out.
         chip.querySelectorAll(':scope > i').forEach((n) => n.remove());
         chip.replaceChildren(document.createTextNode(formatParts(value).filter(Boolean).join(' ')));
       }
@@ -742,11 +726,9 @@ function installTeamsView() {
   return true;
 }
 
-// Lays the Teambuilder's team editor out as the launcher's design (client-teambuilder.css):
-// a header with the team's actions and a card per set. Like installTeamsView it only moves,
-// labels and adds elements around the client's own markup after each render, so every
-// input and button keeps the client's handlers. The client has three editor modes, read
-// from its markup: "team" (all sets), "set" (one set with the search pane) and "export".
+// Lays out the team editor in the launcher's design (client-teambuilder.css): a header with the
+// team's actions and a card per set. Like installTeamsView, it only rearranges the client's
+// markup. Editor modes, read from the markup: "team", "set" (with the search pane) and "export".
 function installTeamEditor() {
   if (window.__SD_TEAM_EDITOR || !document.body) return true;
   window.__SD_TEAM_EDITOR = true;
@@ -839,8 +821,8 @@ function installTeamEditor() {
     return [box, text];
   }
 
-  // The whole team as text, like a PokePaste: the client's own export of each set, with the
-  // species, Tera type and move dashes coloured by type. Built as text nodes, never HTML.
+  // The whole team as text, like a PokePaste: the client's export of each set, with species, Tera
+  // type and moves coloured by type. Text nodes only, never HTML.
   function buildPaste(wrapper, room) {
     const box = wrapper.querySelector('.teamchartbox');
     if (!box || box.querySelector(':scope > .sd-te-paste')) return;
@@ -978,8 +960,8 @@ function installTeamEditor() {
     }
   }
 
-  // Team view side panel: the client's upload form, and its tier resource links (loaded
-  // from Smogon after the first render, which re-renders the editor).
+  // Team view side panel: the client's upload form and tier resource links (loaded from Smogon,
+  // which re-renders the editor).
   function buildAside(wrapper, room) {
     const box = wrapper.querySelector('.teamchartbox');
     if (!box || box.querySelector(':scope > .sd-te-aside')) return;
@@ -1028,10 +1010,9 @@ function installTeamEditor() {
     box.append(aside);
   }
 
-  // Set view: the client's results pane (search results, or the stats and details forms)
-  // shown as a centered modal. The client's own field stays behind it; the modal's search
-  // box mirrors it and passes keys through, so choosing a result moves on to the next field
-  // as before and the modal follows. Closing returns to the team view.
+  // Set view: the client's results pane shown as a centered modal. Its search box mirrors the
+  // client's field and passes keys through, so choosing a result still advances to the next field.
+  // Closing returns to the team view.
   const MODAL_TITLES = {
     pokemon: 'Choose a Pokémon', item: 'Choose an item', ability: 'Choose an ability',
     stats: 'EVs, IVs and nature', details: 'Details',
@@ -1098,8 +1079,7 @@ function installTeamEditor() {
       frame.append(head);
       wrapper.append(backdrop, frame);
     }
-    // After a choice the client focuses the next field; follow it even if no focus event
-    // fired (an unfocused window still moves the active element).
+    // After a choice the client focuses the next field; follow it even without a focus event.
     const active = document.activeElement;
     if (active && active.classList.contains('chartinput') && wrapper.contains(active) &&
         active.name !== room.curChartName) {
@@ -1272,8 +1252,8 @@ function installTeamEditor() {
   return true;
 }
 
-// Teambuilder teams of one format, for practice. Returns packed teams: the launcher's main process
-// checks and uses them, and only names reach the Bots page.
+// Packed Teambuilder teams of one format, for practice. Main checks and uses them; only names
+// reach the Bots page.
 function readTeams(format) {
   if (!window.Storage || !Array.isArray(Storage.teams)) return null;
   return Storage.teams.map((t, index) => ({ index, name: t.name, format: t.format, team: t.team }))
@@ -1311,9 +1291,8 @@ function spriteUrl(path) {
   return typeof path === 'string' && SPRITE.test(path) ? `${SHOWDOWN}${path}.png` : null;
 }
 
-// A news post's full text for Home: paragraphs of plain-text runs, some of them links. Links
-// must be http(s) and open in the system browser; anything else stays as plain text. Bounded
-// in paragraphs, runs and total length, and whitespace is collapsed as a browser would.
+// A news post's full text for Home: paragraphs of plain-text runs and links (http(s) only, opened
+// in the browser). Bounded in size; whitespace collapsed as a browser would.
 function newsBody(value) {
   if (!Array.isArray(value)) return [];
   let budget = 6000;
@@ -1400,8 +1379,8 @@ function plain(value, max) {
   return str(value, max * 2).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-// Conversations and challenges, reduced to bounded plain values. Format strings may carry
-// custom rules after "@@@", so they are kept as bounded text rather than IDs.
+// Conversations and challenges as bounded plain values. Formats may carry custom rules after
+// "@@@", so they stay bounded text, not IDs.
 function sanitizeMessages(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
@@ -1497,8 +1476,8 @@ function sanitizeFriends(raw) {
   return { available: raw.length === 0 || items.length > 0, items };
 }
 
-// A promise's value if it settles within the snapshot's network budget, else the fallback.
-// The promise keeps running and fills its cache for the next read.
+// The promise's value if it settles within the snapshot's budget, else the fallback. It keeps
+// running and fills its cache for the next read.
 function within(promise, fallback) {
   let timer;
   const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), SNAPSHOT_NETWORK_WAIT); });
@@ -1552,8 +1531,7 @@ class ShowdownBridge {
     } catch { return false; }
   }
 
-  // Teambuilder teams for `format`: [{ index, name, team }] with the packed team, or null if the
-  // client is not loaded.
+  // Teambuilder teams for `format` as [{ index, name, team }] (packed), or null if the client isn't loaded.
   async teams(format) {
     const contents = this.getContents();
     if (!isId(format) || !contents || contents.isLoading()) return null;

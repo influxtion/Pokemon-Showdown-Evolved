@@ -1,7 +1,7 @@
 'use strict';
 
-// Home hub. Reads state from the hidden Showdown client and sends it actions; the
-// battle itself always happens in the client on the Play screen.
+// Home hub. Reads state from the hidden Showdown client and sends it actions; battles happen in
+// the client on the Play screen.
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -24,8 +24,8 @@ const els = {
 };
 
 let state = { ready: false };
-// Session polling is the freshest source for connection state. Until the first
-// usable session arrives, show loading rather than claiming the socket is lost.
+// Session polling has the freshest connection state; until the first usable session, show
+// loading rather than a lost connection.
 let sessionReady = false;
 let sessionConnected = false;
 let formatsKey = '';
@@ -84,8 +84,8 @@ function toPlay() {
   location.href = 'play.html';
 }
 
-// Most actions open something in the client, so they switch to it. Background actions
-// (search, cancel) only switch when the client needs the user, such as a login prompt.
+// Most actions open something in the client, so they switch to it. Background actions (search,
+// cancel) switch only when the client needs the user, such as a login prompt.
 async function act(action, args, { show = true } = {}) {
   const result = await window.desktop.showdown(action, args);
   if (result === 'needs-client' || (result && show)) toPlay();
@@ -242,9 +242,8 @@ function renderHero() {
   if (challengeSubmit) challengeSubmit.disabled = !sessionReady || !sessionConnected;
 }
 
-// News: each post opens in place to its full text. Links inside it, and the post's page on
-// the website, open in the system browser. Rebuilt only when the news changes, so an open
-// post stays open through Home's regular refreshes.
+// News: each post opens in place. Its links and website page open in the browser. Rebuilt only
+// when the news changes, so an open post stays open across refreshes.
 let newsKey = '';
 const openPosts = new Set();
 
@@ -266,8 +265,8 @@ function postBody(n) {
       if (run.href) {
         const link = el('a', null, run.text);
         link.href = run.href;
-        // A link to a Showdown room (play.pokemonshowdown.com/thecafe) opens that room here,
-        // through the same path as the chat room shortcuts, instead of the website.
+        // A Showdown room link (play.pokemonshowdown.com/thecafe) opens that room here, like the chat
+        // room shortcuts.
         const room = showdownRoom(run.href);
         if (room) link.dataset.room = room;
         p.append(link);
@@ -321,8 +320,7 @@ function renderNews() {
   }));
 }
 
-// Chat room shortcuts. Until the player edits them they follow the busiest rooms; the
-// first edit pins that list, and from then on it is theirs (a convenience, kept locally).
+// Chat room shortcuts follow the busiest rooms until the first edit pins the list (saved locally).
 const MAX_PINNED_ROOMS = 12;
 const ROOM_ID = /^[a-z0-9-]{1,80}$/;
 let editingRooms = false;
@@ -659,9 +657,8 @@ $('live-battle-return').addEventListener('click', () => {
   if (liveBattle) act('join', { room: liveBattle.id });
 });
 
-// Home layout. The choice lives in launcher settings (homeLayout): 'classic' or 'modern'.
-// While none has been made, the welcome asks once; after that it never shows again unless
-// the launcher is reset. The hub stays hidden until a layout is applied, so it never flashes.
+// Home layout ('classic' or 'modern', in settings as homeLayout). The welcome asks once, until a
+// launcher reset. The hub stays hidden until a layout applies, so it never flashes.
 const LAYOUTS = new Set(['classic', 'modern']);
 const welcome = $('welcome');
 

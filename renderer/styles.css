@@ -1,9 +1,7 @@
-/* Showdown Desktop — reference styles.
-   Tokens live on :root. Components only reference tokens, never raw hex. */
+/* Showdown Desktop styles. Tokens live on :root; components use tokens, never raw hex. */
 
 :root {
-  /* Default theme: "Cobalt". Light surfaces, a cobalt rail, and a yellow primary
-     action taken from Showdown's own blue-and-yellow identity. */
+  /* Light theme, "Cobalt": light surfaces, a cobalt rail and Showdown's yellow primary. */
   color-scheme: light;
 
   /* Content surfaces */
@@ -85,8 +83,8 @@
   --space-5: 24px;
 }
 
-/* Dark theme: "Steel blue". Same cobalt rail and yellow primary as light mode.
-   The app sets nativeTheme from the Appearance setting, which drives this query. */
+/* Dark theme, "Steel blue": same rail and primary. nativeTheme (the Appearance setting)
+   drives this query. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -963,9 +961,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .hero .btn:not(.btn-primary):not(.btn-quiet):hover { background: var(--hero-team-bg); }
 #cancel-search { height: 34px; }
-/* Practice uses the same native-view layout as the online client. The setup page is a
-   centered column styled like the Teambuilder's team list: a large title, rounded cards and
-   a closing bar holding the one primary action. */
+/* Practice uses the online client's native-view layout. Setup is a centered column like the
+   Teambuilder list: a large title, cards and a bar with the one primary action. */
 .practice-content { display: flex; flex-direction: column; min-height: 0; }
 .practice-area { flex: 1; min-height: 0; }
 .practice-setup {
@@ -973,8 +970,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   flex: 1; min-height: 0; overflow-y: auto;
 }
 @media (prefers-color-scheme: dark) { .practice-setup { --practice-gold: var(--primary); } }
-/* Bots page: a format switcher, then one collapsible group of cards per difficulty, hardest first.
-   Every card is the same size; flat, with a hairline border and nearly square corners. */
+/* Bots page: a format switcher, then a collapsible group of equal, flat cards per difficulty. */
 .bots-page {
   display: flex; flex-direction: column; gap: 26px;
   max-width: 1120px; margin: 0 auto; padding: 32px 40px 48px;
@@ -1150,8 +1146,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .banner--result .spacer { margin-left: auto; }
 
 /* ---------- Challenges and private messages ----------
-   Challenge bars sit under the top bar on every page (nav.js inserts them), so .main gets a
-   row for them; conversations get tabs after a Messages label in the tab strip. */
+   Challenge bars sit under the top bar on every page (inserted by nav.js), so .main has a row for them. */
 
 .main { grid-template-rows: var(--tabstrip-h) var(--topbar-h) auto minmax(0, 1fr); }
 .main > .tabstrip { grid-row: 1; }
@@ -1183,12 +1178,11 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .nav-item--challenge .nav-room-sub { color: var(--rail-indicator); font-weight: 600; }
 
 /* ---------- Hub layouts ----------
-   Home has two layouts on one page, chosen once in the welcome and switched in Settings:
-   - hub--classic: Showdown's main menu, modernized. The battle panel and shortcut tiles on
-     the left; news over chat rooms and friends on the right, ending level with the tiles.
-   - hub--modern: one centered column. A wide battle panel with its record and shortcuts,
-     then news and chat rooms side by side (70/30).
-   The hub is hidden until home.js applies one, so the wrong layout never flashes. */
+   Two Home layouts, chosen in the welcome and switched in Settings:
+   - hub--classic: Showdown's main menu, modernized. Battle panel and tiles left; news over chat
+     rooms and friends right, ending level with the tiles.
+   - hub--modern: one centered column. A wide battle panel, then news and chat rooms (70/30).
+   Hidden until home.js applies one, so the wrong layout never flashes. */
 
 .hub {
   height: 100%;
@@ -1228,8 +1222,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .hub--classic .hero { grid-area: hero; }
 .hub--classic .hub-tiles { grid-area: tiles; }
-/* Sized by the left column: contain keeps the windows from stretching the row, so news
-   and the lower pair end exactly at the bottom of the tiles. */
+/* Sized by the left column: contain stops the windows stretching the row, so they end level
+   with the tiles. */
 .hub--classic .hub-side { grid-area: side; contain: size; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
 .hub--classic .hub-news { flex: 1 1 0; }
 .hub--classic .hub-lower { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
@@ -1515,8 +1509,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .welcome-option-title { font-size: var(--fs-xl); font-weight: 600; }
 .welcome-option-desc { font-size: var(--fs-md); color: var(--text-2); line-height: 1.45; }
 
-/* Layout previews: a small, labelled copy of each Home layout in the app's own colors and
-   real proportions, so a new player can recognise the battle panel, news and chat rooms. */
+/* Layout previews: small labelled copies of each Home layout in real colors and proportions. */
 .layout-preview {
   display: flex;
   width: 100%;
@@ -1723,10 +1716,9 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .record-text { width: 38px; text-align: right; font-weight: 600; }
 
 /* ---------- Icon bar and room tabs ----------
-   The rail holds the launcher's own pages as an icon with its name underneath. Showdown
-   rooms are tabs in a strip across the top of .main. Tabs sit flat on the strip with a
-   short hairline between neighbours; the open tab takes the top bar's colour so it joins
-   the page below it, and the hairlines beside it (and beside a hovered tab) drop away. */
+   The rail holds the launcher's pages (icon over name); Showdown rooms are tabs across the top of
+   .main. Hairlines separate tabs; the open tab takes the top bar's colour to join the page, and
+   the hairlines beside it (or a hovered tab) drop away. */
 
 .rail-brand { justify-content: center; padding: 12px 0 10px; }
 .rail-brand-text { display: none; }
@@ -1791,9 +1783,11 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .tabstrip .nav-room-main { padding: 0; gap: 7px; }
 .tabstrip .nav-room-icon svg { width: 14px; height: 14px; }
 .tabstrip .nav-room-text { flex: 0 1 auto; flex-direction: row; align-items: baseline; gap: 6px; line-height: 1.2; }
-/* The name wins the space; the format and turn shrink first. */
+/* Tabs are too narrow for a room's format and turn, which would show as a stub like "R.";
+   the tooltip and the room's top bar carry them. A challenge keeps its label. */
 .tabstrip .nav-room-title { flex: 0 1 auto; min-width: 3ch; }
 .tabstrip .nav-room-sub { flex: 0 99999 auto; min-width: 0; font-size: var(--fs-xs); }
+.tabstrip .nav-item:not(.nav-item--challenge) .nav-room-sub { display: none; }
 
 /* Hairline between neighbouring tabs, centred in the gap and shorter than the tab. */
 .tabstrip .nav-item + .nav-item::after {
@@ -1831,8 +1825,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .tabstrip .nav-item[aria-current="page"] .rail-icon-btn { color: var(--text-2); }
 .tabstrip .nav-item[aria-current="page"] .rail-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 
-/* Page tabs: Home, then any launcher page opened from the icon bar. They are only as wide
-   as their label, and a wider gap (no hairline) sets them apart from the room tabs. */
+/* Page tabs (Home, then launcher pages) are as wide as their label, with a wider gap before
+   the rooms. */
 .tabstrip .nav-page { flex: none; min-width: 0; max-width: none; padding: 0 14px; gap: 6px; }
 .tabstrip .nav-page:has(.nav-close) { padding-right: 6px; }
 .tabstrip .nav-page .nav-room-main { gap: 8px; }
@@ -1851,8 +1845,8 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   font-size: 10px;
 }
 
-/* Forfeit confirmation under a battle tab's close button. One row, so it fits over the top bar:
-   below that, a battle view covers the page. */
+/* Forfeit confirmation under a battle tab: one row, so it fits over the top bar above the
+   battle view. */
 .forfeit-ask {
   position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px;
   height: calc(var(--topbar-h) - 6px); padding: 0 6px 0 14px;

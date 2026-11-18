@@ -1,9 +1,8 @@
 'use strict';
 
-// Where Foul Play's moves are computed. Both engines expose the same practice inference API
-// (api/server.js): the cloud one is the hosted server and the default; the local one is opt-in,
-// runs inside this process on 127.0.0.1, and exists only once the player has downloaded Foul Play
-// onto this computer (api/install.js, into the app's user data folder).
+// Where Foul Play's moves are computed. Both engines speak the same API (api/server.js): the
+// hosted cloud server (default) or, once the player downloads Foul Play (api/install.js, into
+// userData), a copy run in this process on 127.0.0.1.
 
 const os = require('node:os');
 const path = require('node:path');
@@ -66,9 +65,8 @@ class CloudEngine {
   }
 }
 
-// Foul Play on this computer. Nothing is downloaded until the player asks (install()); remove()
-// deletes it again. While installed, target() starts a private API server on 127.0.0.1 on first
-// use, with a key only this process knows and the search at below-normal priority.
+// Foul Play on this computer. Nothing downloads until install(); remove() deletes it. target()
+// starts a private 127.0.0.1 server on first use, with a per-process key and below-normal priority.
 class LocalEngine extends EventEmitter {
   constructor({ dir, install = installer.install, remove = installer.remove, inspect = installer.inspect,
     worker = unpacked(installer.WORKER), createServer = createApiServer,
@@ -101,8 +99,7 @@ class LocalEngine extends EventEmitter {
 
   changed() { this.emit('change', this.status()); }
 
-  // Downloads and builds Foul Play, or updates an outdated copy. Resolves when done; progress
-  // arrives as 'change' events and through status().
+  // Downloads and builds Foul Play, or updates an old copy. Progress comes as 'change' events and status().
   install() {
     if (this.installing) return this.installing;
     if (!this.supported) return Promise.resolve({ ok: false, error: "Foul Play can't run on this computer's system yet." });

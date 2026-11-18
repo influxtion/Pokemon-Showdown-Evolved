@@ -216,7 +216,7 @@ app.whenReady().then(async () => {
   await load('play.html');
   await until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-room').length === 2"), 'rail rooms rendered');
   assert.equal(await run("document.querySelector('[data-nav=rooms] .nav-room[aria-current=page] .nav-room-title').textContent"), 'vs. Opponent');
-  assert.deepEqual(await run("[...document.querySelectorAll('[data-nav=rooms] .nav-tab .nav-room-title')].map((n) => n.textContent)"), ['Community']);
+  assert.deepEqual(await run("[...document.querySelectorAll('[data-nav=rooms] .nav-tab .nav-room-title')].map((n) => n.textContent)"), []);
   assert.equal(await run("document.querySelector('[data-nav=rooms] .nav-room-sub').textContent"), 'Random Battle · Turn 3');
   assert.equal(await run("document.querySelectorAll('[data-nav=rooms] .nav-unread').length"), 1);
   assert.equal(await run("document.querySelector('[data-nav=me]').textContent"), 'Tester');
@@ -353,8 +353,12 @@ app.whenReady().then(async () => {
     contents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab', modifiers });
     contents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab', modifiers });
   };
-  const stripReady = () => until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-tab').length === 1"), 'tab strip rendered');
+  const stripReady = () => until(() => run("document.querySelectorAll('[data-nav=rooms] .nav-page').length >= 1"), 'tab strip rendered');
   const titles = "[...document.querySelectorAll('[data-nav=rooms] .nav-item .nav-room-title')].map((n) => n.textContent)";
+  // Community gets a tab once its view shows, and keeps it until closed.
+  current = { ...current, current: '', menuTab: 'community' };
+  await load('play.html');
+  await until(() => run(`${titles}.includes('Community')`), 'Community tab appears with its view');
   current = { ...current, current: '', menuTab: 'battle' };
   await load('index.html');
   await stripReady();
@@ -382,7 +386,7 @@ app.whenReady().then(async () => {
   press(client.webContents, true);
   await until(() => actions.some((a) => a.action === 'show-menu'), 'then Community');
   assert.deepEqual(actions.pop(), { action: 'show-menu', args: { tab: 'community' } });
-  await until(() => run("document.querySelector('.nav-tab[aria-current=page] .nav-room-title')?.textContent === 'Community'"), 'Community open');
+  await until(() => run("document.querySelector('.nav-page[aria-current=page] .nav-room-title')?.textContent === 'Community'"), 'Community open');
   press(client.webContents, true);
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab inside the client view');
   assert.equal(client.getVisible(), false);
@@ -392,8 +396,7 @@ app.whenReady().then(async () => {
   await pause(400);
   assert.match(renderer.getURL(), /settings\.html$/);
 
-  // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home
-  // or Community.
+  // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home.
   const chord = (contents, keyCode) => {
     contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
     contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
@@ -418,22 +421,26 @@ app.whenReady().then(async () => {
   await stripReady();
   actions.length = 0;
   chord(client.webContents, 'W');
-  await pause(500);
-  assert.equal(actions.some((a) => a.action === 'leave-room'), false, 'Ctrl+W leaves Community open');
-  assert.match(renderer.getURL(), /play\.html$/);
-  current = { ...current, current: 'lobby' };
+  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+W closes Community and returns Home');
+  assert.deepEqual(actions.filter((a) => a.action === 'show-menu'), [{ action: 'show-menu', args: { tab: 'battle' } }]);
+  assert.equal(actions.some((a) => a.action === 'leave-room'), false);
+  await stripReady();
+  assert.deepEqual(await run(titles), ['Home', 'vs. Opponent', 'Lobby']);
+  chord(renderer, '3');
+  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+3 opens Lobby');
+  await until(() => client.getVisible(), 'client shown after Ctrl+3');
   await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'Lobby'"), 'Lobby is the open tab');
   chord(client.webContents, 'W');
   await until(() => actions.some((a) => a.action === 'leave-room'), 'Ctrl+W inside the client closes the open room');
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'lobby' } }]);
-  // Real middle clicks: on Community nothing happens, on a room it closes.
+  // Real middle clicks: on Home nothing happens, on a room it closes.
   const middle = async (selector) => {
     const { x, y } = await run(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.left + 12), y: Math.round(r.top + r.height / 2) }; })()`);
     renderer.sendInputEvent({ type: 'mouseDown', x, y, button: 'middle', clickCount: 1 });
     renderer.sendInputEvent({ type: 'mouseUp', x, y, button: 'middle', clickCount: 1 });
   };
   actions.length = 0;
-  await middle('[data-nav=rooms] .nav-tab:not([aria-current])');
+  await middle('[data-nav=rooms] .nav-page:not([aria-current])');
   await pause(400);
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [], 'a middle click leaves a fixed tab open');
   await middle('[data-nav=rooms] .nav-room:not([aria-current])');

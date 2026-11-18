@@ -1,13 +1,10 @@
-/* Friends pages: the server's own /friends HTML (view-friends-all, -spectate, -sent,
-   -received, -help, -settings), restyled in place to match the launcher. Every button,
-   link and form keeps working because nothing is moved or replaced.
+/* Friends pages (view-friends-all, -spectate, -sent, -received, -help, -settings): the
+   server's HTML restyled in place, so every control keeps working. Applies under
+   sd-launcher-shell.
 
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell.
-   The markup comes from the server's friends plugin, sanitised by the client: each page is
-   <div class="pad"> holding a tab bar (<div style="line-height:25px"> with icon + link
-   pairs separated by " / ", and a Refresh button), an <hr>, then the page. <username>
-   arrives as <strong style="color:..."> and online status as <strong> in the server's
-   status colours, which are matched by value below. */
+   Markup: <div class="pad"> with a tab bar (<div style="line-height:25px">, links split by " / ",
+   a Refresh button), an <hr>, then the page. Usernames are <strong style="color:...">; online
+   status is <strong> in the server's status colours, matched by value below. */
 html.sd-launcher-shell [id^="room-view-friends"] {
   --sdf-on-accent: #ffffff;
   --sdf-online: #2e8a55;
@@ -200,8 +197,7 @@ html.sd-launcher-shell [id^="room-view-friends"] {
   .infobox i {
     font-style: normal !important;
   }
-  /* "(◉ Online)": the brackets go (font-size 0) and the status becomes a chip in the
-     app's status colours. Offline friends have no chip; their group heading says so. */
+  /* "(◉ Online)": brackets hidden (font-size 0), status shown as a chip. Offline has no chip. */
   .infobox > span:not(.username) > small {
     font-size: 0 !important;
   }
@@ -233,8 +229,7 @@ html.sd-launcher-shell [id^="room-view-friends"] {
     color: var(--sd-text) !important;
   }
 
-  /* Cards sit in a grid once there are friends; headings and the add form span it. The
-     empty state is plain text, so it keeps normal flow. */
+  /* Cards form a grid once there are friends; headings and the add form span it. */
   &[id="room-view-friends-all"] > .pad:has(> .pad) {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
@@ -355,8 +350,7 @@ html.sd-launcher-shell [id^="room-view-friends"] {
 
   /* ----- Settings: a label, then the two choices as a segmented control ----- */
 
-  /* Showdown marks the current choice by disabling its button, so the disabled one is
-     drawn as selected rather than greyed out. */
+  /* Showdown marks the current choice by disabling it, so disabled is drawn as selected. */
   &[id="room-view-friends-settings"] > .pad {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) auto auto !important;

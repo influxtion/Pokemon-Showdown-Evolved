@@ -60,8 +60,7 @@ function buildClient(target) {
   fs.writeFileSync(path.join(clientSource, template), run('git', ['show', `HEAD:${template}`], clientSource, {
     stdio: ['ignore', 'pipe', 'inherit'],
   }));
-  // The browser's data generator needs current translation tooling. This checkout is
-  // only a build input. Practice continues to run the Laplace-compatible simulator.
+  // The browser data generator needs current translation tooling; this checkout is only a build input.
   const serverCache = path.join(clientSource, 'caches/pokemon-showdown');
   prepareSource(serverCache, 'https://github.com/smogon/pokemon-showdown.git', clientDataRevision);
   installDependencies(clientSource);

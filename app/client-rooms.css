@@ -1,7 +1,5 @@
-/* Chat room list and live battle list: the client's own markup, restyled in place.
-
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell.
-   Both rooms share the .roomlist and .blocklink markup, so they share most rules. */
+/* Chat room list and live battle list, restyled in place. Applies under sd-launcher-shell.
+   Both use .roomlist and .blocklink, so they share most rules. */
 html.sd-launcher-shell #room-rooms,
 html.sd-launcher-shell #room-battles {
   background: var(--sd-app) !important;

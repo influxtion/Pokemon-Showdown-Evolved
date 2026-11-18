@@ -67,11 +67,9 @@ async function verifyPracticePackage(context) {
   console.log(`Practice runtime verified for packaging: ${identity}`);
 }
 
-// Of api/, the app ships what playing Foul Play needs: the client and protocol (cloud and local),
-// and, for players who opt in to running Foul Play on their computer, the installer, its pins, the
-// local server and the worker script. The worker is unpacked from app.asar so Python can read it.
-// Foul Play itself is never in the package: it is downloaded only when the player asks.
-// Nothing else from api/ (its runtime, tests or deploy files) may ship.
+// From api/, the app ships what Foul Play play needs: the client and protocol, plus, for the
+// opt-in local mode, the installer, pins, local server and worker (unpacked from app.asar for
+// Python). Foul Play itself is downloaded only on request; nothing else from api/ may ship.
 const SHIPPED_API = ['client.js', 'protocol.js', 'install.js', 'server.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
 const UNPACKED_API = ['worker', 'worker/foulplay_worker.py'];
 

@@ -1,6 +1,5 @@
-/* Showdex 1.4.2 chrome. Module/local prefixes are retained by the pinned build;
-   hashes are intentionally omitted. Recheck these selectors on upstream updates.
-   Game colors (types, HP, stats, damage and status) retain their upstream rules. */
+/* Showdex 1.4.2 chrome, by the pinned build's module/local prefixes (hashes omitted). Game
+   colours keep upstream rules. Recheck selectors on upgrades. */
 [data-showdex-module] {
   color: var(--sd-text) !important;
   font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif !important;

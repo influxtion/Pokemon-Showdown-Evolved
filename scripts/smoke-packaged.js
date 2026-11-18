@@ -1,8 +1,8 @@
 'use strict';
 
-// Runs the unpacked Windows executable with a temporary profile and blocked outbound web traffic.
-// With --practice it plays a short game whose moves come from the hosted cloud API (reached from
-// the main process, which the renderer proxy does not cover). SHOWDOWN_PRACTICE_API_URL overrides it.
+// Runs the unpacked Windows build with a temporary profile and outbound web traffic blocked.
+// --practice plays a short game against the hosted API (from main, outside the renderer proxy);
+// SHOWDOWN_PRACTICE_API_URL overrides it.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

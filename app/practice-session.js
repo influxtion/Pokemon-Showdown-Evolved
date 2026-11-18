@@ -1,10 +1,8 @@
 'use strict';
 
-// One practice session: the Showdown simulator runs on this computer. The bridge logs in to it as
-// the bot, accepts the player's challenge and hands the bot's battle-room frames to whoever plays
-// the bot's seat: the practice inference API for Foul Play (see api/), on the cloud server or, if
-// the player opted in and downloaded it, on this computer; or one of the simple bots in
-// app/simple-bots.js, which run right here. Choices come back the same way for all of them.
+// One practice session. The simulator runs locally; the bridge logs in as the bot, accepts the
+// player's challenge and passes the bot's frames to whoever plays its seat: the inference API for
+// Foul Play (api/, cloud or local) or a simple bot (app/simple-bots.js). Choices come back the same way.
 
 const path = require('node:path');
 const os = require('node:os');
@@ -19,9 +17,9 @@ const { InferenceClient } = require('../api/client');
 const { BOTS, FORMAT, MAX_TEAM, ROOM, roomFormat, isTeamText } = require('../api/protocol');
 const { LOCAL_BOTS, LocalBot, loadData } = require('./simple-bots');
 
-// What the Bots page shows, hardest first. `difficulty` is the group a bot is listed under; only
-// the Foul Play levels search, so only they use the cloud and the computation presets.
-// `formats` lists where each is offered; in formats with teams the player brings both teams.
+// What the Bots page shows, hardest first. `difficulty` is the bot's group; only Foul Play levels
+// search, so only they use the cloud and presets. `formats` lists where each is offered; formats
+// with teams need both teams from the player.
 const SIMPLE = { local: true, search: false, difficulty: 'easy', kind: 'Rule-based bot', formats: [FORMAT] };
 const SEARCH = { local: false, search: true, kind: 'Search bot' };
 const OPPONENTS = Object.freeze({
@@ -56,8 +54,7 @@ const ENGINES = Object.freeze(['cloud', 'local']);
 const toId = name => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 class PracticeSession extends EventEmitter {
-  // target(engine) resolves to { url, key } for the API that computes Foul Play's moves, where
-  // engine is 'cloud' (the default) or 'local' (Foul Play downloaded onto this computer).
+  // target(engine) resolves to { url, key } for Foul Play's API; engine is 'cloud' or 'local'.
   constructor({ root, scripts, target, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
     installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient, checkInEveryMs = 3000,
     createBot = kind => new LocalBot({ kind, data: loadData(path.join(this.root, 'server')) }) }) {
@@ -83,8 +80,8 @@ class PracticeSession extends EventEmitter {
     this.connection = null;
     this.battle = null;
     this.format = FORMAT;
-    // In formats with teams: { player, bot } packed teams and the bot's export, in memory for this
-    // session only (rematches reuse them). Never logged or written anywhere.
+    // In team formats: packed { player, bot } teams and the bot's export, in memory for this session
+    // only (rematches reuse them). Never logged or saved.
     this.teams = null;
     this.children = new Set();
     this.reset();
@@ -100,8 +97,7 @@ class PracticeSession extends EventEmitter {
     this.accepted = false;
     this.thinkingSince = null;
     this.threads = null;
-    // While every cloud engine is busy: { ticket, position, waiting }. The battle starts by itself
-    // once it is this player's turn.
+    // While queued for the cloud: { ticket, position, waiting }. The battle starts on its own.
     this.queue = null;
   }
 
@@ -120,8 +116,7 @@ class PracticeSession extends EventEmitter {
 
   changed() { this.emit('change', this.status()); }
 
-  // `teams` ({ player, bot, botExport }) is required in formats where the player brings teams;
-  // the caller has validated both for the format already.
+  // `teams` ({ player, bot, botExport }) is required in team formats; the caller validated them.
   async start(options) {
     const { opponent = 'foulplay', preset = DEFAULT_PRESET, format = FORMAT, teams = null, engine = 'cloud' } =
       options && typeof options === 'object' ? options : {};
@@ -236,10 +231,8 @@ class PracticeSession extends EventEmitter {
     await socket.ready;
   }
 
-  // Waits for a cloud engine, checking in every few seconds. The startup timeout is paused while
-  // waiting (a place in line can last many minutes) and starts again once the engine is ours.
-  // Resolves with the session, { switched: true } if the player moved to this computer, or null
-  // once this start is stale (the player stopped).
+  // Waits for a cloud engine, checking in every few seconds; the startup timeout is paused meanwhile.
+  // Resolves with the session, { switched: true } if the player moved to local, or null if stale.
   async waitInQueue(api, place, generation, engine) {
     clearTimeout(this.timer);
     const every = Math.max(250, Math.min(this.checkInEveryMs, Math.floor(place.checkInMs / 3)));

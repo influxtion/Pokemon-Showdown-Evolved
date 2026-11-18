@@ -1,14 +1,10 @@
-/* Conversation view: one private message window shown full size in the client's main menu,
-   opened from the rail's Messages section. The bridge (openPM in showdown.js) sets
-   sd-menu-pm and marks the window sd-pm-active; the Battle and Community tabs clear it, and
-   readSession clears it if the client closes that window.
+/* Conversation view: one PM window shown full size in the main menu. openPM (showdown.js)
+   sets sd-menu-pm and marks the window sd-pm-active; the Battle and Community tabs clear it, as
+   does readSession if the client closes the window. The window, challenge form and message box
+   stay the client's own; its header is hidden, since the top bar names it and the rail closes it.
 
-   The window, its challenge form and its message box stay the client's own, so sending,
-   accepting and declining behave as upstream. The launcher's top bar names the conversation
-   and the rail closes it, so the window's own header is hidden.
-
-   Loaded after client-battle.css, whose Battle tab rules also match here: equal-specificity
-   rules below win by order. */
+   Loaded after client-battle.css, whose Battle tab rules also match: equal-specificity rules here
+   win by order. */
 html.sd-launcher-shell.sd-menu-pm {
   .mainmenuwrapper {
     background: var(--sd-app) !important;
@@ -69,8 +65,7 @@ html.sd-launcher-shell.sd-menu-pm {
     max-width: 460px !important;
     margin: 0 !important;
   }
-  /* client-battle.css sizes .battleform for the Battle tab's big search form; here the rows
-     are compact: label beside a normal-height picker, no row icons. */
+  /* Compact rows here, unlike the Battle tab's big search form: label beside picker, no icons. */
   .sd-pm-active .challenge .battleform > p:first-child {
     margin: 0 0 8px !important;
     font-size: 15px !important;

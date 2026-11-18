@@ -1,7 +1,7 @@
 'use strict';
 
-// Client for the practice inference API. The launcher uses it for the cloud server and, when the
-// player opts in to local play, for the copy it runs on this computer: only the origin and key differ.
+// Client for the practice inference API, used for the cloud server and the local copy alike;
+// only the origin and key differ.
 
 const { EventEmitter } = require('node:events');
 const { WebSocket } = require('ws');
@@ -23,9 +23,8 @@ async function readJson(response, limit = 65536) {
   try { return JSON.parse(text); } catch { throw new ApiError('The practice server sent an invalid reply.', { status: response.status, code: 'invalid-reply' }); }
 }
 
-// One battle session's socket. Emits the server messages listed in protocol.js (the `error`
-// message is emitted as `failure`, so an unhandled one never throws), plus `close`.
-// `ready` is also a promise, because the server can send it before anyone subscribes.
+// One session's socket. Emits protocol.js's server messages (`error` as `failure`, so an
+// unhandled one never throws) and `close`. `ready` is also a promise, as it can arrive first.
 class InferenceSocket extends EventEmitter {
   constructor(socket) {
     super();
@@ -108,17 +107,16 @@ class InferenceClient {
 
   info() { return this.request('/v1/info'); }
 
-  // `team` is the bot's own team as a Showdown export, for formats where the player brings it (OU).
-  // With `queue`, a busy server may answer with a place in line instead of a session:
-  // { queued: true, ticket, position, waiting, checkInMs }. Then call checkIn(ticket) until it
-  // returns the session, or leaveQueue(ticket).
+  // `team` is the bot's team as a Showdown export, for team formats (OU). With `queue`, a busy
+  // server may return a place in line ({ queued: true, ticket, position, waiting, checkInMs });
+  // then call checkIn(ticket) until it returns the session, or leaveQueue(ticket).
   async createSession({ bot = 'foulplay', preset, format = FORMAT, team, queue = false }) {
     if (!Object.hasOwn(BOTS, bot) || !Object.hasOwn(PRESETS, preset) || !BOTS[bot].formats.includes(format)) {
       throw new ApiError('Choose a supported bot, format and preset.', { code: 'invalid-options' });
     }
     const needsTeam = TEAM_FORMATS.includes(format);
     if (needsTeam && !isTeamText(team)) throw new ApiError('This format needs a team for the bot.', { code: 'invalid-team' });
-    // Older servers know only Random Battle and refuse unknown fields, so send the format only when it matters.
+    // Older servers know only Random Battle and refuse unknown fields; send the format only when needed.
     const body = format === FORMAT ? { bot, preset } : { bot, preset, format, team };
     let value;
     try {
@@ -144,7 +142,7 @@ class InferenceClient {
     return value;
   }
 
-  // Keeps a place in the queue. Returns the place again, or the session once it is this client's turn.
+  // Keeps a place in the queue. Returns the place, or the session once it's this client's turn.
   async checkIn(ticket) {
     if (!SESSION_ID.test(ticket || '')) throw new ApiError('Invalid queue place.', { code: 'invalid-options' });
     return this.sessionOrPlace(await this.request(`/v1/queue/${ticket}`));

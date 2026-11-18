@@ -1,10 +1,7 @@
-/* Tournaments: the bar, bracket and tools the client pins to the top of a chat room while a
-   tournament runs, its chat notices, and the bracket pop-out.
-
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. The
-   client sizes the box with an inline max-height to open and close it, so nothing here
-   touches max-height or transition on .tournament-box. The bracket tree is an SVG drawn by
-   the client; only its fills, strokes and type change. Room-authored HTML is left alone. */
+/* Tournament bar, bracket, tools, notices and bracket pop-out. Applies under
+   sd-launcher-shell. The client opens and closes .tournament-box with an inline max-height, so
+   never touch its max-height or transition. The SVG bracket only gets fills, strokes and type;
+   room HTML is left alone. */
 html.sd-launcher-shell {
   --sd-tour-bar-h: 34px;
   --sd-tour-win: #2e8a55;

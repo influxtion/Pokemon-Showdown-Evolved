@@ -1,8 +1,7 @@
 'use strict';
 
-// Teams for practice formats where the player brings both sides (OU). Teams are read and checked
-// with the practice simulator's own team code (server/dist/sim), so a team that passes here is
-// one the simulator accepts in the battle. Nothing here keeps or logs a team.
+// Teams for practice formats where the player brings both sides (OU), checked with the practice
+// simulator's own team code, so a passing team is one the battle accepts. Nothing is kept or logged.
 
 const path = require('node:path');
 const { MAX_TEAM } = require('../api/protocol');
@@ -23,8 +22,8 @@ class PracticeTeams {
     return this.sim;
   }
 
-  // Checks one team for a format. `source` is 'packed' (a Teambuilder team) or 'export' (pasted).
-  // Returns { ok, packed, exported, species } or { ok: false, error, problems }.
+  // Checks a team for a format. `source` is 'packed' (Teambuilder) or 'export' (pasted). Returns
+  // { ok, packed, exported, species } or { ok: false, error, problems }.
   check(format, source, text) {
     if (!Object.hasOwn(FORMATS, format)) return { ok: false, error: 'This format has no teams to choose.', problems: [] };
     if (typeof text !== 'string' || !text.trim()) {

@@ -1,8 +1,7 @@
 'use strict';
 
-// Decides when a session read deserves a Windows notification: a new incoming challenge,
-// or a private message that arrived since the last read. Pure, so it can be unit tested;
-// main.js shows the notifications and only while the window is in the background.
+// Decides when a session read deserves a notification: a new incoming challenge or a new private
+// message. Pure, for unit tests; main.js shows them, only while the window is in the background.
 
 class MessageAlerts {
   constructor() {
@@ -11,8 +10,8 @@ class MessageAlerts {
     this.unread = new Map();
   }
 
-  // Returns the alerts this session read adds. The first read for an account is a baseline,
-  // so nothing already waiting is announced again after a reload or sign-in.
+  // The alerts this read adds. An account's first read is a baseline, so nothing already waiting is
+  // announced again after a reload or sign-in.
   observe(session) {
     if (!session || !session.ready || !Array.isArray(session.messages)) return [];
     const baseline = this.me !== session.me;

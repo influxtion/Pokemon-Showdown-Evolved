@@ -1,10 +1,7 @@
-/* Community tab: the other half of the client's main menu (see client-shell.css), restyled
-   in place to match the Battle tab. One centred column: three link tiles, a chat rooms
-   row, then the news and any private message windows.
-
-   Applies only while the bridge sets sd-launcher-shell and the Community view is showing.
-   .leftmenu becomes display: contents so its children can be ordered with .rightmenu; the
-   battle form that needs .leftmenu's box is hidden in this view. */
+/* Community tab: the other half of the client's main menu (see client-shell.css), as one
+   centred column: link tiles, chat rooms, then news and PM windows. Applies under
+   sd-launcher-shell in the Community view. .leftmenu becomes display: contents so its children
+   order with .rightmenu; the battle form that needs its box is hidden here. */
 html.sd-launcher-shell.sd-menu-community {
   .mainmenuwrapper {
     display: flex !important;

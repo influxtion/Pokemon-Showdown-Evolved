@@ -94,7 +94,7 @@ Reviews a finished game turn by turn and shows where the player's choices differ
 - Practice and online games stay loaded side by side; the online account is never used.
 
 ### Settings
-- Appearance, Home layout, Battle screen (launcher style or Showdown's original; applies at once, even mid-battle), start page, close protection for battles and searches, client reload, open logs. Foul Play always runs on the cloud server.
+- Appearance, Home layout, Battle screen (launcher style or Showdown's original; applies at once, even mid-battle), start page, close protection for battles and searches, client reload, open logs. Where Foul Play runs (cloud or this computer) is chosen on the Bots page.
 - **Sign out** clears the Showdown partition, local teams included. **Reset launcher** clears settings and replay notes but keeps the session. Both confirm first.
 - Window size, position and maximized state are remembered.
 
@@ -260,6 +260,7 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 
 - **No automated play on real accounts.** The app and its tests never search, challenge or play on the user's account. Live tests are guest-only and spectate.
 - **Least privilege per view.** Only launcher pages have a preload. Remote views are sandboxed and context-isolated and deny permissions; downloads and popups are blocked. The Showdown client is denied notifications; the launcher shows them itself.
+- **Electron fuses.** Packages disable `NODE_OPTIONS` and `--inspect`, load the app only from a hash-checked `app.asar`, and encrypt cookies (the Showdown login) with the OS key store. `runAsNode` stays on because the practice simulator runs as an `ELECTRON_RUN_AS_NODE` child.
 - **Validated IPC.** Every privileged request is validated in main. The renderer never supplies file paths (native dialogs choose them) or replay URLs (main resolves them from note IDs).
 - **Text, not HTML.** Imported and snapshot text is rendered as text.
 - **Private logs.** Fixed event names and numeric codes only: no usernames, credentials, replay URLs or note text.
@@ -268,13 +269,21 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 
 ## 7. Testing
 
-Electron is pinned to 45.3.3. The dependency override upgrades only affected
+Electron is pinned to 45.3.4. The dependency override upgrades only affected
 `minimatch` versions (7 through 11.0.0) to 11.0.1 for GHSA-g3hv-75wg-m249;
 older unaffected consumers retain their compatible APIs. The build dependency
 test exercises electron-builder's actual file filters and the universal build
 allowlist matcher without creating an installer. Reassess the override when
 updating electron-builder. The live shell test waits for battle metadata as well
 as the tab: the server can deliver the initial turn after the tab appears.
+
+November 18 launch audit: 222 unit tests (one optional skip), all seven desktop
+suites, the practice suite (a real Foul Play battle), live shell and replay checks,
+two battles against the hosted API (median 240 ms per decision), and both packaged
+smokes with fuses on. Three desktop suites had gone stale against current behavior
+and were updated. Guest performance: Home ready 195 ms after launch, client
+connected 4.7 s, every page 17–65 ms in both themes. Of about 1.1 GB working set,
+about 320 MB is three ad iframes Showdown's own page loads. npm audit: zero.
 
 November 16 audit follow-up: syntax, 152 unit tests (one optional skip), all seven
 isolated desktop suites, live shell and live replay review passed on Electron
@@ -328,7 +337,8 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 - **`app.asar`:** contains `app/`, `renderer/`, `api/client.js`, `api/protocol.js`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
 - **Foul Play is not in the release** (D7). It plays on the cloud server unless the player downloads it from the Bots page. For that opt-in, the app ships `api/client.js`, `protocol.js`, `install.js`, `server.js`, `lock.json` and the GPL-3.0-derived worker `api/worker/foulplay_worker.py`, unpacked from app.asar so Python can read it. The after-pack check fails the build if any other `api/` file is packaged or anything else is unpacked. No Python, Foul Play or Laplace ships; the download fetches the pinned Python, Foul Play source, packages and set data.
 - **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse a Laplace harness runtime, and packaging fails on any drift.
-- **Dependency audit:** reports a moderate `minimatch` advisory through electron-builder. It is a development-only dependency and is absent from the app.
+- **Dependency audit:** `npm audit` reports zero vulnerabilities for the app and `api/`.
+- **Fuses:** set in `electron-builder.yml` (see section 6); `npx @electron/fuses read --app <exe>` shows them.
 
 **Release path**, in order. Nothing is published, and there is no updater yet.
 
@@ -359,6 +369,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 | Licensing | AGPL/GPL obligations for the patched client, Foul Play and Showdex | Source and notices retained; owner review before release |
 | Hosted API capacity and reachability | One VM serves 8 battles at once at 2 threads; anonymous access invites abuse; the sslip.io hostname breaks if the static IP is released | Per-network rate limits and caps; tests use a loopback copy of the server; keep the IP reserved; add `API_KEY` or accounts, more VMs, or a domain if usage grows |
 | Unproven demand | Users may not return | Invited alpha measures return use before more features |
+| Local Foul Play supply chain | Downloads are SHA-256 pinned, but pip packages are pinned by version only and poke-engine's build dependencies (maturin) and crates resolve at install time | Add `--require-hashes` pins and a pinned, hash-checked build backend before promoting local play |
 
 **Open decisions (owner)**
 

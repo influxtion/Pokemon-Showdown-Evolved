@@ -1,7 +1,6 @@
-/* Showdown Desktop theme for the official client.
-   Injected with cssOrigin "user", so these !important rules beat both the client's light
-   styles and its own .dark mode. Only the chrome is restyled: the battle field, sprites and
-   type-coloured move buttons stay as upstream draws them. Values mirror renderer/styles.css. */
+/* Showdown Desktop theme for the official client, injected as user-origin so !important beats
+   its light and .dark styles. Chrome only: field, sprites and type colours stay upstream. Values
+   mirror renderer/styles.css. */
 
 :root {
   color-scheme: light !important;
@@ -87,8 +86,8 @@ body {
   text-shadow: none !important;
 }
 
-/* User-origin styles do not switch off native control painting the way page styles do,
-   so appearance must be reset explicitly or the light system button shows through. */
+/* User-origin styles don't switch off native control painting; reset appearance or the light
+   button shows through. */
 .button,
 textarea,
 input[type="text"],

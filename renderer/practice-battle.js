@@ -1,7 +1,7 @@
 'use strict';
 
-// The practice battle's own tab. The Practice page only sets a battle up; this page shows the
-// battle client while a session runs, and closing its tab (or End practice) ends the session.
+// The practice battle's tab. The Bots page sets a battle up; this page shows it, and closing the
+// tab (or End practice) ends the session.
 (() => {
   const $ = id => document.getElementById(id);
   const status = $('battle-status');
@@ -112,7 +112,7 @@
 
   next.addEventListener('click', () => act(() => window.desktop.nextPracticeBattle()));
   forfeit.addEventListener('click', () => act(() => window.desktop.forfeitPractice()));
-  // Ending practice closes this tab, the same as its close button. While queued, that leaves the queue.
+  // End practice closes this tab, like its close button; while queued, that leaves the queue.
   end.addEventListener('click', () => window.showdownNav?.closePracticeBattle());
   leaveQueue.addEventListener('click', () => window.showdownNav?.closePracticeBattle());
   useLocal.addEventListener('click', () => act(() => window.desktop.usePracticeLocal()));

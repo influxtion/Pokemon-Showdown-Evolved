@@ -1,22 +1,20 @@
 'use strict';
 
-// Practice inference API. It runs in the cloud and, for players who opt in to local play, inside
-// the desktop app on 127.0.0.1. Clients run the battle themselves and stream the bot's view of it
-// here; the server only computes the bot's moves.
+// Practice inference API, run in the cloud and, for players who opt in, in the app on 127.0.0.1.
+// Clients run the battle and stream the bot's view here; the server only computes its moves.
 //
-//   GET    /healthz                       liveness
-//   GET    /v1/info                       bots, presets, limits and current capacity
-//   POST   /v1/sessions                   {"bot", "preset", "format"?, "team"?, "queue"?} (see README.md)
-//   GET    /v1/sessions/:id               session status
-//   DELETE /v1/sessions/:id               end a session
-//   WS     /v1/sessions/:id/socket        frames in, choices out (see protocol.js)
-//   GET    /v1/queue/:ticket              check in while waiting; becomes the session once it is your turn
-//   DELETE /v1/queue/:ticket              leave the queue
+//   GET    /healthz                 liveness
+//   GET    /v1/info                 bots, presets, limits and capacity
+//   POST   /v1/sessions             {"bot", "preset", "format"?, "team"?, "queue"?} (README.md)
+//   GET    /v1/sessions/:id         session status
+//   DELETE /v1/sessions/:id         end a session
+//   WS     /v1/sessions/:id/socket  frames in, choices out (protocol.js)
+//   GET    /v1/queue/:ticket        check in; becomes the session on your turn
+//   DELETE /v1/queue/:ticket        leave the queue
 //
-// The queue: when every engine is busy, a client that sent "queue": true gets a place in line
-// (202) instead of 503. It keeps its place by checking in at least every `queueCheckInMs`; the
-// first in line takes the next free engine on its next check-in, and nobody behind it, or new,
-// can take that engine first. At most `maxQueue` wait; past that the server answers 503 again.
+// Queue: when every engine is busy, "queue": true gets a place (202) instead of 503. A client
+// keeps it by checking in every `queueCheckInMs`; the first in line takes the next free engine and
+// nobody can jump ahead. Past `maxQueue` waiting, the answer is 503 again.
 
 const http = require('node:http');
 const os = require('node:os');
@@ -103,8 +101,7 @@ function workerEnvironment() {
   return env;
 }
 
-// `lowPriority` is for the copy inside the desktop app, so a search never starves the player's
-// own battle client and the rest of their computer.
+// `lowPriority` is for the in-app copy, so a search never starves the player's computer.
 function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT, lowPriority = false }) {
   const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads),
     '--level', level, '--format', format],
@@ -158,8 +155,8 @@ function createApiServer({
   if (!Number.isInteger(maxQueue) || maxQueue < 0 || maxQueue > 1000) throw new Error('Invalid maxQueue');
   const resolveRuntime = typeof runtime === 'function' ? runtime : () => runtime;
   const sessions = new Map();
-  // Waiting clients, first in line first: { id, client, options, joined, seen }. Options (with an
-  // OU team) are kept only while waiting and never logged.
+  // Waiting clients, first first: { id, client, options, joined, seen }. Options (maybe an OU team)
+  // are kept only while waiting and never logged.
   const queue = [];
   const limiter = new RateLimiter({ capacity: sessionBurst, perHour: sessionsPerHour, now });
   const sockets = new WebSocketServer({ noServer: true, maxPayload: maxFrameBytes + 1024, perMessageDeflate: false });
@@ -185,6 +182,8 @@ function createApiServer({
   async function readBody(request) {
     if (!/^application\/json\b/.test(request.headers['content-type'] || '')) throw new Error('Expected JSON');
     let text = '';
+    // Decode as a stream, so a character split across chunks survives (Flabébé in an OU team).
+    request.setEncoding('utf8');
     for await (const chunk of request) {
       text += chunk;
       // Room for an OU team; every other body is tiny.
@@ -335,7 +334,7 @@ function createApiServer({
       return failure(response, 429, 'rate-limited', `Too many practice battles started. Try again in ${Math.ceil(seconds / 60)} min.`, { 'Retry-After': String(seconds) });
     }
     const wanted = { bot: options.bot, preset: options.preset, format, ...(needsTeam ? { team: options.team } : {}) };
-    // A free engine goes to whoever is waiting first; only with nobody in line can a new client take it.
+    // A free engine goes to the first in line; a new client takes one only when nobody waits.
     if (!queue.length && freeSlots() > 0) return openSession(response, client, wanted, paths);
     if (options.queue === true && queue.length < maxQueue) {
       const ticket = { id: crypto.randomBytes(32).toString('hex'), client, options: wanted, joined: now(), seen: now() };
@@ -348,8 +347,8 @@ function createApiServer({
     { 'Retry-After': '30' });
   }
 
-  // A check-in keeps the ticket's place. Once enough engines are free for its position, the
-  // ticket becomes a session right here, so a slot is only ever held for the next check-in.
+  // A check-in keeps the place; once enough engines are free for its position, the ticket becomes a
+  // session here, so a slot is held only until the next check-in.
   function checkIn(response, ticket) {
     ticket.seen = now();
     if (queue.indexOf(ticket) + 1 > freeSlots()) return send(response, 200, place(ticket));

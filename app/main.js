@@ -31,8 +31,8 @@ let showdexLoadFailed = false;
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const CLIENT_CSS = ['client-theme.css', 'client-shell.css', 'client-battle.css', 'client-ladder.css', 'client-teambuilder.css', 'client-community.css', 'client-messages.css', 'client-rooms.css', 'client-friends.css', 'client-chat.css', 'client-tournament.css', 'showdex-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
-// The restyled battle room, injected only while Settings > Battle screen is the launcher style,
-// so switching to Showdown's own battle UI takes effect at once without reloading a battle.
+// Restyled battle room, injected only while Settings > Battle screen is the launcher style, so
+// switching takes effect at once without reloading a battle.
 const BATTLE_CSS = fs.readFileSync(path.join(__dirname, 'client-battle-room.css'), 'utf8');
 const launcherBattles = () => settings.get('battleStyle') !== 'showdown';
 const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
@@ -54,13 +54,11 @@ let replayReview = null;
 let practice = null;
 let practiceView = null;
 let practiceTeams = null;
-// Where Foul Play's moves are computed: the cloud server (default), or Foul Play downloaded onto
-// this computer if the player opted in. Both live for the whole app, independent of windows.
+// Where Foul Play's moves are computed: the cloud (default) or an opted-in local download.
 let cloudEngine = null;
 let localEngine = null;
-// The battle stylesheet inserted into the Showdown client, kept by key so the Battle screen
-// setting can remove or re-add it live. Changes run in order, so a quick toggle cannot insert
-// it twice; a new document starts without it.
+// Key of the battle stylesheet in the client, so the Battle screen setting can toggle it live.
+// Changes run in order so a quick toggle can't insert it twice; a new document starts without it.
 let clientBattleCssKey = null;
 let clientBattleCssQueue = Promise.resolve();
 function applyClientBattleCss(contents, { reloaded = false } = {}) {
@@ -114,10 +112,9 @@ function openExternal(url) {
   if (u && (u.protocol === 'https:' || u.protocol === 'http:')) shell.openExternal(u.href);
 }
 
-// Tab strip shortcuts: Ctrl+Tab cycles, Ctrl+W closes the open tab, Ctrl+1–9 jump to a tab.
-// The focus can be in the launcher page or in a view on top of it (the Showdown client, a
-// replay, a practice battle), so the keys are caught here and passed to the launcher, which
-// owns the tab order and knows which tabs can close. Sign-in popups are left alone.
+// Tab shortcuts (Ctrl+Tab, Ctrl+W, Ctrl+1–9). Focus may be in the launcher or a view on top of it,
+// so keys are caught here and passed to the launcher, which owns the tab order. Sign-in popups
+// are left alone.
 let cycleFocus = false;
 let cycleFocusTimer = null;
 
@@ -164,8 +161,8 @@ function toBounds(value) {
   return out.width > 0 && out.height > 0 ? out : null;
 }
 
-// Loaded hidden at startup so Home can read formats, teams and rooms. Leaving Play only
-// hides it, so an active battle survives screen changes.
+// Loaded hidden at startup so Home can read formats, teams and rooms. Leaving Play only hides it,
+// so battles survive screen changes.
 function ensureClient() {
   if (client) return client;
 
@@ -183,8 +180,8 @@ function ensureClient() {
   client.setBackgroundColor(background());
 
   const contents = client.webContents;
-  // The launcher sends challenge and message notifications itself (see announce), so the
-  // client's own would only duplicate them, and clicking those cannot raise the window.
+  // The launcher sends its own challenge and message notifications (see announce); the client's
+  // would duplicate them and can't raise the window.
   denyPermissions(contents.session);
   contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
     if (isMainFrame) logger.write('client-load-failed', code);
@@ -226,9 +223,8 @@ function ensureClient() {
   contents.on('will-redirect', (event, url) => {
     if (!isShowdownUrl(url)) event.preventDefault();
   });
-  // The client moves its address (/lobby, /battle-…) whenever it opens or switches rooms.
-  // Tell the launcher page at once, so its tabs and top bar follow without waiting for the
-  // next poll. It carries no data; the page reads the session through the bridge as usual.
+  // The client changes its address whenever it opens or switches rooms. Cue the launcher to read
+  // the session now instead of at the next poll; the message carries no data.
   contents.on('did-navigate-in-page', (_event, _url, isMainFrame) => {
     if (isMainFrame && win && !win.isDestroyed()) win.webContents.send('client:changed');
   });
@@ -329,8 +325,8 @@ function createWindow() {
     openExternal(url);
     return { action: 'deny' };
   });
-  // will-frame-navigate fires first, for every frame; cancelling it there means will-navigate
-  // never fires, so an outside link (Home's news, for one) is handed to the browser here.
+  // will-frame-navigate fires first and cancelling it stops will-navigate, so outside links (Home's
+  // news) are handed to the browser here.
   contents.on('will-frame-navigate', event => {
     if (event.isMainFrame && launcherUrl(event.url, RENDERER_DIR)) return;
     event.preventDefault();
@@ -423,7 +419,7 @@ ipcMain.handle('practice:status', async event => {
   return { ...practice.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status(),
     local: localEngine.status(), engineChoice: settings.get('practiceEngine') };
 });
-// A team the Bots page picked: a Teambuilder team ({ source: 'teambuilder', index, name }) or a
+// The Bots page's team choice: a Teambuilder team ({ source: 'teambuilder', index, name }) or a
 // pasted export ({ source: 'paste', text }). Teambuilder teams are read here, never sent by the page.
 async function practiceTeam(format, spec) {
   if (!spec || typeof spec !== 'object') return { ok: false, error: 'Choose a team.' };
@@ -465,8 +461,8 @@ ipcMain.handle('practice:start', async (event, options) => {
   if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
   return practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
 });
-// While waiting in line for a cloud engine, the battle tab can move the battle to Foul Play on this
-// computer, if the player has downloaded it. That also becomes their choice for later battles.
+// While queued for the cloud, the battle tab can move the battle to downloaded Foul Play; that
+// also becomes the choice for later battles.
 ipcMain.handle('practice:use-local', event => {
   if (!isBattleFrame(event)) return { ok: false };
   if (!practice.queue) return { ok: false, error: 'The battle is no longer waiting for a cloud engine.' };
@@ -474,7 +470,7 @@ ipcMain.handle('practice:use-local', event => {
   try { settings.set('practiceEngine', 'local'); } catch { /* The battle still moves; the choice just is not remembered. */ }
   return practice.useEngine('local');
 });
-// Local Foul Play, opt-in. Downloading runs for minutes; the Bots page follows it through practice:status.
+// Local Foul Play (opt-in). The download takes minutes; the Bots page follows it via practice:status.
 const localBattleOn = () => practice.engine === 'local' && ['starting', 'ready'].includes(practice.state);
 ipcMain.handle('practice:install-local', event => {
   if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
@@ -502,9 +498,8 @@ ipcMain.handle('practice:remove-local', async event => {
     return { ok: false, error: 'Foul Play could not be removed. Close other apps using it and try again.' };
   }
 });
-// Closing the battle's tab ends practice, and that tab can be closed from any launcher page.
-// A battle still on is forfeited by stopping, so the launcher confirms first in its own popup
-// under the battle's tab, then calls again with confirmed set.
+// Closing the battle tab, from any page, ends practice. An unfinished battle is forfeited, so the
+// launcher confirms in its own popup first, then calls again with confirmed set.
 ipcMain.handle('practice:stop', async (event, confirmed) => {
   if (!isLauncherFrame(event)) return { ok: false };
   if (practice.battle && !practice.battle.finished && confirmed !== true) return { ok: false, needsConfirm: true };
@@ -514,8 +509,8 @@ ipcMain.handle('practice:show', (event, bounds) => {
   if (!isBattleFrame(event)) return { ok: false };
   return { ok: practiceView.show(bounds) };
 });
-// The client's header is hidden in practice, so Forfeit opens the client's own confirmation
-// through the battle tab's (hidden) close button. Nothing is sent until the player confirms there.
+// The practice client's header is hidden, so Forfeit clicks the battle tab's hidden close button to
+// open the client's own confirmation. Nothing is sent until the player confirms.
 ipcMain.handle('practice:forfeit', async event => {
   if (!isBattleFrame(event) || !practice.battle || practice.battle.finished || !practiceView.view) return { ok: false };
   try {
@@ -618,8 +613,8 @@ ipcMain.handle('showdown:session', async (event) => {
   return state;
 });
 
-// Challenges and messages that arrive while the app is in the background. In the foreground
-// the rail and the challenge bar already show them.
+// Challenges and messages arriving while the app is in the background; in the foreground the
+// rail and challenge bar show them.
 function announce(alerts) {
   if (!alerts.length || !win || win.isDestroyed() || win.isFocused() || !settings.get('notifyMessages')) return;
   win.flashFrame(true);
@@ -639,15 +634,15 @@ async function openAlert(alert) {
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
-  // A challenge is answered from the bar on any page; a message opens its conversation,
-  // unless leaving the current page would drop an unsaved replay note.
+  // A challenge is answered from the bar on any page; a message opens its conversation unless that
+  // would drop an unsaved replay note.
   if (alert.kind !== 'pm' || replayDirty || maintenance) return;
   if (await bridge.act('open-pm', { user: alert.user }) !== true || !win) return;
   if (!parseUrl(win.webContents.getURL())?.pathname.endsWith('/play.html')) win.loadFile(path.join(RENDERER_DIR, 'play.html'));
 }
 
-// leave-room answers 'needs-forfeit' for a battle the user is still playing; the launcher asks
-// in its own popup under the tab and repeats the call with forfeit: true once confirmed.
+// leave-room answers 'needs-forfeit' for a battle still being played; the launcher confirms under
+// the tab and repeats the call with forfeit: true.
 ipcMain.handle('showdown:action', (event, action, args) => {
   if (!isLauncherFrame(event) || typeof action !== 'string') return false;
   return bridge.act(action, args);

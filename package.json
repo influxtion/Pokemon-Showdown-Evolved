@@ -2,7 +2,7 @@
   "name": "showdown-desktop",
   "version": "0.2.0",
   "private": true,
-  "description": "A desktop workspace for Pok\u00e9mon Showdown.",
+  "description": "A desktop workspace for Pokémon Showdown.",
   "main": "app/main.js",
   "engines": {
     "node": ">=24"
@@ -30,7 +30,7 @@
     "check": "node scripts/check.js"
   },
   "devDependencies": {
-    "electron": "45.3.3",
+    "electron": "45.3.4",
     "electron-builder": "26.18.0"
   },
   "dependencies": {

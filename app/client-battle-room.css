@@ -1,20 +1,15 @@
-/* Battle rooms, styled after the "A · Cobalt Cards" mockup: the field, the controls and the
-   log as separate cards on the app background; a header row with the gimmick toggles and the
-   timer as pills; type-tinted move tiles with a type chip and PP; switch cards with an HP bar;
-   card statbars on the field; turn pills in the log.
+/* Battle rooms ("A · Cobalt Cards" mockup): field, controls and log as cards; gimmick toggles
+   and timer as pills; type-tinted move tiles; switch cards with HP bars; turn pills in the log.
 
-   Applies to online battles (while the bridge sets sd-launcher-shell) and practice battles
-   (the practice client sets data-practice-state on <html>). Everything keeps the client's
-   markup, so it covers every generation and game type: moves (normal, Z, Max, Struggle),
-   switches, team preview, doubles/triples targets, Shift, and the Mega Evolution, Mega X/Y,
-   Z-Power, Ultra Burst, Dynamax and Terastallize toggles (all label.megaevo).
+   Applies to online battles (sd-launcher-shell) and practice (data-practice-state on <html>).
+   Only the client's markup is restyled, so every generation and game type is covered, including
+   the Z, Max, Mega, Ultra Burst, Dynamax and Tera toggles (all label.megaevo).
 
-   Layout rules (card positions, grids, the header row) apply only in the client's full layout:
-   at least 830px wide (no .small-layout) and 571px tall. Narrower or shorter windows keep the
-   client's own compact layouts with the colours and type below.
+   The card layout applies only in the client's full layout (at least 830px wide, no
+   .small-layout, and 571px tall); smaller windows keep the client's compact layouts.
 
-   These rules are user-origin. Chromium paints a native button face over a background that
-   only a user-origin rule sets, so every restyled button also gets appearance: none. */
+   Rules are user-origin, where Chromium still paints a native button face, so every restyled
+   button also gets appearance: none. */
 
 :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room {
 
@@ -66,11 +61,9 @@
     text-shadow: none !important;
   }
 
-  /* Statbars: the client builds strong(name) + .hpbar(.hptext, .hptextborder, .prevhp > .hp,
-     .status) and positions the card. The bar stays 151px wide, as the client sizes the HP
-     fill in pixels of that width. */
-  /* No card behind the name and bar: they sit on the field, with a thin light outline on the
-     text (as upstream) so they stay readable on any background art and in either theme. */
+  /* Statbars: strong(name) + .hpbar(.hptext, .hptextborder, .prevhp > .hp, .status), positioned
+     by the client. The bar stays 151px, as the client sizes the HP fill in pixels of that width. */
+  /* No card behind name and bar; a thin outline on the text (as upstream) keeps them readable. */
   .statbar {
     border: 0 !important;
     border-radius: 0 !important;
@@ -101,8 +94,8 @@
     border-radius: 0 !important;
     background: #e6ecf5 !important;
   }
-  /* The declaration order of the hp* and prevhp* rules is significant, as upstream. .prevhp is
-     the client's lost-HP trail during the damage animation; at rest .hp covers it. */
+  /* Order of the hp* and prevhp* rules matters, as upstream: .prevhp is the lost-HP trail and
+     .hp covers it at rest. */
   .statbar .hpbar .hp {
     height: 8px !important;
     border: 0 !important;
@@ -237,8 +230,8 @@
     text-shadow: none !important;
   }
 
-  /* Move tiles: tinted with the move's type (Z and Max moves carry the same type-* class);
-     Struggle and empty slots have no type and stay plain. */
+  /* Move tiles tinted by type (Z and Max moves carry type-* too); Struggle and empty slots stay
+     plain. */
   .movebutton {
     appearance: none !important;
     border: 1px solid var(--sd-border) !important;
@@ -290,8 +283,7 @@
     font-size: 11px !important;
     line-height: 13px !important;
   }
-  /* Dark keeps the tile blue (a tint of a warm type turns grey on the navy panel) and marks
-     the type with a top edge, as in the Steel Blue mockup. */
+  /* Dark keeps tiles blue (warm tints go grey on navy) and marks the type with a top edge. */
   @media (prefers-color-scheme: dark) {
     .movemenu .movebutton[class*="type-"]:not(:disabled) {
       border-color: var(--sd-border-strong) !important;
@@ -482,6 +474,30 @@
   }
 }
 
+/* In the compact layouts, Attack and Switch are toggles over the field, not labels. */
+@media (max-height: 570px) {
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room :is(.moveselect, .switchselect, .shiftselect) button {
+    padding: 4px 12px !important;
+    border: 1px solid var(--sd-border) !important;
+    border-radius: 0 !important;
+    background: var(--sd-panel) !important;
+    color: var(--sd-text) !important;
+  }
+  /* The prompt sits on the client's dark strip over the field, in either theme. */
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room .battle-controls .whatdo,
+  :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room .battle-controls .whatdo :is(strong, small:not(.weak):not(.critical)) {
+    color: #f1f4fa !important;
+    border-color: rgba(241, 244, 250, 0.5) !important;
+  }
+}
+:is(html.sd-launcher-shell, html[data-practice-state]) .ps-room:is(.small-layout, .tiny-layout) :is(.moveselect, .switchselect, .shiftselect) button {
+  padding: 4px 12px !important;
+  border: 1px solid var(--sd-border) !important;
+  border-radius: 0 !important;
+  background: var(--sd-panel) !important;
+  color: var(--sd-text) !important;
+}
+
 /* ----- Card layout (the client's full layout only) ----- */
 
 @media (min-height: 571px) {
@@ -579,8 +595,7 @@
       margin-top: 12px !important;
     }
 
-    /* Moves: four columns. Z and Max moves sit in a wrapper that the toggle shows or hides
-       with an inline display: none, so only a shown wrapper becomes a grid. */
+    /* Moves: four columns. Z/Max wrappers are hidden inline, so only a shown one becomes a grid. */
     .movemenu,
     .movemenu > [class^="movebuttons-"]:not([style*="none"]) {
       display: grid !important;
@@ -595,8 +610,7 @@
     .movemenu > div[style*="clear"] {
       display: none !important;
     }
-    /* Showdown's move button: 40px tall, the name centred on the first line, type and PP
-       on the second. Only the width follows the four-column grid. */
+    /* Showdown's 40px move button: name on the first line, type and PP on the second. */
     .movebutton {
       float: none !important;
       width: auto !important;
@@ -620,8 +634,7 @@
       padding-top: 0 !important;
     }
 
-    /* Switches, targets and team preview: six columns of cards. The HP bar keeps the
-       client's 92px scale, centred in the card. */
+    /* Switches, targets and team preview: a card grid. HP bars keep the client's 92px scale. */
     .switchmenu {
       display: grid !important;
       grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)) !important;

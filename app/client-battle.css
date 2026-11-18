@@ -1,11 +1,9 @@
-/* Modern layout for the Battle tab: the client's own main menu, restyled in place so its
-   format and team pickers, search and login prompts keep working.
+/* The client's main menu, restyled in place as the Battle tab so its pickers, search and login
+   prompts keep working. Applies only under sd-launcher-shell.
 
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. Do not
-   give .leftmenu, .mainmenu, .menugroup, .battleform or their <p> rows a position or
-   transform, not even in an animation: the client's team picker expects the select's
-   offsetParent to be .mainmenuwrapper, and an animation stays on its first frame while the
-   client view is hidden (on Home, for example). */
+   Never give .leftmenu, .mainmenu, .menugroup, .battleform or their <p> rows a position or
+   transform, even in an animation: the team picker expects .mainmenuwrapper as the select's
+   offsetParent, and animations freeze on their first frame while the view is hidden. */
 html.sd-launcher-shell:not(.sd-menu-community) {
   .mainmenuwrapper {
     background: radial-gradient(ellipse 900px 420px at 50% -80px,
@@ -472,11 +470,10 @@ html.sd-launcher-shell:not(.sd-menu-community) {
   40% { transform: translateY(-5px); }
 }
 
-/* Format picker as a centered modal. showdown.js (installFormatModal) tags the client's own
-   FormatPopup with .sd-format-modal and adds the header and backdrop; everything inside is
-   still the client's markup: a search <ul>, then span[name=formats] holding one <ul> per
-   column with <details> sections of button.option rows. The client positions the popup
-   with inline styles, which user-origin !important rules override. */
+/* Format picker as a centered modal. installFormatModal (showdown.js) tags the client's
+   FormatPopup with .sd-format-modal and adds a header and backdrop; the rest is the client's
+   markup (a search <ul>, then span[name=formats] with a <ul> per column of <details> sections).
+   User-origin !important rules override its inline position. */
 html.sd-launcher-shell {
   .sd-modal-backdrop {
     position: fixed;
@@ -592,8 +589,8 @@ html.sd-launcher-shell {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--sd-accent) 28%, transparent) !important;
   }
 
-  /* Sections flow into balanced columns. The columns sit in an unbounded block inside the
-     scrolling body; on a fixed-height element they would spill sideways instead. */
+  /* Sections flow into balanced columns inside an unbounded block; a fixed height would spill
+     sideways. */
   .sd-format-modal .sd-modal-body {
     flex: 1 1 auto;
     min-height: 0;

@@ -1,11 +1,10 @@
 'use strict';
 
-// Tab strip: small tabs for launcher pages, then one tab per room open in the Showdown
-// client, so the launcher owns navigation.
-// Other pages can listen for the "showdown-session" event instead of polling again.
+// Tab strip: small tabs for launcher pages, then one per room open in the Showdown client, so
+// the launcher owns navigation. Other pages can listen for "showdown-session" instead of polling.
 (() => {
-  // Following the current page's link reloads the renderer and resets its UI.
-  // (The practice battle page highlights Bots too, but that link leads back to setup.)
+  // Following the current page's link reloads it and resets its UI. (The practice battle page
+  // highlights Bots too, but that link goes back to setup.)
   const currentPage = document.querySelector('.rail a.nav-item[aria-current="page"]');
   const ownFile = (/([a-z-]+\.html)(?:[?#].*)?$/.exec(String(location.href)) || [])[1] || '';
   const currentHref = currentPage && currentPage.getAttribute('href');
@@ -69,8 +68,8 @@
     if (!(onPlay && page === 'play.html')) location.href = page;
   }
 
-  // focus-room and leave-room answer 'needs-client' when the client shows its own popup
-  // (such as a forfeit confirmation); the user has to see it, so we go to play.html.
+  // focus-room and leave-room answer 'needs-client' when the client shows a popup (such as a
+  // forfeit prompt), so the user is taken to play.html to see it.
   async function act(action, args) {
     try {
       return await desktop.showdown(action, args);
@@ -85,9 +84,8 @@
     else go('play.html');
   }
 
-  // Closing a battle that is still on asks first, in a small popup under the tab, as Showdown
-  // does. It stays inside the tab strip and the top bar, the only part of the window not
-  // covered by a battle view. Resolves true for Forfeit, false for Cancel, Escape or a click away.
+  // Closing an unfinished battle asks first in a small popup under the tab, as Showdown does. It
+  // stays in the strip and top bar, the only area no battle view covers. Resolves true for Forfeit.
   let forfeitAsk = null;
   function confirmForfeit(tabId) {
     if (forfeitAsk) forfeitAsk.finish(false);
@@ -151,8 +149,8 @@
     return result;
   }
 
-  // Fixed rail tabs. Each one says how to reach its view in the client. There is no tab for
-  // the client's own main menu: Home replaces it (see onMainMenu and update below).
+  // Fixed tabs and how to reach their view in the client. The client's main menu has no tab; Home
+  // replaces it (see onMainMenu).
   const TABS = {
     teambuilder: { title: 'Teambuilder', kind: 'teambuilder', action: 'join', args: { room: 'teambuilder' } },
     community: { title: 'Community', kind: 'community', action: 'show-menu', args: { tab: 'community' } },
@@ -192,8 +190,7 @@
     else go('play.html');
   }
 
-  // How a tab closes, or null when it cannot: Home always stays.
-  // The close button, a middle click and Ctrl+W all go through these.
+  // How a tab closes, or null if it can't (Home). Close buttons, middle clicks and Ctrl+W use these.
   const rowCloser = ({ closable, pm, id }) => (!closable ? null : pm ? () => closeConversation(pm) : () => closeRoom(id));
   const pageCloser = (file) => (file === 'index.html' ? null : file === 'community' ? closeCommunity
     : PAGES[file].room ? () => closeRoom(file) : file === BATTLE_PAGE ? closePracticeBattle : () => closePage(file));
@@ -254,11 +251,9 @@
   // Every tab in strip order, with how to open it; Ctrl+Tab steps through this.
   let strip = [];
 
-  // Launcher pages are small tabs ahead of the room tabs. Home is always first; the others
-  // appear once opened from the icon bar and stay until closed or the app restarts.
-  // Teambuilder is the client's own room, so its tab follows that room being open. Community
-  // is the client's main menu in its Community view: opened from the icon bar, it stays
-  // until closed, like a launcher page.
+  // Launcher pages are small tabs ahead of the rooms. Home is always first; others appear when
+  // opened and stay until closed or restart. Teambuilder follows its client room being open;
+  // Community (the client's main menu in its Community view) stays until closed.
   const PAGES = {
     'index.html': { title: 'Home', kind: 'home' },
     'stats.html': { title: 'Stats', kind: 'stats' },
@@ -273,8 +268,8 @@
   const isPage = (file) => Object.prototype.hasOwnProperty.call(PAGES, file);
   const pagesKey = 'nav.pages';
   const thisPage = ownFile;
-  // The practice battle's tab exists while a practice session does: starting one opens it,
-  // and closing it ends the session (after a confirmation while the battle is still on).
+  // The practice battle tab exists while a session does; closing it ends the session (confirmed
+  // first if the battle is still on).
   const BATTLE_PAGE = 'practice-battle.html';
   const RESOURCES_ROOM = 'resources';
 
@@ -317,8 +312,7 @@
     if (lastSession) render(lastSession);
   }
 
-  // Closing Community while it is showing returns the client to its Battle view, which Home
-  // stands in for, so Home opens.
+  // Closing Community while shown returns the client to its Battle view, so Home opens.
   async function closeCommunity() {
     const at = pages.indexOf('community');
     if (at >= 0) {
@@ -402,8 +396,8 @@
     return node;
   }
 
-  // Challenge bars sit under the top bar on every page, so a challenge can be answered
-  // without leaving the current screen. Answers go through the client's own buttons.
+  // Challenge bars sit under the top bar on every page, so a challenge can be answered anywhere.
+  // Answers go through the client's own buttons.
   let barsKey = null;
   let barsBox = null;
   const chosenTeams = new Map();
@@ -523,9 +517,8 @@
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
-    // Every open room in the client's order. The Teambuilder room is a small page tab, so it
-    // never gets a row of its own, and the client's resources room gives way to the launcher's
-    // Info & Resources page (see update).
+    // Open rooms in the client's order. Teambuilder is a page tab, not a row, and the client's
+    // resources room gives way to the Info & Resources page (see update).
     const rows = rooms.filter((r) => r.id !== 'teambuilder' && r.id !== RESOURCES_ROOM).map(roomRow);
     // Conversations and challenges, from the client's private message windows.
     const messages = (Array.isArray(session.messages) ? session.messages : []).map((m) => ({
@@ -535,8 +528,8 @@
       challenge: !!(m.challenge && m.challenge.dir === 'in'),
       current: onPlay && current === '' && session.menuTab === 'pm' && session.pmOpen === m.userid,
     }));
-    // Rebuild only on change so hover and focus survive each poll.
-    // The Teambuilder page tab exists exactly while its room is open in the client.
+    // Rebuild only on change so hover and focus survive each poll. The Teambuilder tab exists exactly
+    // while its room is open.
     const teambuilding = onPlay && current === 'teambuilder';
     if (session.ready) {
       const open = rooms.some((r) => r.id === 'teambuilder');
@@ -662,8 +655,8 @@
       }
     }
     const started = mine.some((r) => !known.has(r.id));
-    // A battle room is created before its player names arrive. Wait to classify it
-    // so an early poll cannot suppress the later player match.
+    // A battle room appears before its player names; wait to classify it so an early poll can't
+    // suppress the later match.
     session.rooms.forEach((r) => {
       if (!r.battle || r.ended || (r.players.length === 2 && r.players.every(Boolean))) known.add(r.id);
     });
@@ -695,8 +688,7 @@
     if (session.ready) {
       try { sessionStorage.setItem(lastSessionKey, JSON.stringify(session)); } catch {}
     }
-    // The client's Info & Resources room is fetched from the server; the launcher has its own
-    // page with the same help written out, so the room is closed and that page opens instead.
+    // The launcher has its own Info & Resources page, so the client's room is closed and that opens.
     if (session.ready && session.rooms.some((r) => r.id === RESOURCES_ROOM)) {
       await act('leave-room', { room: RESOURCES_ROOM });
       if (thisPage !== 'resources.html') {
@@ -708,9 +700,8 @@
       location.href = 'play.html';
       return session;
     }
-    // The Showdown screen never shows the client's main menu; Home replaces it. Two reads
-    // in a row must agree, so a room that is still opening does not bounce back to Home,
-    // and a client popup (such as a forfeit prompt) is left on screen.
+    // The Showdown screen never shows the client's main menu; Home replaces it. Two reads must agree,
+    // so a room still opening doesn't bounce to Home, and client popups stay on screen.
     menuReads = onPlay && onMainMenu(session) && !session.popups ? menuReads + 1 : 0;
     if (menuReads >= 2) {
       location.href = 'index.html';
@@ -722,8 +713,8 @@
     return session;
   }
 
-  // Ctrl+Tab opens the tab to the right of the open one and Ctrl+Shift+Tab the one to its
-  // left, wrapping at the ends. Presses queue, so each one steps from where the last landed.
+  // Ctrl+Tab opens the next tab and Ctrl+Shift+Tab the previous, wrapping. Presses queue, so each
+  // steps from where the last landed.
   let cycling = Promise.resolve();
 
   // A step answers false when it changed nothing.
@@ -754,8 +745,7 @@
     });
   }
 
-  // Ctrl+W closes the open tab the way its close button does. Home has no close
-  // button, so nothing happens on it.
+  // Ctrl+W closes the open tab like its close button; nothing happens on Home.
   function closeTab() {
     return queued(() => {
       const tab = strip.find((t) => t.current);
@@ -775,11 +765,9 @@
 
   if (typeof desktop.onTabShortcut === 'function') desktop.onTabShortcut(tabShortcut);
 
-  // A room opened or switched inside the client (from Community's room list, a link in chat):
-  // read the session now instead of at the next poll, up to a second away. A read already
-  // under way may predate the change, so one more follows it.
-  // A newly joined room is named by its ID ("lobby") until the server sends its title a
-  // moment later, so one more read follows shortly to pick that up.
+  // A room opened or switched inside the client: read the session now, not at the next poll. A read
+  // in progress may predate the change, so one more follows, and another shortly after to pick up
+  // the room's title (a new room is named by its ID until the server sends it).
   let changeQueued = false;
   let titleTimer = null;
   function clientChanged() {
@@ -795,9 +783,8 @@
   if (typeof desktop.onClientChange === 'function') desktop.onClientChange(clientChanged);
 
   window.showdownNav = { matchup, closeRoom, pollNow, tabShortcut, closePracticeBattle };
-  // Every launcher page is a fresh document. Draw the tab strip from the last session read in
-  // this window straight away, so it never flashes empty while the first read is on its way;
-  // that read then replaces it. Only the strip is drawn: nothing navigates on stale data.
+  // Each page is a fresh document. Draw the strip from this window's last session read at once so
+  // it never flashes empty; the first read replaces it. Nothing navigates on stale data.
   try {
     const last = JSON.parse(sessionStorage.getItem(lastSessionKey));
     if (last && last.ready && Array.isArray(last.rooms)) render(last);

@@ -1,10 +1,9 @@
 'use strict';
 
-// The Bots page: format tabs, then one collapsible group of cards per difficulty, hardest first.
-// Each card starts a practice battle against its bot. The simple bots run on this computer; the
-// Foul Play levels play on the cloud server unless the player opts in: the "Foul Play on this
-// computer" panel downloads Foul Play and then lets them choose where it runs. In OU the player
-// also picks both teams, each from the Teambuilder or pasted; Play waits until both are legal.
+// The Bots page: format tabs, then a collapsible group of cards per difficulty, hardest first.
+// Simple bots run locally; Foul Play plays in the cloud unless the player downloads it with the
+// "Foul Play on this computer" panel. In OU the player picks both teams (Teambuilder or pasted),
+// and Play waits until both are legal.
 (() => {
   const $ = id => document.getElementById(id);
   const status = $('practice-status');
@@ -27,8 +26,8 @@
   // The last Teambuilder team picked for each side, by index and name. Pasted teams are never saved.
   const PICKS_KEY = 'bots.ouTeams';
   const SIDES = ['player', 'bot'];
-  // Line icons, 24 × 24, drawn in the card's accent color. Static markup, never built from data.
-  // The Foul Play levels share one search tree, with fewer branches the weaker the level.
+  // 24 × 24 line icons in the card's accent color; static markup, never built from data. Foul Play
+  // levels share a search tree, with fewer branches the weaker the level.
   const ICONS = {
     foulplay: '<circle cx="12" cy="4.5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6.5v10.5M12 10l-7 7M12 10l7 7"/>',
     'foulplay-medium': '<circle cx="12" cy="4.5" r="2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M12 6.5V10M12 10l-5 7M12 10l5 7"/>',

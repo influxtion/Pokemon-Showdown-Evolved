@@ -8,8 +8,8 @@ const MANIFEST = 'manifest.json';
 const MAX_MANIFEST_BYTES = 8 * 1024 ** 2;
 const MAX_FILES = 40000;
 const MAX_TOTAL_BYTES = 4 * 1024 ** 3;
-// Every runtime carries the simulator and the battle client. Only the Laplace harness runtime
-// (npm run build:laplace, never packaged) also carries Python and the Laplace model.
+// Every runtime has the simulator and battle client; only the Laplace harness (npm run
+// build:laplace, never packaged) adds Python and the model.
 const KINDS = Object.freeze({
   simulator: ['server/dist/server/index.js', 'client/practice-client.html'],
   laplace: ['server/dist/server/index.js', 'client/practice-client.html',

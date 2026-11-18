@@ -6,15 +6,14 @@ const { randomUUID } = require('node:crypto');
 
 const THEMES = new Set(['system', 'light', 'dark']);
 const START_PAGES = new Set(['home', 'showdown', 'replays']);
-// Keys older versions saved that no longer mean anything; dropped on load so those files still open.
+// Keys older versions saved that mean nothing now; dropped on load so those files still open.
 const RETIRED_KEYS = new Set([]);
 // Where Foul Play runs: 'cloud' (the default) or 'local', once the player has downloaded it.
 const PRACTICE_ENGINES = new Set(['cloud', 'local']);
-// Home layouts: 'classic' is Showdown's main menu modernised, 'modern' the focused redesign.
-// null means the player has not chosen yet, so Home asks once with a welcome.
+// Home layouts: 'classic' (Showdown's menu, modernised) or 'modern' (the focused redesign); null
+// until the player picks one in the welcome.
 const HOME_LAYOUTS = new Set(['classic', 'modern']);
-// Battle screen: 'launcher' is the restyled battle room (app/client-battle-room.css),
-// 'showdown' leaves Showdown's own battle UI untouched.
+// Battle screen: 'launcher' (app/client-battle-room.css) or 'showdown' (Showdown's own, untouched).
 const BATTLE_STYLES = new Set(['launcher', 'showdown']);
 const DEFAULTS = Object.freeze({
   theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null,

@@ -1,9 +1,6 @@
-/* Chat rooms: type, surfaces and controls only. Battle rooms are in client-battle-room.css.
-
-   Like client-shell.css, this applies only while the bridge sets sd-launcher-shell. The
-   battle scene, the chat log and the user list are positioned by the client, so nothing
-   here changes sizes or positions. Usernames keep the colours the client gives them, and
-   room-authored HTML (welcome banners, polls) is left alone. */
+/* Chat rooms: type, surfaces and controls only (battles: client-battle-room.css). Applies
+   under sd-launcher-shell. The client positions the scene, log and user list, so no sizes or
+   positions change here. Username colours and room-authored HTML are left alone. */
 html.sd-launcher-shell .ps-room {
   .chat-log,
   .chat-log-add,
