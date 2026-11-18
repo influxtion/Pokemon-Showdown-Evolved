@@ -1839,3 +1839,147 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .forfeit-ask-yes:hover { background: var(--err); filter: brightness(1.08); }
 @keyframes forfeit-ask-in { from { opacity: 0; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .forfeit-ask { animation: none; } }
+
+/* ---------- Info & Resources ---------- */
+
+/* A contents list beside one reading column. The help is written into the page. */
+.res {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 760px);
+  gap: 40px;
+  align-items: start;
+}
+.res-toc {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+.res-toc-head {
+  margin-bottom: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.res-toc a {
+  padding: 5px 0 5px var(--space-3);
+  border-left: 2px solid var(--border);
+  color: var(--text-2);
+}
+.res-toc a:hover { color: var(--text); text-decoration: none; border-left-color: var(--border-hover); }
+.res-toc a[aria-current] { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+.res-body { display: flex; flex-direction: column; gap: 44px; min-width: 0; padding-bottom: 40vh; }
+.res-intro { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-2); }
+.res-title { font-size: 24px; font-weight: 600; line-height: 1.25; }
+.res-intro p { max-width: 600px; color: var(--text-2); font-size: var(--fs-lg); line-height: 1.5; }
+
+.res-section { display: flex; flex-direction: column; gap: var(--space-3); scroll-margin-top: var(--space-4); }
+.res-section > h2 {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xl);
+}
+.res-sub { margin-top: var(--space-3); color: var(--text); font-size: var(--fs-lg); }
+.res-lead { color: var(--text-2); line-height: 1.55; }
+.res-section code, .res-table code {
+  font: var(--fs-sm) var(--font-mono);
+  color: var(--text);
+}
+.res-lead code { padding: 1px 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-subtle); }
+
+/* Getting started: numbered steps. */
+.res-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; }
+.res-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.res-steps li:last-child { border-bottom: 0; }
+.res-steps li::before {
+  content: counter(step, decimal-leading-zero);
+  grid-row: 1 / 3;
+  color: var(--accent);
+  font: 600 var(--fs-lg)/1.3 var(--font-mono);
+}
+.res-steps strong { font-size: var(--fs-lg); font-weight: 600; }
+.res-steps span { color: var(--text-2); line-height: 1.55; }
+
+/* Further reading: plain links with an outward arrow. */
+.res-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.res-links a { font-weight: 600; }
+.res-links a::after { content: " ↗"; font-weight: 400; }
+
+/* Tables: tiers, commands, ranks. */
+.res-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); }
+.res-table { width: 100%; border-collapse: collapse; }
+.res-table th, .res-table td { padding: 9px var(--space-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.res-table tr:last-child > * { border-bottom: 0; }
+.res-table thead th { background: var(--bg-selected); color: var(--text); font-size: var(--fs-sm); font-weight: 600; }
+.res-table tbody th { color: var(--text); font-weight: 600; white-space: nowrap; }
+.res-table td { color: var(--text-2); line-height: 1.5; }
+.res-table td:nth-child(2) { color: var(--text); }
+.res-table--cmd tbody th { width: 280px; }
+.res-table--cmd td:nth-child(2) { color: var(--text-2); }
+.res-table--ranks tbody th { width: 1%; text-align: center; }
+.res-table--ranks td:nth-child(2) { width: 1%; white-space: nowrap; font-weight: 600; }
+.res-rank { color: var(--accent); font: 600 var(--fs-lg) var(--font-mono); }
+
+/* Definitions: rows of term and meaning, ruled like the tables. */
+.res-defs { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); }
+.res-defs > div { display: contents; }
+.res-defs dt, .res-defs dd { margin: 0; padding: 9px var(--space-4); border-bottom: 1px solid var(--border); }
+.res-defs > div:last-child > * { border-bottom: 0; }
+.res-defs dt { color: var(--text); font-weight: 600; }
+.res-defs dd { color: var(--text-2); line-height: 1.5; }
+
+/* Keyboard shortcuts. */
+.res-keys { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); }
+.res-keys > div { display: contents; }
+.res-keys dt, .res-keys dd { margin: 0; padding: 9px var(--space-4); border-bottom: 1px solid var(--border); }
+.res-keys > div:last-child > * { border-bottom: 0; }
+.res-keys dd { color: var(--text-2); }
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--text);
+  font: 600 var(--fs-sm)/1.5 var(--font-mono);
+  text-align: center;
+}
+
+/* Getting help: two side-by-side actions. */
+.res-help { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.res-help-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.res-help-item h3 { font-size: var(--fs-lg); }
+.res-help-item p { flex: 1; color: var(--text-2); line-height: 1.5; }
+.res-help-item .btn { margin-top: var(--space-1); }
+.res-note { color: var(--warn); }
+
+@media (max-width: 900px) {
+  .res { grid-template-columns: minmax(0, 1fr); }
+  .res-toc { display: none; }
+}
+@media (max-width: 640px) {
+  .res-help { grid-template-columns: minmax(0, 1fr); }
+}
