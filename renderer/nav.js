@@ -307,7 +307,10 @@
     pages.splice(at, 1);
     savePages();
     if (file === thisPage) {
-      location.href = pages[at - 1] || 'index.html';
+      // Community and Teambuilder are client rooms, not files: open them the way their tab does.
+      const left = pages[at - 1] || 'index.html';
+      if (PAGES[left].room) openTab(left).catch(() => { location.href = 'index.html'; });
+      else location.href = left;
       return;
     }
     lastKey = null;

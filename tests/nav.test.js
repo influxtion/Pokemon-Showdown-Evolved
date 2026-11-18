@@ -865,3 +865,25 @@ test('Ctrl+1 to Ctrl+8 open that tab from the left and Ctrl+9 opens the last one
   await home.jump(1);
   assert.equal(home.location.href, 'index.html', 'Ctrl+1 is always Home');
 });
+
+test('closing the page being shown opens the tab on its left, even a client room', async () => {
+  // Community (a client room, not a file) sits left of Stats: closing Stats opens Community
+  // through the client instead of loading a file called "community", which left Stats showing.
+  const saved = new Map([['nav.pages', '["community","stats.html"]']]);
+  const h = harness([session([])], { saved, page: 'stats.html' });
+  await h.settle();
+  h.close(h.tab('Stats')).click();
+  await h.settle();
+  assert.deepEqual(h.calls, [{ action: 'show-menu', args: { tab: 'community' } }]);
+  assert.equal(h.location.href, 'play.html');
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['community']);
+
+  // With only Home to its left, closing Stats goes Home.
+  const alone = new Map([['nav.pages', '["stats.html"]']]);
+  const home = harness([session([])], { saved: alone, page: 'stats.html' });
+  await home.settle();
+  home.close(home.tab('Stats')).click();
+  await home.settle();
+  assert.equal(home.location.href, 'index.html');
+  assert.deepEqual(JSON.parse(alone.get('nav.pages')), []);
+});
