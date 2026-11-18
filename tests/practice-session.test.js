@@ -7,6 +7,7 @@ const { PassThrough } = require('node:stream');
 const { WebSocketServer } = require('ws');
 const { PracticeSession } = require('../app/practice-session');
 const { createApiServer } = require('../api/server');
+const { InferenceClient } = require('../api/client');
 
 const ROOM = 'battle-gen9randombattle-7';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -68,10 +69,10 @@ function fakeBots() {
   return { bots, createBot };
 }
 
-async function setup(t, { target } = {}) {
+async function setup(t, { target, server = {}, localUrl } = {}) {
   const sim = await fakeSimulator(t);
   const fake = fakeWorkers();
-  const api = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch });
+  const api = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch, ...server });
   const url = await api.listen();
   t.after(() => api.close());
   const spawned = [];
@@ -86,9 +87,10 @@ async function setup(t, { target } = {}) {
   const local = fakeBots();
   const session = new PracticeSession({ root: '/runtime', scripts: '/scripts', spawnChild, installed: () => true, createBot: local.createBot,
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }),
-    target: target || (async engine => { engines.push(engine); return { url }; }) });
+    checkInEveryMs: 20,
+    target: target || (async engine => { engines.push(engine); return { url: engine === 'local' && localUrl ? localUrl() : url }; }) });
   t.after(() => session.stop());
-  return { sim, session, workers: fake.workers, spawned, requested: () => engines.length, engines, api, bots: local.bots };
+  return { sim, session, workers: fake.workers, spawned, requested: () => engines.length, engines, api, url, bots: local.bots };
 }
 
 test('starts the simulator and an engine session, then logs the bot in', async t => {
@@ -288,4 +290,54 @@ test('fails if a simple bot stops mid-battle', async t => {
   bots[0].emit('close', {});
   assert.deepEqual(await failure, ['bot']);
   assert.match(session.status().error, /bot stopped unexpectedly/);
+});
+
+// ---- Waiting for a cloud engine -----------------------------------------------------------
+
+test('waits in line while every cloud engine is busy, then starts by itself', async t => {
+  const { session, api, url, workers } = await setup(t, { server: { maxSessions: 1, maxSessionsPerClient: 2 } });
+  const other = new InferenceClient({ url });
+  const busy = await other.createSession({ preset: 'quiet' });
+  const ready = once(session, 'ready');
+  const starting = session.start({ opponent: 'foulplay', preset: 'quiet' });
+  await until(() => session.status().queue, 'queued');
+  assert.deepEqual(session.status().queue, { position: 1, waiting: 1 });
+  assert.equal(session.status().state, 'starting');
+  assert.equal(api.queue.length, 1);
+  await other.deleteSession(busy.id);
+  await until(() => workers.length === 2, 'engine started for the queued player');
+  assert.deepEqual(await starting, { ok: true });
+  await ready;
+  assert.equal(session.status().queue, null);
+  assert.equal(api.queue.length, 0);
+});
+
+test('stopping while queued leaves the queue', async t => {
+  const { session, api, url } = await setup(t, { server: { maxSessions: 1, maxSessionsPerClient: 2 } });
+  await new InferenceClient({ url }).createSession({ preset: 'quiet' });
+  session.start({ opponent: 'foulplay', preset: 'quiet' });
+  await until(() => api.queue.length === 1, 'queued');
+  session.stop();
+  await until(() => api.queue.length === 0, 'left the queue');
+  assert.equal(session.status().queue, null);
+  assert.equal(session.status().state, 'idle');
+});
+
+test('a queued player can move to Foul Play on this computer', async t => {
+  let localUrl = null;
+  const { session, api, url, engines } = await setup(t, { server: { maxSessions: 1, maxSessionsPerClient: 2 }, localUrl: () => localUrl });
+  const fake = fakeWorkers();
+  const local = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch });
+  localUrl = await local.listen();
+  t.after(() => local.close());
+  await new InferenceClient({ url }).createSession({ preset: 'quiet' });
+  const starting = session.start({ opponent: 'foulplay', preset: 'quiet' });
+  await until(() => session.status().queue, 'queued');
+  assert.deepEqual(session.useEngine('local'), { ok: true });
+  await until(() => fake.workers.length === 1, 'local engine started');
+  assert.deepEqual(await starting, { ok: true });
+  assert.deepEqual(engines, ['cloud', 'local']);
+  assert.equal(session.status().engine, 'local');
+  assert.equal(api.queue.length, 0, 'the cloud place was given up');
+  assert.deepEqual(session.useEngine('cloud'), { ok: false }, 'only while queued');
 });

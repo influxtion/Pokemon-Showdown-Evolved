@@ -239,7 +239,11 @@
     if (!cloud.checked) return { ready: true, text: 'Checking the cloud server…' };
     if (!cloud.online) return { ready: true, text: "Can't reach the cloud server", tone: 'warn' };
     if (!cloud.available) return { ready: false, text: 'Unavailable on the cloud server', tone: 'warn' };
-    if (cloud.busy) return { ready: true, text: 'Cloud server busy, try again shortly', tone: 'warn' };
+    // Busy is still playable: the battle waits in line for the next free engine.
+    if (cloud.busy) {
+      const waiting = cloud.waiting > 0 ? ` · ${cloud.waiting} waiting` : '';
+      return { ready: true, text: cloud.queue ? `Cloud server busy${waiting}. You'll wait in line` : 'Cloud server busy, try again shortly', tone: 'warn' };
+    }
     return { ready: true, text: 'Cloud server, online' };
   }
 

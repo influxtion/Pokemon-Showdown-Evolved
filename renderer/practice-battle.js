@@ -15,6 +15,10 @@
   const emptyText = $('battle-empty-text');
   const back = $('battle-back');
   const subtitle = $('battle-subtitle');
+  const queueActions = $('battle-queue-actions');
+  const useLocal = $('battle-use-local');
+  const leaveQueue = $('battle-leave-queue');
+  const ordinal = n => `${n}${(n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
   let NAME = 'the bot';
   let busy = false;
   let polling = false;
@@ -49,7 +53,14 @@
       // The battle view is only shown once it has a battle open; until then a plain card says why.
       area.hidden = !clientUp;
       empty.hidden = true;
-      if (value.state === 'failed' || value.clientError) {
+      const queue = starting ? value.queue : null;
+      queueActions.hidden = !queue;
+      useLocal.hidden = !(queue && value.local?.installed && !value.local.installing);
+      useLocal.disabled = leaveQueue.disabled = busy;
+      if (queue) {
+        showEmpty('Waiting for a cloud engine', `Every cloud engine is busy, so you're in line: ${ordinal(queue.position)} of ${queue.waiting}. ` +
+          `The battle starts by itself when it's your turn.${queue.position === 1 ? ' You are next.' : ''}`, false);
+      } else if (value.state === 'failed' || value.clientError) {
         showEmpty('Practice stopped', value.error || value.clientError || 'The practice session failed.', true);
       } else if (starting || (running && !clientUp)) {
         showEmpty('Starting the battle', `Preparing the simulator and connecting to ${NAME}. This can take a moment.`, false);
@@ -58,7 +69,8 @@
       }
 
       let text = 'Not running';
-      if (starting) text = 'Starting…';
+      if (queue) text = `In queue · ${ordinal(queue.position)} in line`;
+      else if (starting) text = 'Starting…';
       else if (running && value.battle?.thinking) text = `${NAME} is thinking · turn ${value.battle.turn || 1}`;
       else if (finished) text = ({ win: 'You won', loss: `${NAME} won`, tie: 'Battle tied' })[value.battle.result] || 'Battle finished';
       else if (running && value.battle?.turn) text = `Turn ${value.battle.turn} · last search ${((value.battle.elapsedMs || 0) / 1000).toFixed(1)}s`;
@@ -68,6 +80,7 @@
       else if (value.state === 'failed' || value.clientError) text = 'Practice stopped';
       status.textContent = text;
       status.className = `status status--${value.error || value.clientError ? 'err' : starting || recovery ? 'warn' : running ? 'ok' : 'off'}`;
+      end.textContent = queue ? 'Leave queue' : 'End practice';
 
       next.hidden = !finished;
       next.disabled = busy;
@@ -99,8 +112,10 @@
 
   next.addEventListener('click', () => act(() => window.desktop.nextPracticeBattle()));
   forfeit.addEventListener('click', () => act(() => window.desktop.forfeitPractice()));
-  // Ending practice closes this tab, the same as its close button.
+  // Ending practice closes this tab, the same as its close button. While queued, that leaves the queue.
   end.addEventListener('click', () => window.showdownNav?.closePracticeBattle());
+  leaveQueue.addEventListener('click', () => window.showdownNav?.closePracticeBattle());
+  useLocal.addEventListener('click', () => act(() => window.desktop.usePracticeLocal()));
   new ResizeObserver(sync).observe(area);
   window.addEventListener('resize', sync);
   refresh();

@@ -109,7 +109,10 @@ class InferenceClient {
   info() { return this.request('/v1/info'); }
 
   // `team` is the bot's own team as a Showdown export, for formats where the player brings it (OU).
-  async createSession({ bot = 'foulplay', preset, format = FORMAT, team }) {
+  // With `queue`, a busy server may answer with a place in line instead of a session:
+  // { queued: true, ticket, position, waiting, checkInMs }. Then call checkIn(ticket) until it
+  // returns the session, or leaveQueue(ticket).
+  async createSession({ bot = 'foulplay', preset, format = FORMAT, team, queue = false }) {
     if (!Object.hasOwn(BOTS, bot) || !Object.hasOwn(PRESETS, preset) || !BOTS[bot].formats.includes(format)) {
       throw new ApiError('Choose a supported bot, format and preset.', { code: 'invalid-options' });
     }
@@ -117,9 +120,39 @@ class InferenceClient {
     if (needsTeam && !isTeamText(team)) throw new ApiError('This format needs a team for the bot.', { code: 'invalid-team' });
     // Older servers know only Random Battle and refuse unknown fields, so send the format only when it matters.
     const body = format === FORMAT ? { bot, preset } : { bot, preset, format, team };
-    const value = await this.request('/v1/sessions', { method: 'POST', body });
+    let value;
+    try {
+      value = await this.request('/v1/sessions', { method: 'POST', body: queue ? { ...body, queue: true } : body });
+    } catch (error) {
+      // A server from before the queue refuses the unknown field; ask again the old way.
+      if (!queue || error.status !== 400 || error.code !== 'invalid-options') throw error;
+      value = await this.request('/v1/sessions', { method: 'POST', body });
+    }
+    return this.sessionOrPlace(value);
+  }
+
+  sessionOrPlace(value) {
+    if (value?.queued === true) {
+      const whole = number => Number.isInteger(number) && number >= 0 && number <= 100000;
+      if (!SESSION_ID.test(value.ticket || '') || !whole(value.position) || !whole(value.waiting)) {
+        throw new ApiError('The practice server sent an invalid queue place.', { code: 'invalid-reply' });
+      }
+      return { queued: true, ticket: value.ticket, position: value.position, waiting: value.waiting,
+        checkInMs: whole(value.checkInMs) && value.checkInMs >= 1000 ? value.checkInMs : 15000 };
+    }
     if (!SESSION_ID.test(value?.id || '')) throw new ApiError('The practice server sent an invalid session.', { code: 'invalid-reply' });
     return value;
+  }
+
+  // Keeps a place in the queue. Returns the place again, or the session once it is this client's turn.
+  async checkIn(ticket) {
+    if (!SESSION_ID.test(ticket || '')) throw new ApiError('Invalid queue place.', { code: 'invalid-options' });
+    return this.sessionOrPlace(await this.request(`/v1/queue/${ticket}`));
+  }
+
+  leaveQueue(ticket) {
+    if (!SESSION_ID.test(ticket || '')) return Promise.resolve(null);
+    return this.request(`/v1/queue/${ticket}`, { method: 'DELETE' }).catch(() => null);
   }
 
   session(id) { return this.request(`/v1/sessions/${id}`); }

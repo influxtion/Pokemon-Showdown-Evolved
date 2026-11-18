@@ -45,7 +45,9 @@ class CloudEngine {
       const info = await new this.Client({ url: this.url, key: this.key, timeoutMs: 5000 }).info();
       const bot = info.bots?.find(value => value.id === 'foulplay');
       this.value = { configured: true, checked: true, online: true, available: Boolean(bot?.available),
-        busy: Boolean(info.capacity && info.capacity.active >= info.capacity.max), presets: bot?.presets || null,
+        busy: Boolean(info.capacity && (info.capacity.active >= info.capacity.max || info.capacity.waiting > 0)),
+        waiting: Number.isInteger(info.capacity?.waiting) ? info.capacity.waiting : 0,
+        queue: Number.isInteger(info.capacity?.queueMax) && info.capacity.queueMax > 0, presets: bot?.presets || null,
         error: bot?.available ? '' : 'Foul Play is not available on the cloud server right now.' };
     } catch (error) {
       this.value = { configured: true, checked: true, online: false, available: false, error: error.message };

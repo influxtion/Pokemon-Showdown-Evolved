@@ -465,6 +465,15 @@ ipcMain.handle('practice:start', async (event, options) => {
   if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
   return practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
 });
+// While waiting in line for a cloud engine, the battle tab can move the battle to Foul Play on this
+// computer, if the player has downloaded it. That also becomes their choice for later battles.
+ipcMain.handle('practice:use-local', event => {
+  if (!isBattleFrame(event)) return { ok: false };
+  if (!practice.queue) return { ok: false, error: 'The battle is no longer waiting for a cloud engine.' };
+  if (!localEngine.inspect().installed || localEngine.installing) return { ok: false, error: 'Download Foul Play on the Bots page first.' };
+  try { settings.set('practiceEngine', 'local'); } catch { /* The battle still moves; the choice just is not remembered. */ }
+  return practice.useEngine('local');
+});
 // Local Foul Play, opt-in. Downloading runs for minutes; the Bots page follows it through practice:status.
 const localBattleOn = () => practice.engine === 'local' && ['starting', 'ready'].includes(practice.state);
 ipcMain.handle('practice:install-local', event => {

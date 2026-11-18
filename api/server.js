@@ -6,10 +6,17 @@
 //
 //   GET    /healthz                       liveness
 //   GET    /v1/info                       bots, presets, limits and current capacity
-//   POST   /v1/sessions                   {"bot", "preset", "format"?, "team"?} (see README.md)
+//   POST   /v1/sessions                   {"bot", "preset", "format"?, "team"?, "queue"?} (see README.md)
 //   GET    /v1/sessions/:id               session status
 //   DELETE /v1/sessions/:id               end a session
 //   WS     /v1/sessions/:id/socket        frames in, choices out (see protocol.js)
+//   GET    /v1/queue/:ticket              check in while waiting; becomes the session once it is your turn
+//   DELETE /v1/queue/:ticket              leave the queue
+//
+// The queue: when every engine is busy, a client that sent "queue": true gets a place in line
+// (202) instead of 503. It keeps its place by checking in at least every `queueCheckInMs`; the
+// first in line takes the next free engine on its next check-in, and nobody behind it, or new,
+// can take that engine first. At most `maxQueue` wait; past that the server answers 503 again.
 
 const http = require('node:http');
 const os = require('node:os');
@@ -138,6 +145,8 @@ function createApiServer({
   maxFrameBytes = 256 * 1024,
   trustProxy = false,
   lowPriority = false,
+  maxQueue = 20,
+  queueCheckInMs = 15 * 1000,
   launch = spawnWorker,
   now = Date.now,
   log = () => {},
@@ -146,8 +155,12 @@ function createApiServer({
   for (const [name, value] of Object.entries({ maxSessions, maxSessionsPerClient, maxThreads })) {
     if (!Number.isInteger(value) || value < 1 || value > 256) throw new Error(`Invalid ${name}`);
   }
+  if (!Number.isInteger(maxQueue) || maxQueue < 0 || maxQueue > 1000) throw new Error('Invalid maxQueue');
   const resolveRuntime = typeof runtime === 'function' ? runtime : () => runtime;
   const sessions = new Map();
+  // Waiting clients, first in line first: { id, client, options, joined, seen }. Options (with an
+  // OU team) are kept only while waiting and never logged.
+  const queue = [];
   const limiter = new RateLimiter({ capacity: sessionBurst, perHour: sessionsPerHour, now });
   const sockets = new WebSocketServer({ noServer: true, maxPayload: maxFrameBytes + 1024, perMessageDeflate: false });
   let closing = false;
@@ -268,11 +281,34 @@ function createApiServer({
     session.startupTimer.unref?.();
   }
 
+  const freeSlots = () => Math.max(0, maxSessions - sessions.size);
+  const place = ticket => ({ queued: true, ticket: ticket.id, position: queue.indexOf(ticket) + 1, waiting: queue.length,
+    checkInMs: queueCheckInMs });
+  function leaveQueue(ticket, reason) {
+    const index = queue.indexOf(ticket);
+    if (index === -1) return;
+    queue.splice(index, 1);
+    log('queue-leave', { reason, waiting: queue.length });
+  }
+
+  // Starts an engine for a client that has a slot. The OU team goes to the worker and nowhere else.
+  function openSession(response, client, options, paths) {
+    const format = options.format === undefined ? FORMAT : options.format;
+    const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, format, preset: options.preset,
+      threads: threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
+      decisions: 0, battles: 0, frames: new FrameBudget({ burst: frameBurst, perSecond: framesPerSecond, now }) };
+    sessions.set(session.id, session);
+    startWorker(session, paths, TEAM_FORMATS.includes(format) ? options.team : null);
+    log('session-start', { bot: session.bot, format, threads: session.threads, active: sessions.size, waiting: queue.length });
+    return send(response, 201, { ...describe(session), socket: `/v1/sessions/${session.id}/socket` });
+  }
+
   async function createSession(request, response) {
     let options;
     try { options = await readBody(request); } catch { return failure(response, 400, 'invalid-request', 'Expected a small JSON body.'); }
     if (!options || typeof options !== 'object' || !Object.hasOwn(BOTS, options.bot) || !Object.hasOwn(PRESETS, options.preset) ||
-        Object.keys(options).some(key => !['bot', 'preset', 'format', 'team'].includes(key))) {
+        Object.keys(options).some(key => !['bot', 'preset', 'format', 'team', 'queue'].includes(key)) ||
+        (options.queue !== undefined && typeof options.queue !== 'boolean')) {
       return failure(response, 400, 'invalid-options', 'Choose a supported bot and computation preset.');
     }
     const format = options.format === undefined ? FORMAT : options.format;
@@ -290,21 +326,38 @@ function createApiServer({
     if (mine >= maxSessionsPerClient) {
       return failure(response, 429, 'too-many-sessions', 'You already have a practice battle running. Stop it before starting another.', { 'Retry-After': '10' });
     }
+    if (queue.some(ticket => ticket.client === client)) {
+      return failure(response, 429, 'already-queued', 'You are already waiting for a cloud engine. Leave the queue before starting another.', { 'Retry-After': '10' });
+    }
     const allowed = limiter.take(client);
     if (!allowed.ok) {
       const seconds = Math.ceil(allowed.retryAfterMs / 1000);
       return failure(response, 429, 'rate-limited', `Too many practice battles started. Try again in ${Math.ceil(seconds / 60)} min.`, { 'Retry-After': String(seconds) });
     }
-    if (sessions.size >= maxSessions) {
-      return failure(response, 503, 'at-capacity', 'Every engine is busy right now. Try again shortly.', { 'Retry-After': '30' });
+    const wanted = { bot: options.bot, preset: options.preset, format, ...(needsTeam ? { team: options.team } : {}) };
+    // A free engine goes to whoever is waiting first; only with nobody in line can a new client take it.
+    if (!queue.length && freeSlots() > 0) return openSession(response, client, wanted, paths);
+    if (options.queue === true && queue.length < maxQueue) {
+      const ticket = { id: crypto.randomBytes(32).toString('hex'), client, options: wanted, joined: now(), seen: now() };
+      queue.push(ticket);
+      log('queue-join', { bot: wanted.bot, format, waiting: queue.length });
+      return send(response, 202, place(ticket));
     }
-    const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, format, preset: options.preset,
-      threads: threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
-      decisions: 0, battles: 0, frames: new FrameBudget({ burst: frameBurst, perSecond: framesPerSecond, now }) };
-    sessions.set(session.id, session);
-    startWorker(session, paths, needsTeam ? options.team : null);
-    log('session-start', { bot: session.bot, format, threads: session.threads, active: sessions.size });
-    return send(response, 201, { ...describe(session), socket: `/v1/sessions/${session.id}/socket` });
+    return failure(response, 503, 'at-capacity', queue.length >= maxQueue && options.queue === true
+      ? 'Every engine is busy and the queue is full. Try again in a few minutes.' : 'Every engine is busy right now. Try again shortly.',
+    { 'Retry-After': '30' });
+  }
+
+  // A check-in keeps the ticket's place. Once enough engines are free for its position, the
+  // ticket becomes a session right here, so a slot is only ever held for the next check-in.
+  function checkIn(response, ticket) {
+    ticket.seen = now();
+    if (queue.indexOf(ticket) + 1 > freeSlots()) return send(response, 200, place(ticket));
+    const paths = resolveRuntime();
+    if (!paths) return failure(response, 503, 'unavailable', 'Foul Play is not installed on this server.');
+    leaveQueue(ticket, 'started');
+    log('queue-wait', { seconds: Math.round((now() - ticket.joined) / 1000) });
+    return openSession(response, ticket.client, ticket.options, paths);
   }
 
   const server = http.createServer(async (request, response) => {
@@ -321,11 +374,19 @@ function createApiServer({
             formats: bot.formats, available: available(),
             presets: Object.fromEntries(Object.keys(PRESETS).map(preset => [preset, threadsFor(preset)])) })),
           limits: { maxSessionsPerClient, sessionsPerHour, sessionBurst, lifetimeMs, idleMs, maxDecisions },
-          capacity: { active: sessions.size, max: maxSessions } });
+          capacity: { active: sessions.size, max: maxSessions, waiting: queue.length, queueMax: maxQueue, checkInMs: queueCheckInMs } });
       }
       if (url.pathname === '/v1/sessions') {
         if (request.method === 'POST') return await createSession(request, response);
         return failure(response, 405, 'method-not-allowed', 'Use POST.');
+      }
+      const waiting = /^\/v1\/queue\/([^/]+)$/.exec(url.pathname);
+      if (waiting) {
+        const ticket = SESSION_ID.test(waiting[1]) ? queue.find(value => value.id === waiting[1]) : null;
+        if (!ticket) return failure(response, 404, 'ticket-not-found', 'Your place in the queue has expired. Start the battle again.');
+        if (request.method === 'GET') return checkIn(response, ticket);
+        if (request.method === 'DELETE') { leaveQueue(ticket, 'left'); return send(response, 200, { ok: true }); }
+        return failure(response, 405, 'method-not-allowed', 'Use GET or DELETE.');
       }
       const match = /^\/v1\/sessions\/([^/]+)$/.exec(url.pathname);
       if (match && SESSION_ID.test(match[1])) {
@@ -385,6 +446,8 @@ function createApiServer({
       else if (!session.socket && time - session.created > connectMs) end(session);
       else if (time - session.touched > idleMs) end(session, 'idle');
     }
+    // A client that stops checking in (closed the app, lost its connection) loses its place.
+    for (const ticket of [...queue]) if (time - ticket.seen > queueCheckInMs) leaveQueue(ticket, 'expired');
     limiter.prune();
   }
   function heartbeat() {
@@ -401,7 +464,7 @@ function createApiServer({
   heartbeatTimer.unref();
 
   return {
-    server, sessions, sweep,
+    server, sessions, queue, sweep,
     async listen(port = 0, host = '127.0.0.1') {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
       const address = server.address();
@@ -412,6 +475,7 @@ function createApiServer({
       clearInterval(sweepTimer);
       clearInterval(heartbeatTimer);
       for (const session of [...sessions.values()]) end(session, 'shutting-down');
+      queue.length = 0;
       sockets.close();
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
@@ -437,6 +501,7 @@ async function main() {
     apiKey: process.env.API_KEY || null,
     maxSessions: integer('MAX_SESSIONS', Math.max(1, Math.floor(os.availableParallelism() / 2))),
     maxSessionsPerClient: integer('MAX_SESSIONS_PER_CLIENT', 1),
+    maxQueue: integer('MAX_QUEUE', 20),
     sessionsPerHour: integer('SESSIONS_PER_HOUR', 30),
     sessionBurst: integer('SESSION_BURST', 6),
     maxThreads: integer('MAX_THREADS', 2),

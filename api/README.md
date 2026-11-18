@@ -55,6 +55,7 @@ Supported hosts: Linux x64/arm64, macOS x64/arm64 and Windows x64.
 | `MAX_SESSIONS` | half the CPUs, at least 1 | Concurrent battles across the server |
 | `MAX_THREADS` | `2` | Search threads per battle; caps the app's Quiet/Balanced/Full (1/2/8) |
 | `MAX_SESSIONS_PER_CLIENT` | `1` | Concurrent battles per client network |
+| `MAX_QUEUE` | `20` | Players who may wait in line for an engine; `0` turns the queue off |
 | `SESSIONS_PER_HOUR`, `SESSION_BURST` | `30`, `6` | Token bucket for starting battles, per client network |
 
 CPU use is roughly `MAX_SESSIONS × MAX_THREADS` cores while every battle is thinking. A decision takes about 200 ms of search.
@@ -67,13 +68,28 @@ Access is anonymous by default, so limits are per **client network**: an IPv4 ad
 | --- | --- | --- |
 | Starting battles | Bursts of 6, refilling at 30 per hour | `429 rate-limited` with `Retry-After` |
 | Concurrent battles per client network | 1 | `429 too-many-sessions` |
-| Concurrent battles on the server | `MAX_SESSIONS` | `503 at-capacity` with `Retry-After: 30` |
+| Concurrent battles on the server | `MAX_SESSIONS` | A place in the queue if asked for (below), else `503 at-capacity` with `Retry-After: 30` |
+| Players waiting | `MAX_QUEUE` (20), one place per client network | `503 at-capacity`; a second place is `429 already-queued` |
+| Check-ins while waiting | At least every 15 s | Place lost (`404 ticket-not-found`) |
 | Frames per socket | Bursts of 200, refilling at 40 per second | Socket closed (`rate-limited`) |
 | Frame size | 256 KiB | Socket closed |
 | Moves per session | 5,000 | Socket closed (`decision-limit`) |
 | Session lifetime, idle time, time to connect | 2 h, 15 min, 1 min | Session ended |
 
 A single battle needs one session; rematches reuse it.
+
+### The queue
+
+When every engine is busy, a client that sends `"queue": true` with `POST /v1/sessions` gets `202 {queued: true, ticket, position, waiting, checkInMs}` instead of `503`. Players are served first come, first served:
+
+- The client checks in with `GET /v1/queue/:ticket` (the desktop app does so every 3 s). Each check-in answers `200` with the current place, or, once it is the client's turn and an engine is free, `201` with the new session, exactly as `POST /v1/sessions` would.
+- A free engine is held for whoever is first in line until their next check-in. Nobody behind them, and no new client, can take it first.
+- A client that misses check-ins for 15 s loses its place, so a closed app never blocks the line. `DELETE /v1/queue/:ticket` leaves at once.
+- Starting a battle uses one rate-limit token when the client joins the line, not again when it starts.
+- An OU team waits with the ticket in memory and goes only to the worker that starts. It is never logged or returned.
+- `GET /v1/info` reports `capacity: {active, max, waiting, queueMax, checkInMs}`.
+
+The server does not estimate waiting times; battles run from a few minutes to the 2-hour lifetime.
 
 ## Host it on a server
 
@@ -257,7 +273,9 @@ All responses are JSON. Errors look like `{"error": {"code": "rate-limited", "me
 | --- | --- |
 | `GET /healthz` | Liveness, no auth |
 | `GET /v1/info` | API version, bots with their level, formats and presets (after `MAX_THREADS`), limits, current capacity |
-| `POST /v1/sessions` | Body `{"bot", "preset", "format"?, "team"?}` (below) → `201 {id, bot, level, format, threads, expiresAt, socket, …}` |
+| `POST /v1/sessions` | Body `{"bot", "preset", "format"?, "team"?, "queue"?}` (below) → `201 {id, bot, level, format, threads, expiresAt, socket, …}`, or `202` with a place in the queue |
+| `GET /v1/queue/:ticket` | Check in while waiting → `200` with the place, or `201` with the session once it is your turn |
+| `DELETE /v1/queue/:ticket` | Leave the queue |
 | `GET /v1/sessions/:id` | State, battles and decisions so far |
 | `DELETE /v1/sessions/:id` | End the session and its worker |
 | `WS /v1/sessions/:id/socket` | One socket per session. Requests with an `Origin` header (browsers) are refused |
@@ -272,6 +290,7 @@ The session ID is 256 random bits and acts as the capability for that session.
 | `preset` | `quiet`, `balanced`, `full`: search threads 1, 2, 8, capped by `MAX_THREADS` |
 | `format` | `gen9randombattle` (default) or `gen9ou`. OU is `foulplay` only |
 | `team` | OU only, and required there: Foul Play's own team as a Showdown export, up to 8,192 characters |
+| `queue` | `true` to wait in line when every engine is busy ([The queue](#the-queue)). Servers from before the queue refuse the field with `400`; the app then asks again without it |
 
 The team goes straight to the worker's stdin. It is not stored on the session, returned by any route or logged. The client is expected to send a team its own simulator has validated for the format, and to give the bot the same team in the battle (`/utm`). If Foul Play cannot read it, the socket closes with `invalid-team`.
 

@@ -59,7 +59,7 @@ class PracticeSession extends EventEmitter {
   // target(engine) resolves to { url, key } for the API that computes Foul Play's moves, where
   // engine is 'cloud' (the default) or 'local' (Foul Play downloaded onto this computer).
   constructor({ root, scripts, target, node = process.execPath, spawnChild = spawn, verify = verifyInWorker,
-    installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient,
+    installed = null, timeoutMs = 120000, WebSocketImpl = WebSocket, Client = InferenceClient, checkInEveryMs = 3000,
     createBot = kind => new LocalBot({ kind, data: loadData(path.join(this.root, 'server')) }) }) {
     super();
     this.root = root;
@@ -72,6 +72,7 @@ class PracticeSession extends EventEmitter {
     this.timeoutMs = timeoutMs;
     this.WebSocketImpl = WebSocketImpl;
     this.Client = Client;
+    this.checkInEveryMs = checkInEveryMs;
     this.createBot = createBot;
     this.bot = OPPONENTS.foulplay;
     this.generation = 0;
@@ -99,6 +100,9 @@ class PracticeSession extends EventEmitter {
     this.accepted = false;
     this.thinkingSince = null;
     this.threads = null;
+    // While every cloud engine is busy: { ticket, position, waiting }. The battle starts by itself
+    // once it is this player's turn.
+    this.queue = null;
   }
 
   installed() {
@@ -108,7 +112,7 @@ class PracticeSession extends EventEmitter {
 
   status() {
     return { installed: this.installed(), state: this.state, opponent: this.bot.id, format: this.format, engine: this.engine,
-      threads: this.threads,
+      threads: this.threads, queue: this.queue ? { position: this.queue.position, waiting: this.queue.waiting } : null,
       opponents: Object.values(OPPONENTS).map(bot => ({ id: bot.id, name: bot.name, local: bot.local, search: bot.search,
         difficulty: bot.difficulty, kind: bot.kind, formats: bot.formats, description: bot.description })),
       error: this.error, preset: this.preset, battle: this.battle };
@@ -205,12 +209,20 @@ class PracticeSession extends EventEmitter {
 
   async startEngine(generation) {
     if (this.bot.local) return this.startLocalBot(generation);
-    const target = await this.target(this.engine);
+    const engine = this.engine;
+    const target = await this.target(engine);
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
     this.api = api;
-    const session = await api.createSession({ bot: this.bot.id, preset: this.preset, format: this.format,
-      ...(this.teams ? { team: this.teams.botExport } : {}) });
+    // Only the cloud queues; the copy on this computer always has room for its one player.
+    let session = await api.createSession({ bot: this.bot.id, preset: this.preset, format: this.format,
+      ...(this.teams ? { team: this.teams.botExport } : {}), queue: engine === 'cloud' });
+    if (session.queued) {
+      session = await this.waitInQueue(api, session, generation, engine);
+      if (!session) return;
+      // The player chose to stop waiting and play on this computer instead.
+      if (session.switched) return this.startEngine(generation);
+    }
     if (generation !== this.generation) { api.deleteSession(session.id); return; }
     this.apiSession = session.id;
     this.threads = session.threads;
@@ -222,6 +234,47 @@ class PracticeSession extends EventEmitter {
       if (generation === this.generation && this.inference === socket) this.fail('engine', generation, error?.message);
     });
     await socket.ready;
+  }
+
+  // Waits for a cloud engine, checking in every few seconds. The startup timeout is paused while
+  // waiting (a place in line can last many minutes) and starts again once the engine is ours.
+  // Resolves with the session, { switched: true } if the player moved to this computer, or null
+  // once this start is stale (the player stopped).
+  async waitInQueue(api, place, generation, engine) {
+    clearTimeout(this.timer);
+    const every = Math.max(250, Math.min(this.checkInEveryMs, Math.floor(place.checkInMs / 3)));
+    let current = place;
+    try {
+      while (current.queued) {
+        this.queue = { ticket: current.ticket, position: current.position, waiting: current.waiting };
+        this.changed();
+        await new Promise(resolve => setTimeout(resolve, every));
+        if (generation !== this.generation) { api.leaveQueue(current.ticket); return null; }
+        if (this.engine !== engine) { await api.leaveQueue(current.ticket); return { switched: true }; }
+        current = await api.checkIn(current.ticket);
+        if (generation !== this.generation) {
+          if (current.queued) api.leaveQueue(current.ticket); else api.deleteSession(current.id);
+          return null;
+        }
+      }
+      return current;
+    } finally {
+      if (generation === this.generation) {
+        this.queue = null;
+        this.changed();
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.fail('timeout', generation), this.timeoutMs);
+        this.timer.unref?.();
+      }
+    }
+  }
+
+  // While waiting for a cloud engine, the player can move to Foul Play on this computer.
+  useEngine(engine) {
+    if (!this.queue || !ENGINES.includes(engine) || engine === this.engine) return { ok: false };
+    this.engine = engine;
+    this.changed();
+    return { ok: true };
   }
 
   // The simple bots play in this process; there is no API session and no thread count.
@@ -344,6 +397,7 @@ class PracticeSession extends EventEmitter {
     this.inference?.close();
     this.simulator?.terminate?.();
     if (this.api && this.apiSession) this.api.deleteSession(this.apiSession);
+    if (this.api && this.queue) this.api.leaveQueue(this.queue.ticket);
     for (const child of this.children) {
       child.stdin?.end?.();
       child.kill();

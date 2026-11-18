@@ -1108,6 +1108,10 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .battle-empty-card h2 { margin: 4px 0 0; font-size: 18px; }
 .battle-empty-card p { margin: 0; color: var(--text-2); }
 .battle-empty-card .btn { margin-top: 8px; }
+/* Waiting in line for a cloud engine: the way out, and the way to play on this computer instead. */
+.battle-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.battle-empty-actions[hidden], .battle-empty-actions .btn[hidden] { display: none; }
+.battle-empty-actions .btn { margin-top: 0; }
 
 /* ---------- Rail rooms, room title and result bar ---------- */
 

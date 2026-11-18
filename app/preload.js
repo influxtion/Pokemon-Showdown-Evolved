@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('desktop', {
   showPractice: (bounds) => ipcRenderer.invoke('practice:show', bounds),
   nextPracticeBattle: () => ipcRenderer.invoke('practice:next'),
   installLocalPractice: () => ipcRenderer.invoke('practice:install-local'),
+  usePracticeLocal: () => ipcRenderer.invoke('practice:use-local'),
   cancelLocalPracticeInstall: () => ipcRenderer.invoke('practice:cancel-install'),
   removeLocalPractice: () => ipcRenderer.invoke('practice:remove-local'),
   getShowdex: () => ipcRenderer.invoke('showdex:status'),

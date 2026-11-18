@@ -59,7 +59,7 @@ test('reports bots, presets capped to the server limit, and capacity', async t =
   assert.deepEqual(info.bots[0].formats, ['gen9randombattle', 'gen9ou']);
   assert.deepEqual(info.bots[1].formats, ['gen9randombattle']);
   assert.deepEqual(info.bots[0].presets, { quiet: 1, balanced: 2, full: 2 });
-  assert.deepEqual(info.capacity, { active: 0, max: 3 });
+  assert.deepEqual(info.capacity, { active: 0, max: 3, waiting: 0, queueMax: 20, checkInMs: 15000 });
 });
 
 test('relays frames to the worker and choices back to the client', async t => {
@@ -320,4 +320,109 @@ test('keys rate limits by IPv4 address, IPv6 /64 and trusted proxy hop', () => {
   assert.equal(clientKey(request('2001:db8:1:2::9'), false), '2001:db8:1:2::/64');
   assert.equal(clientKey(request('10.0.0.2', '1.1.1.1, 198.51.100.4'), true), '198.51.100.4');
   assert.equal(clientKey(request('10.0.0.2', '1.1.1.1'), false), '10.0.0.2');
+});
+
+// ---- Queue -----------------------------------------------------------------------------------
+
+// A client that the server sees at its own address (trustProxy reads X-Forwarded-For), so one
+// test can stand in for several players.
+function player(url, address) {
+  const fetcher = (target, init) => fetch(target, { ...init, headers: { ...init.headers, 'X-Forwarded-For': address } });
+  return new InferenceClient({ url, fetcher });
+}
+
+test('a full server queues players who ask, in order, and starts them as engines free up', async t => {
+  let time = 1000;
+  const { api, url } = await start(t, { maxSessions: 1, trustProxy: true, now: () => time });
+  const [a, b, c] = ['10.0.0.1', '10.0.0.2', '10.0.0.3'].map(address => player(url, address));
+  const first = await a.createSession({ preset: 'quiet', queue: true });
+  assert.ok(first.id, 'a free engine starts at once');
+  const second = await b.createSession({ preset: 'quiet', queue: true });
+  const third = await c.createSession({ preset: 'quiet', queue: true });
+  assert.deepEqual([second.queued, second.position, second.waiting], [true, 1, 1]);
+  assert.deepEqual([third.position, third.waiting], [2, 2]);
+  assert.equal((await a.info()).capacity.waiting, 2);
+
+  // Still busy: checking in keeps the place.
+  assert.deepEqual(await c.checkIn(third.ticket).then(value => [value.queued, value.position]), [true, 2]);
+  await a.deleteSession(first.id);
+  // The free engine is held for the first in line: the third player cannot take it.
+  assert.deepEqual(await c.checkIn(third.ticket).then(value => [value.queued, value.position]), [true, 2]);
+  const started = await b.checkIn(second.ticket);
+  assert.ok(started.id && !started.queued, 'the first in line gets the engine on its next check-in');
+  assert.equal(api.sessions.size, 1);
+  assert.deepEqual(await c.checkIn(third.ticket).then(value => [value.position, value.waiting]), [1, 1]);
+});
+
+test('without asking to queue, or with the queue full, a busy server still answers 503', async t => {
+  const { url } = await start(t, { maxSessions: 1, maxQueue: 1, trustProxy: true });
+  const [a, b, c, d] = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'].map(address => player(url, address));
+  await a.createSession({ preset: 'quiet' });
+  await assert.rejects(b.createSession({ preset: 'quiet' }), { status: 503, code: 'at-capacity' });
+  assert.equal((await c.createSession({ preset: 'quiet', queue: true })).queued, true);
+  await assert.rejects(d.createSession({ preset: 'quiet', queue: true }), { status: 503, code: 'at-capacity', message: /queue is full/ });
+});
+
+test('a new player cannot jump the queue when an engine frees up', async t => {
+  const { url } = await start(t, { maxSessions: 1, trustProxy: true });
+  const [a, b, c] = ['10.0.0.1', '10.0.0.2', '10.0.0.3'].map(address => player(url, address));
+  const first = await a.createSession({ preset: 'quiet' });
+  const waiting = await b.createSession({ preset: 'quiet', queue: true });
+  await a.deleteSession(first.id);
+  const late = await c.createSession({ preset: 'quiet', queue: true });
+  assert.deepEqual([late.queued, late.position], [true, 2], 'the newcomer lines up behind');
+  assert.ok((await b.checkIn(waiting.ticket)).id);
+});
+
+test('one place per player, leaving frees it, and a place expires without check-ins', async t => {
+  let time = 1000;
+  const { api, url } = await start(t, { maxSessions: 1, trustProxy: true, queueCheckInMs: 5000, now: () => time });
+  const [a, b, c] = ['10.0.0.1', '10.0.0.2', '10.0.0.3'].map(address => player(url, address));
+  await a.createSession({ preset: 'quiet' });
+  const place = await b.createSession({ preset: 'quiet', queue: true });
+  await assert.rejects(b.createSession({ preset: 'quiet', queue: true }), { status: 429, code: 'already-queued' });
+  await b.leaveQueue(place.ticket);
+  assert.equal(api.queue.length, 0);
+  await assert.rejects(b.checkIn(place.ticket), { status: 404, code: 'ticket-not-found' });
+
+  const other = await c.createSession({ preset: 'quiet', queue: true });
+  time += 4000;
+  api.sweep();
+  assert.equal(api.queue.length, 1, 'still inside the check-in window');
+  time += 2000;
+  api.sweep();
+  assert.equal(api.queue.length, 0, 'gone after missing check-ins');
+  await assert.rejects(c.checkIn(other.ticket), { status: 404, code: 'ticket-not-found' });
+});
+
+test('an OU team waits in the queue and reaches only the worker that starts', async t => {
+  const { url, workers } = await start(t, { maxSessions: 1, trustProxy: true });
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const team = fs.readFileSync(path.join(__dirname, '..', '..', 'tests', 'fixtures', 'ou-team.txt'), 'utf8');
+  const [a, b] = ['10.0.0.1', '10.0.0.2'].map(address => player(url, address));
+  const first = await a.createSession({ preset: 'quiet' });
+  const place = await b.createSession({ preset: 'quiet', format: 'gen9ou', team, queue: true });
+  assert.equal(workers.length, 1);
+  await a.deleteSession(first.id);
+  const session = await b.checkIn(place.ticket);
+  assert.equal(session.format, 'gen9ou');
+  const worker = workers[1];
+  if (!worker.frames.length) await once(worker, 'frames');
+  assert.equal(worker.frames[0].type, 'team');
+  assert.equal(worker.frames[0].data, team);
+});
+
+test('the client falls back to a plain request on a server without the queue', async t => {
+  const bodies = [];
+  const fetcher = async (target, init) => {
+    const body = JSON.parse(init.body);
+    bodies.push(body);
+    if (body.queue) return new Response(JSON.stringify({ error: { code: 'invalid-options', message: 'Choose a supported bot.' } }), { status: 400 });
+    return new Response(JSON.stringify({ id: 'a'.repeat(64), threads: 1 }), { status: 201 });
+  };
+  const client = new InferenceClient({ url: 'http://127.0.0.1:9', fetcher });
+  const session = await client.createSession({ preset: 'quiet', queue: true });
+  assert.equal(session.id, 'a'.repeat(64));
+  assert.deepEqual(bodies, [{ bot: 'foulplay', preset: 'quiet', queue: true }, { bot: 'foulplay', preset: 'quiet' }]);
 });
