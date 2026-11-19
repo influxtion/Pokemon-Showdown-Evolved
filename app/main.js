@@ -13,6 +13,7 @@ const { ShowdownBridge } = require('./showdown');
 const { Replays } = require('./replays');
 const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
+const { DailyStore, DailyChallenge } = require('./daily-challenge');
 const { PracticeSession } = require('./practice-session');
 const { CloudEngine, LocalEngine } = require('./practice-engines');
 const { PracticeView } = require('./practice-view');
@@ -61,6 +62,8 @@ let replays = null;
 let replayImports = null;
 let replayReview = null;
 let practice = null;
+let dailyStore = null;
+let dailyChallenge = null;
 let practiceView = null;
 let practiceTeams = null;
 // Where Foul Play's moves are computed: the cloud (default) or an opted-in local download.
@@ -310,6 +313,7 @@ function createWindow() {
   // The simulator runs here; only Foul Play's moves come from the cloud or the local engine.
   const target = engine => (engine === 'local' ? localEngine : cloudEngine).target();
   practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, target });
+  dailyChallenge = new DailyChallenge(dailyStore, practice);
   practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
     battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),
@@ -433,8 +437,21 @@ const isBattleFrame = event => isPracticeFrame(event, ['/practice-battle.html'])
 ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
   const clientState = await practiceView.status();
-  return { ...practice.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status(),
+  return { ...practice.status(), daily: dailyChallenge.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status(),
     local: localEngine.status(), engineChoice: settings.get('practiceEngine') };
+});
+ipcMain.handle('daily:status', event => {
+  if (!isLauncherFrame(event)) return null;
+  return { ...dailyChallenge.status(), installed: practice.installed(),
+    practiceBusy: ['starting', 'ready'].includes(practice.state) && !practice.battle?.finished };
+});
+ipcMain.handle('daily:start', event => {
+  if (!isPracticeFrame(event, ['/index.html', '/practice-battle.html'])) return { ok: false };
+  const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
+  if (dailyChallenge.starting) return { ok: false, error: 'A daily attempt is already starting.' };
+  const pending = dailyChallenge.start(engine);
+  // Show the battle tab immediately, including while a cloud engine is queued.
+  return dailyChallenge.starting ? { ok: true } : pending;
 });
 // The Bots page's team choice: a Teambuilder team ({ source: 'teambuilder', index, name }) or a
 // pasted export ({ source: 'paste', text }). Teambuilder teams are read here, never sent by the page.
@@ -465,6 +482,7 @@ ipcMain.handle('practice:check-team', async (event, value) => {
 });
 ipcMain.handle('practice:start', async (event, options) => {
   if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
+  if (dailyChallenge.starting || dailyChallenge.attempt) return { ok: false, error: 'End the daily challenge first.' };
   const { opponent, preset, format } = options;
   // Foul Play runs where the player chose on the Bots page; the cloud unless they opted in to local.
   const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
@@ -543,7 +561,7 @@ ipcMain.handle('practice:forfeit', async event => {
   } catch { return { ok: false, error: 'Could not open the forfeit prompt.' }; }
 });
 ipcMain.handle('practice:next', async event => {
-  if (!isBattleFrame(event) || !practice.battle?.finished || !practiceView.view) return { ok: false };
+  if (!isBattleFrame(event) || practice.dailyChallenge || !practice.battle?.finished || !practiceView.view) return { ok: false };
   try {
     const ok = await practiceView.view.webContents.executeJavaScript('Boolean(window.desktopPracticeStart?.())');
     return { ok };
@@ -915,7 +933,7 @@ ipcMain.handle('settings:reset', async (event) => {
   try {
     const { response } = await dialog.showMessageBox(win, {
       type: 'warning', title: 'Reset launcher data', message: 'Reset settings and delete all replay notes?',
-      detail: 'Launcher preferences and unsaved notes will also be discarded. Your Showdown session and teams are kept. This cannot be undone.',
+      detail: 'Launcher preferences and unsaved notes will also be discarded. Your Showdown session, teams and daily challenge progress are kept. This cannot be undone.',
       buttons: ['Cancel', 'Reset launcher data'], defaultId: 0, cancelId: 0, noLink: true,
     });
     if (response !== 1) return { ok: true, cancelled: true };
@@ -967,6 +985,7 @@ app.whenReady().then(async () => {
   settings = new Settings(app.getPath('userData'));
   windowState = new WindowState(app.getPath('userData'));
   replays = new Replays(app.getPath('userData'));
+  dailyStore = new DailyStore(app.getPath('userData'));
   replayImports = new ReplayImports(replays);
   cloudEngine = new CloudEngine();
   localEngine = new LocalEngine({ dir: process.env.SHOWDOWN_FOULPLAY_DIR || path.join(app.getPath('userData'), 'foulplay') });

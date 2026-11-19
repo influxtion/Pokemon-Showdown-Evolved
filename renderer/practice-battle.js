@@ -20,6 +20,7 @@
   const leaveQueue = $('battle-leave-queue');
   const ordinal = n => `${n}${(n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
   let NAME = 'the bot';
+  let daily = false;
   let busy = false;
   let polling = false;
   let actionError = '';
@@ -42,8 +43,10 @@
     polling = true;
     try {
       const value = await window.desktop.getPractice();
+      daily = Boolean(value.dailyChallenge);
       NAME = value.opponents?.find(bot => bot.id === value.opponent)?.name || 'the bot';
       subtitle.textContent = `vs. ${NAME} · ${({ gen9ou: 'Gen 9 OU' })[value.format] || 'Gen 9 Random Battle'}`;
+      if (daily) subtitle.textContent = `Daily Foul Play · Medium · Gen 9 Random Battle`;
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
       const finished = Boolean(running && value.battle?.finished);
@@ -80,16 +83,21 @@
       else if (value.state === 'failed' || value.clientError) text = 'Practice stopped';
       status.textContent = text;
       status.className = `status status--${value.error || value.clientError ? 'err' : starting || recovery ? 'warn' : running ? 'ok' : 'off'}`;
-      end.textContent = queue ? 'Leave queue' : 'End practice';
+      end.textContent = queue ? 'Leave queue' : daily ? 'End challenge' : 'End practice';
 
-      next.hidden = !finished;
+      next.hidden = !finished || (daily && !value.daily?.canStart);
+      next.textContent = daily ? 'Try daily challenge again' : 'Battle again';
       next.disabled = busy;
       forfeit.hidden = !clientUp || finished;
       forfeit.disabled = busy;
       end.hidden = !running && !starting;
       end.disabled = busy;
-      message.textContent = actionError;
-      message.hidden = !actionError;
+      const dailyMessage = daily ? (!value.daily?.ok ? value.daily?.error
+        : value.daily.cleared ? `Daily challenge cleared · ${value.daily.streak}-day streak. Next challenge at 00:00 UTC.`
+          : value.daily.running && !value.daily.pending ? 'The daily deadline passed. This battle no longer counts toward a streak.'
+            : `${value.daily.attemptsLeft} attempts remaining${finished ? '' : ' after this attempt'} · resets at 00:00 UTC. Quitting uses this attempt.`) : '';
+      message.textContent = actionError || dailyMessage || '';
+      message.hidden = !message.textContent;
       sync();
     } catch {
       status.textContent = 'Practice status unavailable';
@@ -110,7 +118,7 @@
     } finally { busy = false; await refresh(); }
   }
 
-  next.addEventListener('click', () => act(() => window.desktop.nextPracticeBattle()));
+  next.addEventListener('click', () => act(() => daily ? window.desktop.startDailyChallenge() : window.desktop.nextPracticeBattle()));
   forfeit.addEventListener('click', () => act(() => window.desktop.forfeitPractice()));
   // End practice closes this tab, like its close button; while queued, that leaves the queue.
   end.addEventListener('click', () => window.showdownNav?.closePracticeBattle());

@@ -168,7 +168,7 @@ app.whenReady().then(async () => {
   assert.equal((await result('resetLauncher()')).ok, true);
   assert.equal(await noteCount(), 0);
   assert.equal(fs.existsSync(replayFile), false);
-  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud' });
+  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640 });
   assert.equal(await run("localStorage.getItem('launcher-marker')"), null);
   assert.equal(await client().executeJavaScript("localStorage.getItem('session-marker')"), 'keep-after-reset');
 

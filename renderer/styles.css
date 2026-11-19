@@ -2020,3 +2020,18 @@ kbd {
 @media (max-width: 640px) {
   .res-help { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Daily challenge occupies its own row in either Home layout. */
+.hub--classic .hub-grid { grid-template-areas: "daily daily" "hero side" "tiles side"; }
+.hub--classic .daily-challenge { grid-area: daily; }
+.daily-challenge { min-width: 0; }
+.daily-streak { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.daily-streak svg { width: 16px; height: 16px; flex: none; }
+.daily-streak.is-lit svg { color: var(--warn); }
+.daily-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.daily-body p { margin: 0 0 4px; }
+.daily-record, .daily-rules { color: var(--text-2); font-size: var(--fs-sm); }
+.daily-rules { padding: 0 16px 12px; }
+.daily-rules summary { cursor: pointer; }
+.daily-rules p { line-height: 1.5; margin-bottom: 0; }
+.daily-error { margin: 0 16px 12px; color: var(--err); }

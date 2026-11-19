@@ -162,6 +162,16 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ## 4. Feature details
 
+### Daily Foul Play
+
+Home includes a Daily Foul Play card in both layouts, with an outlined flame lit while the current streak is positive. Win one Gen 9 Random Battle against Foul Play Medium in at most three attempts per UTC calendar day. A clear adds exactly one day to the streak and locks further daily play until 00:00 UTC. Missing a day or finishing all three attempts without a win resets the current streak; personal best and total daily clears remain. Ordinary practice does not count and remains available.
+
+The card offers Start challenge or Return to challenge, remaining attempts, current/best streak, lifetime clears, and the rules. Daily battles use the existing battle tab, with a guarded daily retry after a loss. Each retry starts a fresh session and random teams. Finish before midnight UTC: a late result cannot clear either the expired challenge or the next day's challenge. Ties and deliberate exits from active battles consume an attempt; cancelling setup or a detected runtime/engine failure refunds it. The app cannot resume a simulator after restart: an interrupted active attempt counts, while interrupted setup is refunded.
+
+Progress is private to this launcher profile, stored atomically in `daily-challenge.json`. It uses the computer's UTC date, not an authenticated service clock. Backwards clock changes block new attempts until the stored day is reached; this is personal progression, not a tamper-proof competition or cross-device account system. Renderer IPC can request a start or read status, but cannot submit a result, choose the daily opponent, or edit counters. The main-process controller observes the simulator bridge. Corrupt files are preserved and disable challenge play; save failures fail closed. Reset settings/replay notes keeps daily progress, as the confirmation states.
+
+Verification: daily state tests cover streaks, three attempts, ties, missed days, midnight, backwards clocks, duplicate results, restarts, failure refunds and failed/corrupt persistence. The isolated daily desktop test exercises real IPC and Home/battle navigation with simulated outcomes, captures both layouts/themes at both window sizes, and blocks public-client requests.
+
 ### Launcher shell and Home
 
 - **Icon bar:** an 84px cobalt bar on the left; each page (Home, Teambuilder, Stats, Replay notes, Practice, Settings) is an icon with its name underneath, and the account avatar and name sit at the foot.

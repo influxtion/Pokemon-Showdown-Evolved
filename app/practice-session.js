@@ -87,6 +87,7 @@ class PracticeSession extends EventEmitter {
     this.error = '';
     this.preset = 'full';
     this.engine = 'cloud';
+    this.dailyChallenge = false;
     this.connection = null;
     this.battle = null;
     this.format = FORMAT;
@@ -117,7 +118,7 @@ class PracticeSession extends EventEmitter {
   }
 
   status() {
-    return { installed: this.installed(), state: this.state, opponent: this.bot.id, format: this.format, engine: this.engine,
+    return { installed: this.installed(), state: this.state, dailyChallenge: this.dailyChallenge, opponent: this.bot.id, format: this.format, engine: this.engine,
       threads: this.threads, queue: this.queue ? { position: this.queue.position, waiting: this.queue.waiting } : null,
       opponents: Object.values(OPPONENTS).map(bot => ({ id: bot.id, name: bot.name, local: bot.local, search: bot.search,
         difficulty: bot.difficulty, kind: bot.kind, formats: bot.formats, description: bot.description })),
@@ -330,7 +331,7 @@ class PracticeSession extends EventEmitter {
         const parts = line.split('|');
         // |pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|...
         if (parts.length >= 6 && parts[1] === 'pm' && toId(parts[2]) === toId(HUMAN) && toId(parts[3]) === toId(this.bot.account) &&
-            parts[4] === `/challenge ${this.format}` && parts[5] === this.format && (!this.battle || this.battle.finished)) {
+            parts[4] === `/challenge ${this.format}` && parts[5] === this.format && (!this.battle || (this.battle.finished && !this.dailyChallenge))) {
           this.simulator.send(`|/utm ${this.teams ? this.teams.bot : 'null'}`);
           this.simulator.send(`|/accept ${HUMAN}`);
           this.accepted = true;
@@ -367,7 +368,7 @@ class PracticeSession extends EventEmitter {
         changed = true;
       }
     }
-    if (changed) this.changed();
+    if (changed || lines.includes('|init|battle')) this.changed();
   }
 
   choice(value, generation) {
@@ -380,7 +381,7 @@ class PracticeSession extends EventEmitter {
 
   fail(code, generation, message) {
     if (generation !== this.generation) return { ok: false, cancelled: true };
-    this.stop();
+    this.stop('failure');
     this.state = 'failed';
     this.error = code === 'engine' && message ? message : ERRORS[code] || ERRORS.start;
     this.changed();
@@ -392,7 +393,9 @@ class PracticeSession extends EventEmitter {
     if (this.connection?.token === token) this.fail('client', this.generation);
   }
 
-  stop() {
+  stop(reason = 'stop') {
+    this.emit('ending', reason);
+    this.dailyChallenge = false;
     ++this.generation;
     this.verification?.cancel();
     this.verification = null;

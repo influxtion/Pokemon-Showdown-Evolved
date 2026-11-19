@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('desktop', {
   hideClient: () => ipcRenderer.send('client:hide'),
   reloadClient: () => ipcRenderer.invoke('client:reload'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
+  getDailyChallenge: () => ipcRenderer.invoke('daily:status'),
+  startDailyChallenge: () => ipcRenderer.invoke('daily:start'),
   getPractice: () => ipcRenderer.invoke('practice:status'),
   startPractice: (preset) => ipcRenderer.invoke('practice:start', preset),
   getPracticeTeams: (format) => ipcRenderer.invoke('practice:teams', format),

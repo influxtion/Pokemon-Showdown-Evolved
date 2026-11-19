@@ -355,3 +355,29 @@ test('the simulator child environment excludes inherited account and Python sett
     else process.env.SHOWDOWN_PASSWORD = original;
   }
 });
+
+test('daily controller observes real bridge results and blocks unreserved rematches', async t => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { DailyStore, DailyChallenge } = require('../app/daily-challenge');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'daily-bridge-'));
+  const { session, sim } = await setup(t);
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const store = new DailyStore(dir);
+  const daily = new DailyChallenge(store, session);
+  assert.equal((await daily.start('cloud')).ok, true);
+  session.simulatorFrame('|pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|||');
+  session.simulatorFrame(`>${ROOM}\n|init|battle\n|title|Player vs. FoulPlay`);
+  assert.equal(store.data.pending.phase, 'active', 'initialization alone persists active attempt');
+  session.simulatorFrame('>battle-gen9randombattle-999\n|win|Player');
+  assert.equal(store.status().total, 0, 'unrelated room ignored');
+  session.simulatorFrame(`>${ROOM}\n|win|Player`);
+  assert.equal(store.status().total, 1);
+  await until(() => sim.received.includes('|/accept Player'), 'first accept');
+  session.simulatorFrame('|pm| Player| FoulPlay|/challenge gen9randombattle|gen9randombattle|||');
+  await pause(30);
+  assert.equal(sim.received.filter(text => text === '|/accept Player').length, 1);
+  session.simulatorFrame(`>${ROOM}\n|win|Player`);
+  assert.equal(store.status().total, 1);
+});

@@ -280,3 +280,11 @@ All of these use disposable profiles and private servers, never the player's acc
 
 - The Docker image build (`api/deploy/`), and the in-app install on Windows and macOS. The systemd and Caddy setup is verified on the hosted Google Cloud VM. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
 - Server sizing: search is time-limited, so fewer CPUs give similar decision times but shallower search; that is one reason the API caps threads (`MAX_THREADS`). A decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.
+
+## Daily Foul Play
+
+The Home challenge pins `foulplay-medium`, `gen9randombattle`, and the `full` computation preset. It respects the player's existing cloud/local engine choice. No teams are authored: the simulator generates both sides. Daily attempts use separate sessions; same-session rematches are blocked in both the IPC handler and the bot challenge-accept path.
+
+Medium is an existing worker level, not a new difficulty adjustment. `api/worker/foulplay_worker.py` sets a 40 ms base search budget and keeps upstream world sampling: in the current pinned Random Battle mode, normally four worlds at 20 ms early and two at 40 ms later (fewer under time pressure). Move selection is weighted by search visit share among candidates with at least 50% of the best share. Medium has no additional deliberate-slip probability. The Full preset requests eight search threads, subject to the API server's cap; it does not alter the level. This is a computation configuration, not a measured skill rating.
+
+`app/daily-challenge.js` owns reservations and persistence. `PracticeSession` reports battle initialization and final simulator outcomes, and emits `ending` before clearing a session so the controller distinguishes deliberate exits from failures. Only the daily session can award a clear. Startup reservation, active-battle state, and settlement are persisted, and result processing is idempotent. The simulator and progress remain local; the inference service does not enforce daily attempts or streaks. See [design.md](design.md#daily-foul-play) for player rules and storage limitations.
