@@ -9,7 +9,7 @@ const liveFile = process.argv.includes('--showdex-live') ? 'showdex-live.cjs'
   : process.argv.includes('--replay-review-live') ? 'replay-review-live.cjs'
     : process.argv.includes('--shell-live') ? 'shell-live.cjs'
       : process.argv.includes('--practice') ? 'practice-desktop.cjs' : null;
-for (const file of liveFile ? [liveFile] : ['daily-challenge-desktop.cjs', 'desktop.cjs', 'replays-desktop.cjs', 'replay-import-desktop.cjs', 'replay-review-desktop.cjs', 'settings-desktop.cjs', 'security-desktop.cjs', 'friends-desktop.cjs']) {
+for (const file of liveFile ? [liveFile] : ['showdex-onboarding-desktop.cjs', 'daily-challenge-desktop.cjs', 'desktop.cjs', 'replays-desktop.cjs', 'replay-import-desktop.cjs', 'replay-review-desktop.cjs', 'settings-desktop.cjs', 'security-desktop.cjs', 'friends-desktop.cjs']) {
   const result = spawnSync(require('electron'), [path.join(__dirname, '..', 'tests', file)], {
     stdio: 'inherit', env, timeout: liveFile === 'practice-desktop.cjs' ? 300000 : liveFile ? 180000 : 90000,
   });

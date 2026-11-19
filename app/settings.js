@@ -18,7 +18,7 @@ const BATTLE_STYLES = new Set(['launcher', 'showdown']);
 // How wide the battle column is, set by dragging the handle beside the log.
 const { validWidth } = require('./battle-resize');
 const DEFAULTS = Object.freeze({
-  theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null,
+  theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, showdexPrompted: false, notifyMessages: true, homeLayout: null,
   battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640,
 });
 const KEYS = new Set(Object.keys(DEFAULTS));
@@ -32,6 +32,7 @@ function valid(key, value) {
   if (key === 'practiceEngine') return PRACTICE_ENGINES.has(value);
   if (key === 'battleWidth') return validWidth(value);
   if (key === 'confirmOnClose') return typeof value === 'boolean';
+  if (key === 'showdexPrompted') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';
   return false;
@@ -46,6 +47,8 @@ function parse(text) {
     if (!KEYS.has(key) || !valid(key, value)) throw new Error('Invalid settings');
     values[key] = value;
   }
+  // A pre-existing settings file belongs to an upgrade, not a new installation.
+  if (!Object.hasOwn(raw, 'showdexPrompted')) values.showdexPrompted = true;
   return values;
 }
 
@@ -107,7 +110,7 @@ class Settings {
   }
 
   reset() {
-    this.write({ ...DEFAULTS });
+    this.write({ ...DEFAULTS, showdexPrompted: this.values.showdexPrompted });
     return this.snapshot();
   }
 }

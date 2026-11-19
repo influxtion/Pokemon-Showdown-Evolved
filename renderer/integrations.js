@@ -4,6 +4,7 @@
   const status = document.getElementById('showdex-status');
   if (!status) return;
   const toggle = document.getElementById('showdex-enabled');
+  const install = document.getElementById('showdex-install');
   const banner = document.getElementById('showdex-reload-banner');
   const reload = document.getElementById('showdex-reload');
   const settingsStatus = document.getElementById('settings-status');
@@ -19,6 +20,7 @@
   }
 
   function label(value) {
+    if (value.installing) return ['Installing…', 'warn'];
     if (!value.installed || value.status === 'not-installed') return ['Not installed', 'off'];
     if (value.loaded && !value.enabled && value.pendingReload) return ['Loaded · reload to disable', 'ok'];
     if (!value.loaded && value.enabled && value.pendingReload) return ['Will load after reload', 'warn'];
@@ -41,6 +43,11 @@
       toggle.checked = Boolean(value.enabled);
       toggle.disabled = busy || !value.installed;
     }
+    if (install) {
+      install.hidden = Boolean(value.installed);
+      install.disabled = busy || value.installing;
+      install.textContent = value.installing ? 'Installing…' : 'Install Showdex';
+    }
     if (banner) banner.hidden = !value.pendingReload;
   }
 
@@ -60,6 +67,18 @@
       polling = false;
     }
   }
+
+  if (install) install.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    install.disabled = true;
+    install.textContent = 'Installing…';
+    try {
+      const result = await window.desktop.installShowdex();
+      feedback(result?.ok ? 'Showdex installed and enabled. Waiting for the client to load it.' : result?.error || 'Showdex could not be installed.');
+    } catch { feedback('Showdex could not be installed. Try again.'); }
+    finally { busy = false; await refresh(); }
+  });
 
   if (toggle) {
     toggle.addEventListener('change', async () => {

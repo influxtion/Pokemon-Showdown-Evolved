@@ -41,7 +41,8 @@ files:
   - vendor/showdex/LICENSE
   - vendor/showdex/SOURCE.md
   - vendor/showdex/manifest.json
-  - '!vendor/showdex/dist/**'
+  # Inert install payload; copied and enabled only after the player's explicit choice.
+  - vendor/showdex/dist/**/*
   - '!app/**/*.test.js'
   - '!app/**/tests/**'
 win:

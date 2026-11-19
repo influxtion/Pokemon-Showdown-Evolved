@@ -2065,3 +2065,19 @@ kbd {
   .daily-summary h2 span { display: none; }
   .daily-compact { gap: 10px; }
 }
+
+/* Optional first-launch integration, following the layout choice. */
+.showdex-welcome {
+  width: min(440px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: auto;
+  padding: 0; border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--bg-panel); color: var(--text);
+}
+.showdex-welcome::backdrop { background: var(--bg-app); }
+.showdex-welcome-head { padding: 20px; background: var(--hero-bg); color: var(--hero-text); border-top: 3px solid var(--primary); }
+.showdex-welcome-head > span { color: var(--hero-muted); font-size: var(--fs-sm); }
+.showdex-welcome h2 { margin: 6px 0 0; font-size: var(--fs-xl); }
+.showdex-welcome-body { padding: 20px; }
+.showdex-welcome-body p { margin: 0 0 12px; line-height: 1.5; }
+.showdex-welcome-body p + p { color: var(--text-2); }
+.showdex-welcome-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.showdex-welcome-status { padding-left: 10px; border-left: 3px solid var(--accent); }

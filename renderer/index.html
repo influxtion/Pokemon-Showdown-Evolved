@@ -261,7 +261,20 @@
     </button>
   </div>
 </dialog>
+<dialog class="showdex-welcome" id="showdex-welcome" aria-labelledby="showdex-welcome-title" aria-describedby="showdex-welcome-desc">
+  <div class="showdex-welcome-head"><span>Optional setup</span><h2 id="showdex-welcome-title">Install Showdex?</h2></div>
+  <div class="showdex-welcome-body">
+    <p id="showdex-welcome-desc">See damage calculations and matchup information alongside your battles.</p>
+    <p>Showdex is free and optional. You can disable it or install it later in Settings.</p>
+    <p class="showdex-welcome-status" id="showdex-welcome-status" role="status" hidden></p>
+    <div class="showdex-welcome-actions">
+      <button class="btn" type="button" id="showdex-welcome-skip" autofocus>Not now</button>
+      <button class="btn btn-primary" type="button" id="showdex-welcome-install">Install Showdex</button>
+    </div>
+  </div>
+</dialog>
 <script src="home.js"></script>
+<script src="showdex-onboarding.js"></script>
 <script src="daily-challenge.js"></script>
 <script src="nav.js"></script>
 </body>

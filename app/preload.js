@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('desktop', {
   usePracticeLocal: () => ipcRenderer.invoke('practice:use-local'),
   cancelLocalPracticeInstall: () => ipcRenderer.invoke('practice:cancel-install'),
   removeLocalPractice: () => ipcRenderer.invoke('practice:remove-local'),
+  installShowdex: () => ipcRenderer.invoke('showdex:install'),
   getShowdex: () => ipcRenderer.invoke('showdex:status'),
   setSetting: (key, value) => ipcRenderer.invoke('settings:set', key, value),
   openLogs: () => ipcRenderer.invoke('settings:open-logs'),

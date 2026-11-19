@@ -27,7 +27,10 @@ const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integra
 const { tabShortcut } = require('./shortcuts');
 
 if (!app.isReady()) registerShowdexScheme(protocol);
+const { ShowdexInstaller } = require('./showdex-install');
 const showdex = new ShowdexIntegration();
+let showdexInstaller = null;
+let showdexInstalling = false;
 let showdexBundle = { installed: false, version: '1.4.2' };
 let showdexApplied = false;
 let showdexLoadFailed = false;
@@ -846,11 +849,34 @@ ipcMain.handle('showdex:status', async (event) => {
   const status = showdexBundle.invalid ? 'failed' : !showdexBundle.installed ? 'not-installed' : !showdexApplied ? 'disabled' :
     showdexLoadFailed ? 'failed' : await bridge.showdexStatus();
   return {
-    installed: showdexBundle.installed, enabled, loaded: status === 'loaded', status,
+    installing: showdexInstalling, installed: showdexBundle.installed, enabled, loaded: status === 'loaded', status,
     pendingReload: showdexBundle.installed && enabled !== showdexApplied,
     error: status === 'failed' ? 'Showdex failed to load. Ordinary Showdown play is still available.' : '',
     version: showdexBundle.version,
   };
+});
+
+ipcMain.handle('showdex:install', async event => {
+  if (!isLauncherFrame(event)) return { ok: false, error: 'Access denied.' };
+  if (showdexInstalling) return { ok: false, error: 'Showdex is already being installed.' };
+  showdexInstalling = true;
+  try {
+    const result = await showdexInstaller.install();
+    if (!result.ok) return result;
+    showdex.distDir = showdexInstaller.target;
+    showdexBundle = await showdex.registerAssets(electronSession.fromPartition(CLIENT_PARTITION));
+    if (!showdexBundle.installed) return { ok: false, error: 'Showdex verification failed. Try installing again.' };
+    settings.write({ ...settings.snapshot(), showdexEnabled: true, showdexPrompted: true });
+    // Installation is an explicit opt-in. Inject without reloading or interrupting a battle.
+    if (client && !client.webContents.isDestroyed()) {
+      showdexApplied = true;
+      showdexLoadFailed = false;
+      bridge.loadShowdex().then(loaded => { if (!loaded) showdexLoadFailed = true; });
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Showdex could not be enabled. Try again from Settings.' };
+  } finally { showdexInstalling = false; }
 });
 
 // Battle screen setting: applies to the open client and practice battle at once.
@@ -983,6 +1009,11 @@ app.whenReady().then(async () => {
   logger = new Logger(app.getPath('userData'));
   logger.write('app-started');
   settings = new Settings(app.getPath('userData'));
+  showdexInstaller = new ShowdexInstaller(app.getPath('userData'));
+  // Keep an existing developer opt-in working; new installs use only the per-profile copy.
+  if (app.isPackaged || !settings.get('showdexEnabled') || fs.existsSync(showdexInstaller.target)) {
+    showdex.distDir = showdexInstaller.target;
+  }
   windowState = new WindowState(app.getPath('userData'));
   replays = new Replays(app.getPath('userData'));
   dailyStore = new DailyStore(app.getPath('userData'));

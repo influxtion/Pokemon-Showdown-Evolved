@@ -66,6 +66,8 @@ function verifyAdapters(directory, manifest) {
 }
 
 async function verifyPracticePackage(context) {
+  // Optional first-launch installation still needs a complete, verified payload in the app.
+  new (require('../app/showdex-install').ShowdexInstaller)(ROOT).payload();
   const root = configuredResource(context, 'practice');
   const { manifest, identity } = checkedRuntime(root,
     'Build and verify the local runtime with npm run build:practice before packaging.');

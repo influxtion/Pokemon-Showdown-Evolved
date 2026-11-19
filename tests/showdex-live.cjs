@@ -12,7 +12,7 @@ const { app, BrowserWindow, dialog, shell } = require('electron');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'showdex-live-guest-'));
 app.setPath('userData', profile);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({
-  theme: 'system', startPage: 'showdown', confirmOnClose: true, showdexEnabled: true,
+  theme: 'system', startPage: 'home', homeLayout: 'classic', confirmOnClose: true, showdexEnabled: false,
 }));
 
 assert.equal(app.isReady(), false, 'main must register the scheme before Electron is ready');
@@ -36,13 +36,15 @@ app.whenReady().then(async () => {
   dialog.showMessageBox = async () => { throw new Error('Unexpected confirmation in isolated guest session'); };
   const win = await until(() => BrowserWindow.getAllWindows()[0], 'launcher window', 30000);
   const renderer = win.webContents;
-  await until(() => !renderer.isLoading() && renderer.getURL().endsWith('/play.html'), 'Showdown start page', 30000);
+  await until(() => !renderer.isLoading() && renderer.getURL().endsWith('/index.html'), 'Home start page', 30000);
   const view = await until(() => win.contentView.children[0], 'Showdown WebContentsView', 30000);
   const client = view.webContents;
-  await until(() => view.getVisible(), 'visible Showdown view', 30000);
   const desktop = (method) => renderer.executeJavaScript(`window.desktop.${method}`);
+  assert.equal((await desktop('installShowdex()')).ok, true, 'real optional install');
+  let lastStatus = '';
   const status = await until(async () => {
     const value = await desktop('getShowdex()');
+    if (value?.status !== lastStatus) { lastStatus = value?.status; console.log(`Showdex after install: ${lastStatus}`); }
     return value?.status === 'loaded' ? value : null;
   }, 'Showdex loaded in live client');
   assert.equal(status.installed, true);
@@ -50,6 +52,9 @@ app.whenReady().then(async () => {
   assert.equal(status.loaded, true);
   assert.equal(status.pendingReload, false);
   assert.equal(status.version, '1.4.2');
+  assert.equal(await desktop("showdown('focus-room', {room: 'view-hellodex'})"), true);
+  await win.loadFile(path.join(__dirname, '..', 'renderer', 'play.html'));
+  await until(() => view.getVisible(), 'installed calculator view', 30000);
   const clientPrefs = client.getLastWebPreferences();
   assert.equal(clientPrefs.preload, undefined, 'client has no preload path');
   assert.equal(clientPrefs.nodeIntegration, false);
@@ -155,7 +160,7 @@ app.whenReady().then(async () => {
     win.setSize(1366, 768);
     assert.equal((await desktop(`setSetting('theme', '${theme}')`)).ok, true);
     await until(() => client.executeJavaScript(`matchMedia('(prefers-color-scheme: dark)').matches === ${theme === 'dark'}`), `${theme} client theme`, 10000);
-    await client.executeJavaScript("app.focusRoomRight('view-hellodex'); 0");
+    await desktop("showdown('focus-room', {room: 'view-hellodex'})");
     await until(() => client.executeJavaScript("Boolean(document.querySelector('[data-showdex-module=hellodex]'))"), `${theme} Hellodex`);
     const hello = await checkChrome('hellodex', {
       panel: '[class*="Hellodex-module-instancesContent--"]',

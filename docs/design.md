@@ -238,7 +238,9 @@ Verification: daily state tests cover streaks, three attempts, ties, missed days
 ### Showdex (optional)
 
 - **Build:** `npm run build:showdex` checks out Showdex 1.4.2 at a pinned revision and applies a recorded readiness patch. It verifies every asset against a committed SHA-256 manifest. Sources and the AGPL-3.0 license are in `vendor/showdex/SOURCE.md`.
-- **Enabling:** turn it on in Settings, then reload the client explicitly; a battle is never reloaded automatically. Status reads Loaded only after Showdex has rendered. A failure leaves normal play intact.
+- **First launch:** after choosing a Home layout, new users can choose Install Showdex or Not now. The answer is saved; existing profiles are not prompted on upgrade, and resetting settings does not repeat the Showdex offer. Skipping leaves Showdex disabled and creates no installed copy. Settings offers Install Showdex later.
+- **Installation:** the app carries an inert, pinned payload plus its AGPL license and corresponding source archive. `ShowdexInstaller` copies into a staging directory under the profile, verifies runtime assets against the shipped manifest, and promotes the copy into `showdex/1.4.2`. Failed installs preserve an existing copy and leave a retry available. No terminal, external installer or download is needed. Installed files include the license, source record and source archive.
+- **Enabling:** explicit installation enables Showdex and injects it into the existing client without reloading a battle. Later toggle changes retain the explicit client reload flow. Status reads Loaded only after Showdex has rendered; installation success alone does not claim it loaded. A failure leaves normal play intact. Existing developer opt-ins can still use the verified source-checkout bundle.
 - **Look:** its chrome follows Appearance; calculator behavior and game colors stay upstream. It is excluded from packages until its distribution licensing is decided.
 
 ### Settings
@@ -360,7 +362,7 @@ npm install
 npm start
 ```
 
-For Showdex, run `npm run build:showdex`, then enable it in Settings and reload the client.
+For Showdex development, run `npm run build:showdex`; new users can then install it during setup or from Settings. Packaging now requires this verified payload, including its license and source archive.
 
 **Packaging** (`electron-builder` 26.18.0, always `--publish never`):
 
@@ -373,7 +375,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 ```
 
 - **Installer:** adds a Start menu shortcut but no desktop shortcut, and uses Electron's default icon until branding is decided.
-- **`app.asar`:** contains `app/`, `renderer/`, `api/client.js`, `api/protocol.js`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
+- **`app.asar`:** contains `app/`, `renderer/`, `api/client.js`, `api/protocol.js`, `package.json` and the optional Showdex installation payload with license and source archive. It never contains tests, scripts, `out/` or credentials. Showdex is not installed into the profile or enabled until the player opts in.
 - **Foul Play is not in the release** (D7). It plays on the cloud server unless the player downloads it from the Bots page. For that opt-in, the app ships `api/client.js`, `protocol.js`, `install.js`, `server.js`, `lock.json` and the GPL-3.0-derived worker `api/worker/foulplay_worker.py`, unpacked from app.asar so Python can read it. The after-pack check fails the build if any other `api/` file is packaged or anything else is unpacked. No Python or Foul Play ships; the download fetches the pinned Python, Foul Play source, packages and set data.
 - **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse any other runtime kind, and packaging fails on any drift.
 - **Dependency audit:** `npm audit` reports zero vulnerabilities for the app and `api/`.
@@ -414,7 +416,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 
 - [x] Project license: AGPL-3.0-or-later (2026-11-19), compatible with the patched AGPL client, GPL-3.0 Foul Play and AGPL Showdex.
 - [ ] Code signing and release branding.
-- [ ] Whether Showdex ships in packages.
+- [x] Showdex is an optional first-launch installation from a bundled payload; packaging includes source and license. The installer has not been rebuilt for this feature.
 - [ ] Whether the hosted API stays anonymous, and whether it moves to a proper domain (the current hostname is tied to the VM's IP).
 
 **Verification outstanding**

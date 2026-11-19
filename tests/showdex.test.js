@@ -82,3 +82,22 @@ test('serves exact verified assets only to the Showdown origin', async (t) => {
   fs.writeFileSync(path.join(f.distDir, 'main.js'), 'changed after startup');
   assert.equal(handler(request).status, 404, 'serve checks bytes again after startup');
 });
+
+test('registers an inert handler before installation and activates verified assets without a new handler', async t => {
+  const f = fixture(t);
+  fs.unlinkSync(path.join(f.distDir, 'main.js'));
+  const manager = new ShowdexIntegration(f);
+  let handler;
+  let registrations = 0;
+  const session = { protocol: {
+    async isProtocolHandled() { return registrations > 0; },
+    handle(_scheme, value) { registrations++; handler = value; },
+  } };
+  assert.equal((await manager.registerAssets(session)).installed, false);
+  const request = { method: 'GET', url: SHOWDEX_ENTRY_URL, initiatorOrigin: ORIGIN, referrer: '' };
+  assert.equal(handler(request).status, 503);
+  fs.writeFileSync(path.join(f.distDir, 'main.js'), f.bytes);
+  assert.equal((await manager.registerAssets(session)).installed, true);
+  assert.equal(registrations, 1);
+  assert.equal(handler(request).status, 200);
+});

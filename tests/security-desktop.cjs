@@ -68,6 +68,7 @@ app.whenReady().then(async () => {
   assert.equal((await untrusted.webContents.executeJavaScript('window.desktop.getSettings()')).ok, false);
   assert.equal(await untrusted.webContents.executeJavaScript('window.desktop.getDailyChallenge()'), null);
   assert.equal((await untrusted.webContents.executeJavaScript('window.desktop.startDailyChallenge()')).ok, false);
+  assert.equal((await untrusted.webContents.executeJavaScript('window.desktop.installShowdex()')).ok, false);
   untrusted.destroy();
 
   // Unsupported schemes cannot escape to the system shell.

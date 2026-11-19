@@ -66,7 +66,8 @@ class ShowdexIntegration {
   // Register only on the persistent Showdown session, after app.whenReady().
   async registerAssets(session) {
     const info = this.bundleInfo();
-    if (!info.installed) return info;
+    // Register before creating the client view, even before the optional install. Existing
+    // renderer URL loaders must know the scheme; the handler serves 503 until assets verify.
     if (this.registered) return info;
     if (await session.protocol.isProtocolHandled(SHOWDEX_SCHEME)) throw new Error('Showdex scheme already handled');
     session.protocol.handle(SHOWDEX_SCHEME, (request) => this.serveAsset(request));

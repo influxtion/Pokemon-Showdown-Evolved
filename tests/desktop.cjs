@@ -77,6 +77,9 @@ app.whenReady().then(async () => {
   await run("document.querySelector('#welcome [data-layout=modern]').click(); 0");
   await until(() => run("!document.getElementById('welcome').open && document.getElementById('hub').classList.contains('hub--modern')"), 'welcome choice applied');
   await until(() => { try { return savedSettings().homeLayout === 'modern'; } catch { return false; } }, 'welcome choice saved');
+  await until(() => run("document.getElementById('showdex-welcome').open"), 'optional Showdex setup');
+  await run("document.getElementById('showdex-welcome-skip').click(); 0");
+  await until(() => run("!document.getElementById('showdex-welcome').open"), 'Showdex skipped');
   // Never asked again: later launches go straight to the chosen layout.
   await load('index.html');
   await until(() => run("document.getElementById('hub').classList.contains('hub--modern')"), 'chosen layout on the next launch');
