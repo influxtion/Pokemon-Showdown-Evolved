@@ -9,7 +9,30 @@ permissions:
   contents: read
 
 jobs:
+  showdex:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Reuse the pinned platform-independent Showdex payload
+        shell: bash
+        run: |
+          mkdir -p out/showdex-import
+          curl --fail --location --retry 3 'https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/download/v0.2.0/Pokemon.Showdown.Evolved.Setup.0.2.0-x64.exe' -o out/showdex-import/windows.exe
+          echo '8689e5e3147ba747fa88bc9d112edeb0915c94326568ba68a3dce23483c2218b  out/showdex-import/windows.exe' | sha256sum --check
+          7z x out/showdex-import/windows.exe resources/app.asar -oout/showdex-import -y
+          node scripts/import-showdex-payload.js out/showdex-import/resources/app.asar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pinned-showdex
+          path: vendor/showdex/dist/
+          retention-days: 14
   package:
+    needs: showdex
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +60,6 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm install --global corepack@0.34.6
       - name: Linux test display
         if: runner.os == 'Linux'
         run: |
@@ -48,7 +70,10 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build:practice
-      - run: npm run build:showdex
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pinned-showdex
+          path: vendor/showdex/dist/
       - name: Build native packages
         run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
       - name: Packaged smoke and real local practice
@@ -69,7 +94,7 @@ jobs:
             out/native-release/*.dmg
             out/native-release/*.zip
             out/native-release/*.AppImage
-            out/native-release/*Linux-*.tar.gz
+            out/native-release/Pokemon.Showdown.Evolved.*.Linux-*.tar.gz
           compression-level: 0
           retention-days: 14
       - name: Retain verification reports
