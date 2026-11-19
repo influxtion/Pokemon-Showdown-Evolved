@@ -10,11 +10,11 @@ Pokemon Showdown Evolved is a free, open-source desktop app for [Pokémon Showdo
 
 This is an unsigned early release for Windows x64. Windows may show an unknown-publisher or SmartScreen warning. Clean-PC installation and signed-in acceptance testing are still pending. Updates are manual: download a newer installer from the same Releases page.
 
-## Demo
+## Home preview
 
-![App walkthrough: Home, a real bot battle with Showdex, Bots, and Settings](assets/readme/demo.gif)
+[![Pokemon Showdown Evolved Home in light mode, with Daily Foul Play, battle setup, news, and chat rooms](assets/readme/home-light.png)](assets/readme/home-light.png)
 
-A short slideshow of actual app captures: Home in dark mode, a Foul Play battle with Showdex, and Bots and Settings in light mode. Captured in isolated test profiles; no personal account data is shown. [View the battle screenshot](assets/readme/battle.png).
+The modern Home layout in light mode, captured from the running app in an isolated guest profile. Click the image to view it at full resolution. [See a Foul Play battle with Showdex](assets/readme/battle.png).
 
 ## Features
 
