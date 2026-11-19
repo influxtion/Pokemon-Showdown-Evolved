@@ -6,7 +6,9 @@
 
 A free, open-source Windows desktop app for [Pokémon Showdown](https://play.pokemonshowdown.com/). Play online, calculate damage with Showdex, practise against bots, and keep notes on your replays in one workspace.
 
-**Development preview.** Run from source today. A public Windows installer has not been released yet.
+**Windows preview:** [Download Pokemon Showdown Evolved v0.2.0](https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/tag/v0.2.0). Open the release and download the `.exe` under **Assets**. No Git or Node.js is needed to install it.
+
+This is an unsigned early release for Windows x64. Windows may show an unknown-publisher or SmartScreen warning. Clean-PC installation and signed-in acceptance testing are still pending. Updates are manual: download a newer installer from the same Releases page.
 
 ## Demo
 

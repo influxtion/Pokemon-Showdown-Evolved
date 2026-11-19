@@ -46,12 +46,16 @@ files:
   - '!app/**/*.test.js'
   - '!app/**/tests/**'
 win:
+  icon: renderer/assets/app.ico
   signExecutable: false
   target:
     - target: nsis
       arch:
         - x64
 nsis:
+  installerIcon: renderer/assets/app.ico
+  uninstallerIcon: renderer/assets/app.ico
+  installerHeaderIcon: renderer/assets/app.ico
   oneClick: true
   perMachine: false
   createDesktopShortcut: false

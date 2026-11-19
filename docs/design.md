@@ -482,3 +482,33 @@ Two themes share one identity: a cobalt rail, a cobalt Home hero and a Showdown-
 | `--accent` | `#2459b8` | `#7db2ff` | Links, focus, selection |
 | `--primary` | `#f5c42c` | `#f5c42c` | One primary button per region |
 | `--rail-bg` | `#1f4b9a` | `#193f85` | Navigation rail |
+
+### Publishing the first Windows preview
+
+The v0.2.0 GitHub prerelease uses the owner-supplied Eevee logo for the app,
+installer and uninstaller. `renderer/assets/app.ico` is a format conversion of
+`logo.png`, with 16, 24, 32, 48, 64, 128 and 256 px images. `win.icon` controls
+the executable; the NSIS icon options control setup, removal and its header.
+The BrowserWindow also explicitly uses that icon during development.
+
+Publish from a clean, committed tree: build, run both packaged smoke commands,
+record the source commit and SHA-256, push an annotated version tag, create a
+draft release, upload the installer and checksums, inspect its assets, then
+publish as a prerelease. Keep each public version fixed; changes get a new
+version and tag. GitHub provides source archives for the tag, and the installer
+retains bundled upstream licenses and corresponding source archives.
+
+This release is unsigned, uses manual updates and still needs clean-PC
+installation/uninstallation and signed-in acceptance testing. Release notes
+must state those limits. No telemetry or automatic updater is added.
+
+Download counts are available without app telemetry through GitHub:
+
+```powershell
+gh api repos/influxtion/Pokemon-Showdown-Launcher-App/releases/tags/v0.2.0 --jq ' .assets[] | {name, download_count}'
+```
+
+Count the installer asset separately from checksum/source downloads. Downloads
+are not unique users or successful installations. Repository Insights > Traffic
+provides a rolling 14-day visitor/clone window; save snapshots if long-term
+traffic history is needed.

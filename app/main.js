@@ -291,6 +291,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     title: 'Pokemon Showdown Evolved',
+    icon: path.join(RENDERER_DIR, 'assets', 'app.ico'),
     backgroundColor: background(),
     show: false,
     opacity: process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1' ? 0 : 1,
