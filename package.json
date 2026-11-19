@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "description": "A desktop workspace for Pokémon Showdown.",
+  "license": "AGPL-3.0-or-later",
   "main": "app/main.js",
   "engines": {
     "node": ">=24"

@@ -26,4 +26,13 @@ The app never searches for battles, challenges anyone or plays on your account b
 
 ## License
 
-No license has been chosen yet. Third-party code and its licenses are listed under `vendor/`.
+Showdown Desktop is free software under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`).
+
+It ships or downloads third-party code under its own licenses, kept beside each component:
+
+- Pokémon Showdown classic client (patched for practice): AGPL-3.0, `vendor/practice/SHOWDOWN-CLIENT-LICENSE`. The installer includes its corresponding source.
+- Pokémon Showdown simulator: MIT, `vendor/practice/LICENSE-SHOWDOWN-SERVER`.
+- Showdex (optional, not in the installer): AGPL-3.0, `vendor/showdex/LICENSE`.
+- Foul Play (downloaded only on the hosted API or when a player opts in to local play): GPL-3.0.
+
+Pokémon names and artwork belong to their owners and are not covered by this license.

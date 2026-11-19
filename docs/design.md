@@ -257,7 +257,7 @@ Verification: daily state tests cover streaks, three attempts, ties, missed days
 | D4 | Launcher-owned room navigation, with a fail-safe | Keep Showdown's own tabs | One consistent rail; if client hooks change, the client's tabs return automatically |
 | D5 | Replay notes store links, not replays | Download replay archives | Showdown hosts replays; local data stays small, private and portable |
 | D6 | Import reviews conflicts and keeps existing notes by default | Overwrite or mirror the backup | Restoring must never silently lose notes |
-| D7 | Foul Play plays on the hosted API by default; running it on the player's computer is an opt-in download | Bundle Foul Play with every release; cloud only | Owner decisions (2026-11-13, 2026-11-17 evening): Foul Play is too large for the base release and the hosted API serves everyone regardless of CPU, so the cloud stays the default. The morning of 2026-11-17 local play was removed to keep GPL-3.0 code out of the app; that evening it returned as an opt-in, since the project's intended license (AGPL-3.0-or-later, matching the shipped AGPL client) is compatible with Foul Play's GPL-3.0 |
+| D7 | Foul Play plays on the hosted API by default; running it on the player's computer is an opt-in download | Bundle Foul Play with every release; cloud only | Owner decisions (2026-11-13, 2026-11-17 evening): Foul Play is too large for the base release and the hosted API serves everyone regardless of CPU, so the cloud stays the default. The morning of 2026-11-17 local play was removed to keep GPL-3.0 code out of the app; that evening it returned as an opt-in, since the project's license (AGPL-3.0-or-later, matching the shipped AGPL client) is compatible with Foul Play's GPL-3.0 |
 | D7a | The simulator runs on the player's computer; only inference is remote | Run whole battles on the server | Owner decision (2026-11-16): a server that only searches, and a battle UI that never depends on the network. Foul Play only for now; anonymous access with rate limits |
 | D7b | Host the cloud API on one VM behind Caddy, named through sslip.io | Own domain; managed containers; Docker on the VM | Owner decision (2026-11-16): no domain to buy or manage, and a plain systemd service is simple to update with `git pull`. The hostname is derived from the static IP, so changing the IP means a new app build |
 | D8 | Practice on a private simulator with loopback enforced twice | Bot plays on the public server | Automated play on real accounts is impossible by construction ([bots.md §3.4](bots.md#34-network-confinement)) |
@@ -382,7 +382,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 **Release path**, in order. Nothing is published, and there is no updater yet.
 
 1. Prove a clean Windows 11 install, upgrade between two versions, uninstall and reinstall, as a standard user at 100% and 125% scaling.
-2. Decide the project license, Showdex inclusion and the AGPL/GPL source obligations.
+2. Decide Showdex inclusion and meet the AGPL/GPL source obligations (project license: AGPL-3.0-or-later, decided 2026-11-19).
 3. Settle app identity (icon, publisher name) and code signing.
 4. Build reproducible, versioned GitHub Releases with checksums, notices and install notes.
 5. Run an invited alpha with 8–12 Showdex users, fix launch, data-loss and battle-interruption defects, then publish a public alpha.
@@ -412,7 +412,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 
 **Open decisions (owner)**
 
-- [ ] Project license, and distribution of the patched AGPL client, GPL Foul Play and Showdex.
+- [x] Project license: AGPL-3.0-or-later (2026-11-19), compatible with the patched AGPL client, GPL-3.0 Foul Play and AGPL Showdex.
 - [ ] Code signing and release branding.
 - [ ] Whether Showdex ships in packages.
 - [ ] Whether the hosted API stays anonymous, and whether it moves to a proper domain (the current hostname is tied to the VM's IP).

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Practice bot inference API for Showdown Desktop. Computes Foul Play's moves for battles run by the client.",
+  "license": "AGPL-3.0-or-later",
   "main": "server.js",
   "engines": {
     "node": ">=24"

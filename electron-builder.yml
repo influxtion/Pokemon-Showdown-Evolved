@@ -26,6 +26,7 @@ extraResources:
     filter:
       - server.cjs
 files:
+  - LICENSE
   - app/**/*
   - renderer/**/*
   # Foul Play plays on the cloud server by default. For players who opt in to running it on their
