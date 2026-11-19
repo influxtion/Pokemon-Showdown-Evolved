@@ -634,10 +634,11 @@
       padding-top: 0 !important;
     }
 
-    /* Switches, targets and team preview: a card grid. HP bars keep the client's 92px scale. */
+    /* Switches, targets and team preview: a card grid that stretches with the column. HP bars
+       keep the client's 92px scale. */
     .switchmenu {
       display: grid !important;
-      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)) !important;
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)) !important;
       gap: 8px !important;
       margin: 0 !important;
       padding: 0 !important;
@@ -673,13 +674,17 @@
       padding-left: 8px !important;
       padding-right: 6px !important;
       overflow: hidden !important;
+      container-type: inline-size !important;
     }
+    /* The client sizes the HP fill in pixels out of 92, so the bar stays 92px and is stretched
+       to the card's width (its content box plus the 14px of side padding). */
     .switchmenu button .hpbar {
       left: calc(50% - 46px) !important;
       right: auto !important;
       bottom: 20px !important;
       width: 92px !important;
       height: 4px !important;
+      transform: scaleX(calc((100cqw + 14px) / 92px)) !important;
     }
     .switchmenu button .status {
       right: 8px !important;
