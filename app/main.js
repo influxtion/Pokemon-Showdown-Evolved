@@ -15,7 +15,6 @@ const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
 const { PracticeSession } = require('./practice-session');
 const { CloudEngine, LocalEngine } = require('./practice-engines');
-const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
 const { battleResizeScript, widthFromMessage } = require('./battle-resize');
 const { PracticeTeams, FORMATS: TEAM_FORMATS } = require('./practice-teams');
@@ -304,23 +303,13 @@ function createWindow() {
   win.on('focus', () => { if (!currentWindow.isDestroyed()) currentWindow.flashFrame(false); });
   if (process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1') win.setIgnoreMouseEvents(true);
   replayReview = new ReplayReview({ window: win, css: REPLAY_CSS, background: background() });
-  let practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
-    : path.join(__dirname, '..', 'vendor', 'laplace', 'dist');
+  const practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
+    : path.join(__dirname, '..', 'vendor', 'practice', 'dist');
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
-    : path.join(__dirname, '..', 'scripts', 'laplace');
+    : path.join(__dirname, '..', 'scripts', 'practice');
   // The simulator runs here; only Foul Play's moves come from the cloud or the local engine.
   const target = engine => (engine === 'local' ? localEngine : cloudEngine).target();
-  try {
-    const botConfig = !app.isPackaged ? readBotConfig(process.env.SHOWDOWN_BOT_CONFIG || path.join(__dirname, '../out/bots/config.json')) : null;
-    if (botConfig) practiceRoot = botConfig.root;
-    const checks = botConfig ? runtimeOptions(botConfig, path.join(__dirname, '..')) : {};
-    practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, target,
-      ...(checks.verify ? { verify: checks.verify } : {}), ...(checks.installed ? { installed: checks.installed } : {}) });
-  } catch {
-    practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, target, installed: () => false });
-    practice.state = 'failed';
-    practice.error = 'Battle configuration could not load. Check the practice runtime setup.';
-  }
+  practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, target });
   practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
     battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),

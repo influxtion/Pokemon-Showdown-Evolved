@@ -8,12 +8,9 @@ const MANIFEST = 'manifest.json';
 const MAX_MANIFEST_BYTES = 8 * 1024 ** 2;
 const MAX_FILES = 40000;
 const MAX_TOTAL_BYTES = 4 * 1024 ** 3;
-// Every runtime has the simulator and battle client; only the Laplace harness (npm run
-// build:laplace, never packaged) adds Python and the model.
+// The practice runtime is the local Showdown simulator and its battle client.
 const KINDS = Object.freeze({
   simulator: ['server/dist/server/index.js', 'client/practice-client.html'],
-  laplace: ['server/dist/server/index.js', 'client/practice-client.html',
-    'python/python.exe', 'python/python312.dll', 'laplace/models/value_net.pt'],
 });
 const MISSING = Object.freeze({ ok: false, code: 'missing', error: 'Practice runtime is not installed.' });
 const INVALID = Object.freeze({ ok: false, code: 'invalid', error: 'Practice runtime failed integrity verification.' });

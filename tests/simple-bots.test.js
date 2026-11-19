@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { LocalBot, Picker, Tracker, loadData, legalOptions, battleView, command } = require('../app/simple-bots');
 
-const SERVER = path.resolve(__dirname, '../vendor/laplace/dist/server');
+const SERVER = path.resolve(__dirname, '../vendor/practice/dist/server');
 const built = fs.existsSync(path.join(SERVER, 'dist/data/moves.js'));
 const skip = built ? false : 'the practice simulator is not built';
 const data = built ? loadData(SERVER) : null;

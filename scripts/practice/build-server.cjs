@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const workspace = path.resolve(__dirname, '../..');
-const source = path.join(workspace, 'out/laplace-server-source');
-const vendor = path.join(workspace, 'vendor/laplace');
+const source = path.join(workspace, 'out/practice-server-source');
+const vendor = path.join(workspace, 'vendor/practice');
 const repository = 'https://github.com/smogon/pokemon-showdown.git';
 const revision = 'a9caa4cabe89459b00e717a47148d0f67b4451ae';
 
@@ -54,8 +54,8 @@ function canonicalPath(target) {
 
 function buildServer(target) {
   const destination = path.resolve(target);
-  // Neither the app's simulator runtime nor the Laplace harness runtime may be built over in place.
-  for (const active of [path.join(vendor, 'dist'), path.join(workspace, 'out/laplace-runtime')]) {
+  // The app's active simulator runtime may not be built over in place.
+  for (const active of [path.join(vendor, 'dist')]) {
     const relative = path.relative(canonicalPath(active), canonicalPath(destination));
     if (!relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) {
       throw new Error('Choose a staging path outside the active Practice runtime.');
@@ -95,7 +95,7 @@ function buildServer(target) {
 }
 
 if (require.main === module) {
-  if (process.argv.length > 3) throw new Error('Usage: node scripts/laplace/build-server.cjs [output]');
+  if (process.argv.length > 3) throw new Error('Usage: node scripts/practice/build-server.cjs [output]');
   const target = process.argv[2] || path.join(vendor, 'pending/server');
   buildServer(target);
   console.log(`Built local Showdown server at ${path.resolve(target)}`);

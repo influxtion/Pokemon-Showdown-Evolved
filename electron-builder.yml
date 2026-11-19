@@ -17,11 +17,11 @@ asarUnpack:
 beforePack: scripts/verify-practice-package.js
 afterPack: scripts/verify-practice-package-after.js
 extraResources:
-  - from: vendor/laplace/dist
+  - from: vendor/practice/dist
     to: practice
     filter:
       - '**/*'
-  - from: scripts/laplace
+  - from: scripts/practice
     to: practice-adapter
     filter:
       - server.cjs

@@ -7,7 +7,7 @@ const path = require('node:path');
 const clientRevision = '49b54209ebee54ceb8fff62a5eb5bedf7efcf6dc';
 const clientDataRevision = '202b6b385c2536977c60a97bf12d931c2d449586';
 const workspace = path.resolve(__dirname, '../..');
-const vendor = path.join(workspace, 'vendor/laplace');
+const vendor = path.join(workspace, 'vendor/practice');
 const clientSource = path.join(workspace, 'out/practice-client-source');
 
 function run(file, args, cwd, options = {}) {

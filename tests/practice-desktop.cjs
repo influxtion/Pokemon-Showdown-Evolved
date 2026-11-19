@@ -44,7 +44,7 @@ async function recordPracticeLifecycle() {
   const originalHandle = ipcMain.handle;
   childProcess.spawn = (executable, args, options) => {
     const child = originalSpawn(executable, args, options);
-    const name = args.find(arg => typeof arg === 'string' && /[\\/](scripts[\\/]laplace[\\/]server\.cjs|api[\\/]worker[\\/]foulplay_worker\.py)$/.test(arg));
+    const name = args.find(arg => typeof arg === 'string' && /[\\/](scripts[\\/]practice[\\/]server\.cjs|api[\\/]worker[\\/]foulplay_worker\.py)$/.test(arg));
     if (name) children.push(child);
     return child;
   };

@@ -3,8 +3,8 @@ node_modules
 out
 dist
 release
-vendor/laplace/dist
-vendor/laplace/pending*
+vendor/practice/dist
+vendor/practice/pending*
 vendor/showdex/dist
 **/.env
 **/.env.*

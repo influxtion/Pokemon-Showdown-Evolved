@@ -29,7 +29,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - Pinned Showdex **damage calculator**
 - **Replay notes**, with in-app replay review and backup/restore
 - Game **analysis** against an engine's expected best play
-- **Practice** battles against **Foul Play**, a top ladder engine (Laplace stays in the repo as a development harness)
+- **Practice** battles against **Foul Play**, a top ladder engine, and three simple offline bots
 
 ### Showdown client
 - Official `play.pokemonshowdown.com` client in a persistent partition; sign-in survives restarts.
@@ -155,9 +155,9 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 | `app/` | Main-process modules, preload, injected client, replay and Showdex CSS |
 | `renderer/` | Launcher pages (Home, Showdown, Practice, Replays, Settings), shared nav and styles |
 | `api/` | Practice API: server, client, Foul Play installer and worker, deployment files ([README](../api/README.md)) |
-| `scripts/bots/`, `scripts/laplace/` | Laplace harness setup, simulator wrapper, runtime builders, benchmark |
-| `vendor/laplace/`, `vendor/showdex/` | Source pins, licenses, locks, patched practice client shell |
-| `tests/` | Unit tests, Python runner tests, Electron desktop and live drivers |
+| `scripts/practice/`, `scripts/bots/` | Practice simulator wrapper and runtime builders; the desktop bot suite |
+| `vendor/practice/`, `vendor/showdex/` | Source pins, licenses, locks, patched practice client shell |
+| `tests/` | Unit tests, Electron desktop and live drivers |
 | `docs/` | This document and [bots.md](bots.md) |
 
 ## 4. Feature details
@@ -337,7 +337,7 @@ practice suites were not rerun against the hosted server.
 | `npm run test:shell:live` | Guest, spectate-only drift check of the client hooks the shell depends on. Run before each release |
 | `npm run test:showdex:live`, `npm run test:replays:live` | Guest-only checks of a real Showdex build and a real public replay, in both themes and sizes |
 | `npm run smoke:packaged` | The unpacked package with a fresh profile, system-only PATH and the public client blocked |
-| Bot suites | Real games against Foul Play through a loopback copy of the API server or the hosted one (`--url`), and the Laplace harness ([bots.md §8](bots.md#8-running-and-hosting)) |
+| Bot suites | Real games against Foul Play through a loopback copy of the API server or the hosted one (`--url`), ([bots.md §6](bots.md#6-running-and-hosting)) |
 
 No suite verifies a signed-in account. Those checks are manual and owner-only (section 9).
 
@@ -364,8 +364,8 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 
 - **Installer:** adds a Start menu shortcut but no desktop shortcut, and uses Electron's default icon until branding is decided.
 - **`app.asar`:** contains `app/`, `renderer/`, `api/client.js`, `api/protocol.js`, `package.json` and Showdex source metadata only. It never contains tests, scripts, `out/`, credentials or the Showdex runtime.
-- **Foul Play is not in the release** (D7). It plays on the cloud server unless the player downloads it from the Bots page. For that opt-in, the app ships `api/client.js`, `protocol.js`, `install.js`, `server.js`, `lock.json` and the GPL-3.0-derived worker `api/worker/foulplay_worker.py`, unpacked from app.asar so Python can read it. The after-pack check fails the build if any other `api/` file is packaged or anything else is unpacked. No Python, Foul Play or Laplace ships; the download fetches the pinned Python, Foul Play source, packages and set data.
-- **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse a Laplace harness runtime, and packaging fails on any drift.
+- **Foul Play is not in the release** (D7). It plays on the cloud server unless the player downloads it from the Bots page. For that opt-in, the app ships `api/client.js`, `protocol.js`, `install.js`, `server.js`, `lock.json` and the GPL-3.0-derived worker `api/worker/foulplay_worker.py`, unpacked from app.asar so Python can read it. The after-pack check fails the build if any other `api/` file is packaged or anything else is unpacked. No Python or Foul Play ships; the download fetches the pinned Python, Foul Play source, packages and set data.
+- **Practice simulator runtime:** `build:practice` builds only the pinned Showdown server, the patched battle client and their source archives (a `simulator` manifest, about 290 MB). It ships outside the archive under `resources/practice`, with `server.cjs` alone under `resources/practice-adapter`. Before- and after-pack hooks re-verify every file and refuse any other runtime kind, and packaging fails on any drift.
 - **Dependency audit:** `npm audit` reports zero vulnerabilities for the app and `api/`.
 - **Fuses:** set in `electron-builder.yml` (see section 6); `npx @electron/fuses read --app <exe>` shows them.
 

@@ -6,9 +6,9 @@ const { createHash } = require('node:crypto');
 const { verifyRuntime } = require('../app/practice-manifest');
 
 const ROOT = path.resolve(__dirname, '..');
-const VENDOR = path.join(ROOT, 'vendor', 'laplace');
-const ADAPTER = path.join(__dirname, 'laplace');
-// Releases carry only the simulator entry point; Laplace's runner and runtime stay in the dev harness.
+const VENDOR = path.join(ROOT, 'vendor', 'practice');
+const ADAPTER = path.join(__dirname, 'practice');
+// Releases carry only the simulator entry point; the build scripts are checked as sources.
 const ADAPTER_FILES = ['server.cjs'];
 const BUILD_FILES = ['build-server.cjs', 'build-client.cjs'];
 const CLIENT_FILES = ['practice-client.html', 'practice-client.css', 'client-bootstrap.js'];
@@ -29,7 +29,7 @@ function checkedRuntime(root, failureMessage) {
   const bytes = fs.readFileSync(path.join(root, 'manifest.json'));
   if (sha(bytes) !== result.identity) throw new Error('Practice runtime changed during verification.');
   if (result.kind !== 'simulator') {
-    throw new Error('Only the simulator runtime can be packaged; the Laplace harness runtime never ships.');
+    throw new Error('Only a simulator runtime can be packaged. Rebuild with npm run build:practice.');
   }
   return { manifest: JSON.parse(bytes), identity: result.identity };
 }

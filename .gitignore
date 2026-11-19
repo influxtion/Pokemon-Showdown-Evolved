@@ -7,8 +7,8 @@ dist/
 out/
 release/
 vendor/showdex/dist/
-vendor/laplace/dist/
-vendor/laplace/pending*/
+vendor/practice/dist/
+vendor/practice/pending*/
 __pycache__/
 *.pyc
 

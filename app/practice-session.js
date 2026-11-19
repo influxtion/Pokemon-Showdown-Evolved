@@ -12,10 +12,20 @@ const { EventEmitter } = require('node:events');
 const { WebSocket } = require('ws');
 const { inspectRuntime } = require('./practice-manifest');
 const { verifyInWorker } = require('./practice-verification');
-const { childEnvironment, PRESETS } = require('./practice-runtime');
 const { InferenceClient } = require('../api/client');
-const { BOTS, FORMAT, MAX_TEAM, ROOM, roomFormat, isTeamText } = require('../api/protocol');
+const { BOTS, FORMAT, MAX_TEAM, PRESETS, ROOM, roomFormat, isTeamText } = require('../api/protocol');
 const { LOCAL_BOTS, LocalBot, loadData } = require('./simple-bots');
+
+// The simulator runs under Electron's Node and gets only what Windows needs, never inherited
+// account settings.
+function childEnvironment() {
+  const env = {};
+  for (const key of ['SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'COMSPEC']) {
+    if (process.env[key]) env[key] = process.env[key];
+  }
+  env.ELECTRON_RUN_AS_NODE = '1';
+  return env;
+}
 
 // What the Bots page shows, hardest first. `difficulty` is the bot's group; only Foul Play levels
 // search, so only they use the cloud and presets. `formats` lists where each is offered; formats
@@ -190,7 +200,7 @@ class PracticeSession extends EventEmitter {
 
   launch(executable, args, generation) {
     const child = this.spawnChild(executable, args, { cwd: this.root, windowsHide: true,
-      env: childEnvironment(true), stdio: ['pipe', 'pipe', 'pipe'] });
+      env: childEnvironment(), stdio: ['pipe', 'pipe', 'pipe'] });
     this.children.add(child);
     if (child.pid) {
       try { os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* Best effort. */ }
@@ -407,4 +417,4 @@ class PracticeSession extends EventEmitter {
   }
 }
 
-module.exports = { PracticeSession, ERRORS, OPPONENTS };
+module.exports = { PracticeSession, ERRORS, OPPONENTS, childEnvironment };

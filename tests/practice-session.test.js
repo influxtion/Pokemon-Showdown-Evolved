@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter, once } = require('node:events');
 const { PassThrough } = require('node:stream');
 const { WebSocketServer } = require('ws');
-const { PracticeSession } = require('../app/practice-session');
+const { PracticeSession, childEnvironment } = require('../app/practice-session');
 const { createApiServer } = require('../api/server');
 const { InferenceClient } = require('../api/client');
 
@@ -340,4 +340,18 @@ test('a queued player can move to Foul Play on this computer', async t => {
   assert.equal(session.status().engine, 'local');
   assert.equal(api.queue.length, 0, 'the cloud place was given up');
   assert.deepEqual(session.useEngine('cloud'), { ok: false }, 'only while queued');
+});
+
+test('the simulator child environment excludes inherited account and Python settings', () => {
+  const original = process.env.SHOWDOWN_PASSWORD;
+  process.env.SHOWDOWN_PASSWORD = 'must-not-propagate';
+  try {
+    const env = childEnvironment();
+    assert.equal(env.SHOWDOWN_PASSWORD, undefined);
+    assert.equal(env.PYTHONPATH, undefined);
+    assert.equal(env.ELECTRON_RUN_AS_NODE, '1');
+  } finally {
+    if (original === undefined) delete process.env.SHOWDOWN_PASSWORD;
+    else process.env.SHOWDOWN_PASSWORD = original;
+  }
 });

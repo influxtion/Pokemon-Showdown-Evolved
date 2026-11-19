@@ -8,10 +8,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { inspectRuntime, verifyRuntime } = require('../app/practice-manifest');
 
-const REQUIRED = [
-  'python/python.exe', 'python/python312.dll', 'laplace/models/value_net.pt',
-  'server/dist/server/index.js', 'client/practice-client.html',
-];
+const REQUIRED = ['server/dist/server/index.js', 'client/practice-client.html'];
 const INVALID = { ok: false, code: 'invalid', error: 'Practice runtime failed integrity verification.' };
 const MISSING = { ok: false, code: 'missing', error: 'Practice runtime is not installed.' };
 
@@ -24,7 +21,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const root = path.join(base, 'runtime');
   const filename = path.join(root, 'manifest.json');
-  const manifest = { version: 3, kind: 'laplace', platform: 'win32', arch: 'x64', files: {} };
+  const manifest = { version: 3, kind: 'simulator', platform: 'win32', arch: 'x64', files: {} };
   const add = (name, contents) => {
     const target = path.join(root, name);
     const bytes = Buffer.from(contents);
@@ -45,27 +42,18 @@ function fixture(t) {
 test('verifies every runtime file and identifies the exact manifest bytes', t => {
   const { root, manifest, add, save } = fixture(t);
   add('client/style/empty.css', '');
-  add('python/Lib/large.bin', Buffer.alloc(2 * 1024 ** 2 + 17, 7));
+  add('server/data/large.bin', Buffer.alloc(2 * 1024 ** 2 + 17, 7));
   manifest.build = { extra: ['informational metadata'] };
   const bytes = save();
   assert.deepEqual(inspectRuntime(root), { ok: true });
-  assert.deepEqual(verifyRuntime(root), { ok: true, kind: 'laplace', identity: sha256(bytes) });
+  assert.deepEqual(verifyRuntime(root), { ok: true, kind: 'simulator', identity: sha256(bytes) });
 });
 
-test('a simulator runtime needs only the server and client, and a Laplace one also needs Python', t => {
+test('a simulator runtime needs its server and client, and other kinds are rejected', t => {
   const { root, manifest, save } = fixture(t);
-  const laplaceOnly = REQUIRED.filter(name => !name.startsWith('server/') && !name.startsWith('client/'));
-  for (const name of laplaceOnly) {
-    fs.unlinkSync(path.join(root, name));
-    delete manifest.files[name];
-  }
-  fs.rmSync(path.join(root, 'python'), { recursive: true });
-  fs.rmSync(path.join(root, 'laplace'), { recursive: true });
+  manifest.kind = 'laplace';
   save();
-  assert.deepEqual(verifyRuntime(root), INVALID, 'a Laplace runtime without Python is incomplete');
-  manifest.kind = 'simulator';
-  const bytes = save();
-  assert.deepEqual(verifyRuntime(root), { ok: true, kind: 'simulator', identity: sha256(bytes) });
+  assert.deepEqual(verifyRuntime(root), INVALID, 'the retired Laplace harness kind is rejected');
   manifest.kind = 'other';
   save();
   assert.deepEqual(verifyRuntime(root), INVALID, 'unknown runtime kinds are rejected');
@@ -88,10 +76,10 @@ test('rejects missing or extra payload files and missing required manifest entri
   fs.unlinkSync(path.join(root, REQUIRED[1]));
   assert.deepEqual(verifyRuntime(root), INVALID);
   add(REQUIRED[1], 'restored');
-  fs.writeFileSync(path.join(root, 'python', 'undeclared.dll'), 'extra');
+  fs.writeFileSync(path.join(root, 'client', 'undeclared.js'), 'extra');
   save();
   assert.deepEqual(verifyRuntime(root), INVALID);
-  fs.unlinkSync(path.join(root, 'python', 'undeclared.dll'));
+  fs.unlinkSync(path.join(root, 'client', 'undeclared.js'));
   delete manifest.files[REQUIRED[1]];
   save();
   assert.deepEqual(inspectRuntime(root), INVALID);
@@ -105,7 +93,7 @@ test('rejects noncanonical and ambiguous Windows runtime paths', t => {
     '../outside', 'python/../outside', 'python/./extra', '/absolute', 'C:/absolute',
     '\\server\\share\\file', 'python\\extra', 'python//extra', 'python/extra/',
     'python/extra:stream', 'python/extra. ', 'python/NUL.dll',
-    'PYTHON/PYTHON.EXE', 'MANIFEST.JSON',
+    'SERVER/DIST/SERVER/INDEX.JS', 'MANIFEST.JSON',
   ]) {
     manifest.files[name] = entry;
     save();
