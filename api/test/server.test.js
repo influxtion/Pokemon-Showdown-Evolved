@@ -318,6 +318,11 @@ test('keys rate limits by IPv4 address, IPv6 /64 and trusted proxy hop', () => {
   assert.equal(clientKey(request('::ffff:203.0.113.9'), false), '203.0.113.9');
   assert.equal(clientKey(request('2001:db8:1:2:3:4:5:6'), false), '2001:db8:1:2::/64');
   assert.equal(clientKey(request('2001:db8:1:2::9'), false), '2001:db8:1:2::/64');
+  assert.equal(clientKey(request('2001:0DB8:0001:0002::9'), false), '2001:db8:1:2::/64');
+  assert.equal(clientKey(request('2001:db8::1'), false), '2001:db8:0:0::/64');
+  assert.equal(clientKey(request('2001:db8:0:0:1::9'), false), '2001:db8:0:0::/64');
+  assert.equal(clientKey(request('::ffff:cb00:7109'), false), '203.0.113.9');
+  assert.equal(clientKey(request('10.0.0.2', 'not-an-ip'), true), '10.0.0.2');
   assert.equal(clientKey(request('10.0.0.2', '1.1.1.1, 198.51.100.4'), true), '198.51.100.4');
   assert.equal(clientKey(request('10.0.0.2', '1.1.1.1'), false), '10.0.0.2');
 });

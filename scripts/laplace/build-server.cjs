@@ -74,6 +74,10 @@ function buildServer(target) {
     for (const name of ['dist', 'data', 'translations', 'LICENSE', 'package.json', 'package-lock.json']) {
       fs.cpSync(path.join(source, name), path.join(staging, name), { recursive: true });
     }
+    // Keep upstream source pinned, with separately reviewed production dependency fixes.
+    for (const name of ['package.json', 'package-lock.json']) {
+      fs.copyFileSync(path.join(vendor, `server-${name}`), path.join(staging, name));
+    }
     // The compiled server uses no optional add-ons in the isolated local config.
     npm(staging, 'ci', '--omit=dev', '--omit=optional', '--ignore-scripts', '--no-audit', '--no-fund');
     fs.mkdirSync(path.join(staging, 'config'));

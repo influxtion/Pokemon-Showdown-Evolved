@@ -35,6 +35,13 @@ function checkedRuntime(root, failureMessage) {
 }
 
 function verifySource(manifest) {
+  for (const name of ['package.json', 'package-lock.json']) {
+    const expected = fileSha(path.join(VENDOR, `server-${name}`));
+    if (manifest.files[`server/${name}`]?.sha256 !== expected ||
+        manifest.files[`sources/server-${name}`]?.sha256 !== expected) {
+      throw new Error('Simulator dependencies changed after the runtime build. Rebuild before packaging.');
+    }
+  }
   for (const name of [...ADAPTER_FILES, ...BUILD_FILES]) {
     if (manifest.files[`sources/desktop-adapter/${name}`]?.sha256 !== fileSha(path.join(ADAPTER, name))) {
       throw new Error(`Practice adapter ${name} changed after the runtime build. Rebuild before packaging.`);

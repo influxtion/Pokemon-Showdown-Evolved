@@ -164,6 +164,18 @@ function readSession() {
       app.updateLayout();
     }
     setShell(capable);
+    // Showdex opens tools on the right; the client's single-panel layout hides that panel.
+    if (capable && typeof app.focusRoomRight === 'function' && !app.focusRoomRight.sdSinglePanel) {
+      const original = app.focusRoomRight;
+      const focusRight = function (...args) {
+        if (this.singlePanelMode && root.classList.contains('sd-launcher-shell')) {
+          return this.focusRoom(args[0], true);
+        }
+        return original.apply(this, args);
+      };
+      focusRight.sdSinglePanel = true;
+      app.focusRoomRight = focusRight;
+    }
     return state;
   } catch (error) {
     setShell(false);

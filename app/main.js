@@ -5,6 +5,9 @@ const path = require('node:path');
 const { app, BrowserWindow, WebContentsView, Menu, ipcMain, nativeTheme, shell, dialog,
   protocol, session: electronSession, screen, Notification } = require('electron');
 require('./profile').configureProfile(app);
+// One writer per profile; independent test profiles still run side by side.
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 const { Settings } = require('./settings');
 const { ShowdownBridge } = require('./showdown');
 const { Replays } = require('./replays');
@@ -46,6 +49,12 @@ const CLIENT_PARTITION = 'persist:showdown';
 const POPUP_HOSTS = new Set(['accounts.google.com']);
 
 let win = null;
+app.on('second-instance', () => {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
 let client = null;
 let settings = null;
 let replays = null;
@@ -944,6 +953,7 @@ nativeTheme.on('updated', () => {
 });
 
 app.whenReady().then(async () => {
+  if (!primaryInstance) return;
   logger = new Logger(app.getPath('userData'));
   logger.write('app-started');
   settings = new Settings(app.getPath('userData'));

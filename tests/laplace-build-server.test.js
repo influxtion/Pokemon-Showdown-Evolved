@@ -7,6 +7,14 @@ const path = require('node:path');
 const test = require('node:test');
 const { buildServer } = require('../scripts/laplace/build-server.cjs');
 
+test('simulator production lock contains the reviewed security updates', () => {
+  const lock = require('../vendor/laplace/server-package-lock.json');
+  assert.equal(lock.packages['node_modules/mysql2'].version, '3.24.6');
+  assert.equal(lock.packages['node_modules/websocket-driver'].version, '0.7.5');
+  assert.equal(lock.packages['node_modules/uuid'].version, '11.1.1');
+  assert.equal(Object.keys(lock.packages).some(name => name.endsWith('/sockjs/node_modules/uuid')), false);
+});
+
 test('server builder refuses paths inside the app and Laplace harness runtimes', () => {
   for (const active of [path.resolve(__dirname, '../vendor/laplace/dist'), path.resolve(__dirname, '../out/laplace-runtime')]) {
     assert.throws(() => buildServer(active), /outside the active Practice runtime/);

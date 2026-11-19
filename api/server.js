@@ -20,6 +20,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { isIP } = require('node:net');
 const { spawn } = require('node:child_process');
 const { WebSocketServer } = require('ws');
 const { API_VERSION, FORMAT, TEAM_FORMATS, PRESETS, BOTS, ROOM, CHOICE, RQID, SESSION_ID, roomFormat, isBattleFrame,
@@ -81,11 +82,19 @@ function clientKey(request, trustProxy) {
   if (trustProxy) {
     // The proxy appends the address it saw; anything to the left came from the client.
     const forwarded = String(request.headers['x-forwarded-for'] || '').split(',').map(part => part.trim()).filter(Boolean);
-    if (forwarded.length) address = forwarded.at(-1);
+    if (forwarded.length && isIP(forwarded.at(-1))) address = forwarded.at(-1);
   }
-  address = address.replace(/^::ffff:/, '');
-  if (address.includes(':')) {
-    const groups = address.split('::')[0].split(':');
+  if (isIP(address) === 6) {
+    // URL canonicalizes zero compression, casing, and embedded IPv4 consistently.
+    address = new URL(`http://[${address}]/`).hostname.slice(1, -1);
+    if (/^::ffff:[a-f0-9]+:[a-f0-9]+$/.test(address)) {
+      const words = address.split(':').slice(-2).map(word => parseInt(word, 16));
+      return [words[0] >> 8, words[0] & 255, words[1] >> 8, words[1] & 255].join('.');
+    }
+    const [left, right] = address.split('::');
+    const start = left ? left.split(':') : [];
+    const end = right ? right.split(':') : [];
+    const groups = right === undefined ? start : [...start, ...Array(8 - start.length - end.length).fill('0'), ...end];
     address = `${groups.slice(0, 4).join(':')}::/64`;
   }
   return address;

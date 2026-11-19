@@ -390,6 +390,28 @@ test('a live battle asks in the launcher, then forfeits and leaves without showi
   assert.deepEqual(removed, [['remove', 'battle-gen9ou-2'], ['leave', 'battle-gen9ou-3'], ['leave', 'battle-gen9ou-4']]);
 });
 
+test('right-side tools focus visibly in the shell and retain upstream behavior after fail-safe', async () => {
+  const calls = [];
+  const document = fakeDocument();
+  const app = {
+    user: { get: () => 'Player' }, rooms: { '': { $: () => ({ length: 0 }) } }, curRoom: { id: '' },
+    updateLayout() {}, leaveRoom() {}, joinRoom() {}, addPopup() {},
+    focusRoom(...args) { calls.push(['main', ...args]); return 'visible'; },
+    focusRoomRight(...args) { calls.push(['right', ...args]); return 'upstream'; },
+  };
+  const contents = fakeContents(code => vm.runInNewContext(code, { window: { app, document }, app, document }));
+  const bridge = new ShowdownBridge(() => contents);
+  await bridge.session();
+  const wrapper = app.focusRoomRight;
+  assert.equal(app.focusRoomRight('view-hellodex'), 'visible');
+  await bridge.session();
+  assert.equal(app.focusRoomRight, wrapper, 'polling does not stack wrappers');
+  delete app.leaveRoom;
+  await bridge.session();
+  assert.equal(app.focusRoomRight('view-hellodex'), 'upstream');
+  assert.deepEqual(calls, [['main', 'view-hellodex', true], ['right', 'view-hellodex']]);
+});
+
 test('the client keeps its own header unless a full read confirms the launcher can drive rooms', async () => {
   const make = () => ({
     user: { get: (key) => key === 'name' ? 'Player' : false },

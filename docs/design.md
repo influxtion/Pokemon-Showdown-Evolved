@@ -277,7 +277,29 @@ allowlist matcher without creating an installer. Reassess the override when
 updating electron-builder. The live shell test waits for battle metadata as well
 as the tab: the server can deliver the initial turn after the tab appears.
 
-November 18 launch audit: 222 unit tests (one optional skip), all seven desktop
+November 18 release follow-up: added a per-profile single-instance lock, verified
+by starting a second Electron process, so concurrent launchers cannot overwrite
+each other's settings and notes. Canonicalized IPv6 network keys (including
+embedded IPv4) and rejected invalid forwarded addresses in the practice API.
+The top-level npm audit did not cover the bundled simulator: its separate scan
+found four affected packages, including a critical websocket-driver advisory.
+The simulator now uses a committed production dependency lock with mysql2
+3.24.6, websocket-driver 0.7.5 and uuid 11.1.1. Packaging checks both dependency
+files against the runtime inventory and requires a rebuild after changes.
+Upstream game source remains at its pinned revision. The rebuilt simulator's
+production audit reports zero vulnerabilities, as do the app and API audits.
+Showdex's right-panel navigation now focuses the tool in the launcher's single
+panel, with upstream behavior retained when the shell fail-safe disengages.
+
+224 unit tests passed (one optional skip), and all seven desktop suites passed
+after the instance-lock change. Guest shell, replay and Showdex checks passed;
+real loopback practice passed again against the rebuilt simulator. An isolated offline sample
+measured a 208 ms warm development launch, 17–53 ms page loads, a 5 ms maximum
+session IPC round trip and 31 ms main-loop p99 delay. These do not measure
+network latency or clean-machine performance. No real-account actions or
+production server changes were made.
+
+Earlier November 18 launch audit: 222 unit tests (one optional skip), all seven desktop
 suites, the practice suite (a real Foul Play battle), live shell and replay checks,
 two battles against the hosted API (median 240 ms per decision), and both packaged
 smokes with fuses on. Three desktop suites had gone stale against current behavior
