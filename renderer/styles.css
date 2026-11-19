@@ -192,18 +192,14 @@ a:hover { text-decoration: underline; }
   color: var(--rail-text-strong);
   white-space: nowrap;
 }
+/* The logo is renderer/assets/logo.png, scaled to fit without cropping. */
 .rail-logo {
   width: 32px;
   height: 32px;
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--primary);
-  color: var(--on-primary);
+  display: block;
+  object-fit: contain;
 }
-.rail-logo svg { width: 18px; height: 18px; }
 .rail-brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .rail-brand-text strong { font-size: 14px; font-weight: 700; }
 .rail-brand-text span { font-size: var(--fs-xs); color: var(--rail-muted); }
@@ -716,6 +712,20 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   border-radius: 4px;
   color: var(--hero-text);
   min-height: 248px;
+  position: relative;
+  isolation: isolate;
+}
+/* The keystone as a faint watermark. The pseudo element fills the panel, so the image crops
+   at its edges without clipping the panel's own content. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: url("assets/keystone-outline.svg") no-repeat right -28px top -64px / 280px 280px;
+  opacity: 0.07;
+  pointer-events: none;
 }
 .hero-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hero-kicker { font-size: var(--fs-sm); color: var(--hero-muted); }
@@ -1720,9 +1730,9 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
    .main. Hairlines separate tabs; the open tab takes the top bar's colour to join the page, and
    the hairlines beside it (or a hovered tab) drop away. */
 
-.rail-brand { justify-content: center; padding: 12px 0 10px; }
+.rail-brand { justify-content: center; padding: 8px 0 6px; }
 .rail-brand-text { display: none; }
-.rail-logo { width: 32px; height: 32px; border-radius: 8px; }
+.rail-logo { width: 64px; height: 64px; }
 .rail-nav { flex: 1; gap: 4px; padding: var(--space-1) 6px; overflow-x: hidden; }
 .rail .nav-item {
   flex-direction: column;

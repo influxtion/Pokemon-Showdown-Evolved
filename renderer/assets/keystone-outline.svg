@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#fff">
+  <!-- Line drawing of the keystone, shown as a faint watermark on the Home battle panel. -->
+  <circle cx="32" cy="32" r="30" stroke-width="2"/>
+  <circle cx="32" cy="32" r="21" stroke-width="1.4"/>
+  <g transform="translate(32 32) scale(0.4)" stroke-width="4" stroke-linejoin="round">
+    <clipPath id="inside">
+      <path d="M5.2-41C-10-30-32-22-30.7-6-29 10-10 22-5.2 41 10 30 32 22 30.7 6 29-10 10-22 5.2-41Z"/>
+    </clipPath>
+    <path clip-path="url(#inside)" d="M-44-33L44 3M-44-18L44 18M-44-3L44 33"/>
+    <path d="M5.2-41C-10-30-32-22-30.7-6-29 10-10 22-5.2 41 10 30 32 22 30.7 6 29-10 10-22 5.2-41Z"/>
+  </g>
+</svg>
