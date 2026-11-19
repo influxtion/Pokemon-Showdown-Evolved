@@ -103,6 +103,18 @@ app.whenReady().then(async () => {
     onConfirm = async () => {};
     assert.equal((await restart()).ok, true);
     assert.equal(installed, 1);
+    const { PracticeTeams } = require('../app/practice-teams');
+    const oldCheck = PracticeTeams.prototype.check;
+    const preparations = [];
+    PracticeTeams.prototype.check = () => new Promise(resolve => preparations.push(resolve));
+    await load('practice.html');
+    await run("window.desktop.startPractice({opponent:'foulplay-medium',preset:'full',format:'gen9ou',teams:{player:{source:'paste',text:'Pikachu'},bot:{source:'paste',text:'Pikachu'}}}); void 0");
+    await until(() => preparations.length === 2, 'team preparation');
+    await load('settings.html');
+    assert.match((await restart()).error, /operation/);
+    for (const finish of preparations) finish({ ok: false, error: 'Test cancellation' });
+    PracticeTeams.prototype.check = oldCheck;
+    await new Promise(resolve => setTimeout(resolve, 50));
     await load('replays.html');
     assert.match((await restart()).error, /Settings/);
     await run('window.desktop.setReplayNoteDirty(true)');

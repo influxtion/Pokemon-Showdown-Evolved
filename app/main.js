@@ -111,6 +111,7 @@ let exportingReplays = false;
 let confirmingClose = false;
 let allowClose = false;
 let maintenance = false;
+let preparingPractice = 0;
 let logger = null;
 let windowState = null;
 const bridge = new ShowdownBridge(() => (client ? client.webContents : null));
@@ -458,6 +459,7 @@ ipcMain.handle('daily:status', event => {
     practiceBusy: ['starting', 'ready'].includes(practice.state) && !practice.battle?.finished };
 });
 ipcMain.handle('daily:start', event => {
+  if (updates?.restarting || updateInstalling) return { ok: false, error: 'An update restart is being checked.' };
   if (!isPracticeFrame(event, ['/index.html', '/practice.html', '/practice-battle.html'])) return { ok: false };
   const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
   if (dailyChallenge.starting) return { ok: false, error: 'A daily attempt is already starting.' };
@@ -504,10 +506,13 @@ ipcMain.handle('practice:start', async (event, options) => {
   }
   if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset, engine });
   if (!Object.hasOwn(TEAM_FORMATS, format) || !options.teams || typeof options.teams !== 'object') return { ok: false, error: 'Choose both teams first.' };
-  const [player, bot] = await Promise.all([practiceTeam(format, options.teams.player), practiceTeam(format, options.teams.bot)]);
-  if (!player.ok) return { ok: false, error: `Your team: ${player.error}`, side: 'player' };
-  if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
-  return practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
+  preparingPractice++;
+  try {
+    const [player, bot] = await Promise.all([practiceTeam(format, options.teams.player), practiceTeam(format, options.teams.bot)]);
+    if (!player.ok) return { ok: false, error: `Your team: ${player.error}`, side: 'player' };
+    if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
+    return await practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
+  } finally { preparingPractice--; }
 });
 // While queued for the cloud, the battle tab can move the battle to downloaded Foul Play; that
 // also becomes the choice for later battles.
@@ -1063,7 +1068,7 @@ function setupUpdates() {
           !parseUrl(win.webContents.getURL())?.pathname.endsWith('/settings.html')) return 'Open Settings to restart for an update.';
       return restartBlocker({ session: state, dirty: replayDirty || draft !== false,
         busy: maintenance || confirmingClose || exportingReplays || choosingReplayImport || undoingReplayImport ||
-          showdexInstalling || localEngine?.installing, practice });
+          showdexInstalling || localEngine?.installing || preparingPractice > 0 || dailyChallenge?.starting, practice });
     },
     confirm: async () => (await dialog.showMessageBox(win, {
       type: 'question', title: 'Restart to update', message: 'Restart Pokemon Showdown Evolved to install the update?',

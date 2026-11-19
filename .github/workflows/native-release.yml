@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   showdex:
     runs-on: windows-2025
