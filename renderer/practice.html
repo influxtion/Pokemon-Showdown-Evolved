@@ -68,6 +68,28 @@
       <div class="banner banner--bar banner--warn" id="practice-message" role="status" hidden></div>
       <section class="practice-setup" id="practice-setup">
         <div class="bots-page">
+            <section class="window daily-challenge daily-full" id="daily-challenge" aria-labelledby="daily-title">
+              <div class="window-head">
+                <h2 id="daily-title">Daily Foul Play</h2>
+                <span class="window-space"></span>
+                <span class="daily-streak num" id="daily-streak">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M9 1.5c.5 3-3.5 3.5-3 6C4.5 7 4 6 4 5c-2 2-2 4-1 6a5.5 5.5 0 0 0 10-1c.5-3-1.5-5-2-5-.5 2-1 2.5-2 3 1-2 1-4-0-6.5Z"/></svg>
+                  <span id="daily-streak-text">No streak yet</span>
+                </span>
+              </div>
+              <div class="daily-body">
+                <div><p>Beat Foul Play Medium &middot; Gen 9 Random Battle</p>
+                  <p id="daily-status" role="status">Loading challenge&hellip;</p>
+                  <p class="daily-record num" id="daily-record"></p>
+                </div>
+                <button class="btn btn-primary" type="button" id="daily-start" disabled>Start challenge</button>
+              </div>
+              <details class="daily-rules"><summary>How it works &middot; resets at 00:00 UTC</summary>
+                <p>Win once in three attempts to add a day to your streak. Missing a day or using all three attempts without a win resets it. Ties and quitting an active battle use an attempt; startup and engine failures return it. Finish before midnight UTC. Progress is saved on this computer.</p>
+              </details>
+              <p class="daily-error" id="daily-error" role="alert" hidden></p>
+            </section>
+
           <header class="bots-head">
             <div class="bots-title">
               <h2>Practice against a bot</h2>
@@ -143,5 +165,6 @@
 </div>
 <script src="nav.js"></script>
 <script src="practice.js"></script>
+<script src="daily-challenge.js"></script>
 </body>
 </html>

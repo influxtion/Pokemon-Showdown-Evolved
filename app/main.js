@@ -446,7 +446,7 @@ ipcMain.handle('daily:status', event => {
     practiceBusy: ['starting', 'ready'].includes(practice.state) && !practice.battle?.finished };
 });
 ipcMain.handle('daily:start', event => {
-  if (!isPracticeFrame(event, ['/index.html', '/practice-battle.html'])) return { ok: false };
+  if (!isPracticeFrame(event, ['/index.html', '/practice.html', '/practice-battle.html'])) return { ok: false };
   const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
   if (dailyChallenge.starting) return { ok: false, error: 'A daily attempt is already starting.' };
   const pending = dailyChallenge.start(engine);

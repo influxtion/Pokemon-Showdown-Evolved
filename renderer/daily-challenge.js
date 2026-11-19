@@ -3,6 +3,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const button = $('daily-start');
+  const compact = Boolean(document.querySelector('.daily-compact'));
   let latest = null;
   let busy = false;
   let polling = false;
@@ -13,15 +14,15 @@
       const value = await window.desktop.getDailyChallenge();
       latest = value;
       if (!value?.ok) throw new Error(value?.error || 'Daily challenge unavailable.');
-      $('daily-streak-text').textContent = value.streak ? `${value.streak}-day streak` : 'No active streak';
+      $('daily-streak-text').textContent = value.streak ? `${value.streak}-day streak` : compact ? 'Start a streak' : 'No active streak';
       $('daily-streak').classList.toggle('is-lit', value.streak > 0);
-      $('daily-record').textContent = `Best: ${value.best} ${value.best === 1 ? 'day' : 'days'} · Daily clears: ${value.total}`;
+      if ($('daily-record')) $('daily-record').textContent = `Best: ${value.best} ${value.best === 1 ? 'day' : 'days'} · Daily clears: ${value.total}`;
       $('daily-status').textContent = value.clockError ? 'Check your computer’s date to continue.'
-        : value.running ? 'Attempt in progress · return to your battle'
-          : value.cleared ? 'Challenge cleared. Come back after the next reset.'
-            : !value.attemptsLeft ? 'No attempts left today. Your next streak starts tomorrow.'
+        : value.running ? 'Attempt in progress'
+          : value.cleared ? compact ? 'Cleared today · resets 00:00 UTC' : 'Challenge cleared. Come back after the next reset.'
+            : !value.attemptsLeft ? compact ? 'No attempts left · resets 00:00 UTC' : 'No attempts left today. Your next streak starts tomorrow.'
               : `${value.attemptsLeft} of 3 attempts remaining`;
-      button.textContent = value.running ? 'Return to challenge' : value.cleared ? 'Cleared today' : 'Start challenge';
+      button.textContent = value.running ? (compact ? 'Return' : 'Return to challenge') : value.cleared ? 'Cleared today' : compact ? 'Play daily' : 'Start challenge';
       button.disabled = busy || (!value.running && (!value.canStart || !value.installed || value.practiceBusy));
       if (!value.installed) $('daily-status').textContent = 'The practice battle server is not installed.';
       else if (value.practiceBusy && !value.running) $('daily-status').textContent = 'End your current practice session to play the daily challenge.';

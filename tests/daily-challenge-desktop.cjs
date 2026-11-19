@@ -41,7 +41,11 @@ app.whenReady().then(async () => {
   practice.battle = { ...practice.battle, finished: true, result: 'loss' }; practice.changed();
   await until(() => run("!document.getElementById('battle-next').hidden"), 'retry');
   assert.equal((await run('window.desktop.nextPracticeBattle()')).ok, false, 'ordinary rematch blocked');
-  await run("document.getElementById('battle-next').click(); 0");
+  await win.loadFile(path.join(__dirname, '..', 'renderer', 'practice.html'));
+  await until(() => run("!document.getElementById('daily-start').disabled"), 'Bots daily ready');
+  assert.equal(await run("Boolean(document.getElementById('daily-record'))"), true);
+  await run("document.getElementById('daily-start').click(); 0");
+  await until(() => win.webContents.getURL().endsWith('practice-battle.html') && !win.webContents.isLoading(), 'Bots daily starts battle');
   await until(async () => (await run('window.desktop.getDailyChallenge()')).attemptsLeft === 1, 'second attempt');
   practice.battle = { ...practice.battle, finished: true, result: 'win' }; practice.changed();
   await until(async () => (await run('window.desktop.getDailyChallenge()')).cleared, 'daily cleared');
@@ -60,9 +64,20 @@ app.whenReady().then(async () => {
         await pause(200);
         await run("document.querySelector('.daily-challenge').scrollIntoView({block:'nearest'}); 0");
         assert.equal(await run("document.documentElement.scrollWidth <= innerWidth && document.getElementById('hub').scrollWidth <= document.getElementById('hub').clientWidth"), true, 'no horizontal overflow');
+        assert.equal(await run("document.querySelector('.daily-compact').getBoundingClientRect().height <= 76"), true, 'compact challenge height');
         fs.writeFileSync(path.join(dir, `${layout}-${width}-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       }
     }
+  }
+  await run("document.querySelector('.daily-details').click(); 0");
+  await until(() => win.webContents.getURL().includes('practice.html') && !win.webContents.isLoading(), 'details opens Bots');
+  await until(() => run("document.getElementById('daily-record').textContent.includes('Daily clears: 1')"), 'Bots records');
+  assert.equal(await run("document.getElementById('daily-start').disabled"), true);
+  for (const theme of ['light', 'dark']) {
+    await run(`window.desktop.setTheme('${theme}'); 0`);
+    await pause(200);
+    assert.equal(await run("document.documentElement.scrollWidth <= innerWidth"), true, 'Bots no horizontal overflow');
+    fs.writeFileSync(path.join(dir, `bots-1024-${theme}.png`), (await win.webContents.capturePage()).toPNG());
   }
   console.log('Daily challenge desktop passed: real IPC, pinned Medium, loss/retry/win, rematch guard, flame, both layouts/themes/sizes.');
   win.destroy(); app.exit(0);

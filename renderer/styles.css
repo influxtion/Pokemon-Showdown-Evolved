@@ -2035,3 +2035,33 @@ kbd {
 .daily-rules summary { cursor: pointer; }
 .daily-rules p { line-height: 1.5; margin-bottom: 0; }
 .daily-error { margin: 0 16px 12px; color: var(--err); }
+
+/* Home keeps just the daily action; rules and records live on Bots. */
+.daily-compact {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--hero-border); border-left: 4px solid var(--primary);
+  border-radius: 4px; background: var(--hero-bg); color: var(--hero-text);
+}
+.daily-emblem {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px;
+  border-radius: 3px; background: var(--primary); color: var(--on-primary);
+}
+.daily-emblem svg { width: 24px; height: 24px; }
+.daily-summary { flex: 1; min-width: 0; }
+.daily-summary h2 { font-size: var(--fs-md); margin: 0 0 3px; }
+.daily-summary h2 span { font-size: var(--fs-xs); font-weight: 400; color: var(--hero-muted); margin-left: 8px; }
+.daily-summary p { font-size: var(--fs-sm); margin: 0; color: var(--hero-muted); }
+.daily-compact .daily-streak { color: var(--hero-text); font-size: var(--fs-sm); white-space: nowrap; }
+.daily-compact .daily-streak.is-lit { color: var(--primary); font-weight: 600; }
+.daily-details { color: var(--hero-text); font-size: var(--fs-sm); text-decoration: underline; }
+.daily-compact .btn { flex: none; }
+.daily-compact .daily-error { margin: 0; color: var(--hero-text); flex-basis: 100%; }
+.daily-compact:has(.daily-error:not([hidden])) { flex-wrap: wrap; }
+.daily-full { margin-bottom: 20px; scroll-margin-top: 16px; }
+.daily-full .window-head { background: var(--hero-bg); color: var(--hero-text); border-top: 3px solid var(--primary); }
+.daily-full .daily-streak { color: var(--hero-text); }
+.daily-full .daily-streak svg { color: var(--primary); }
+@media (max-width: 1180px) {
+  .daily-summary h2 span { display: none; }
+  .daily-compact { gap: 10px; }
+}
