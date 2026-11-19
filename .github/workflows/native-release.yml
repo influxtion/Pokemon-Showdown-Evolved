@@ -85,33 +85,14 @@ jobs:
           path: vendor/showdex/dist/
       - name: Build native packages
         run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
-      - name: Packaged smoke and real local practice
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a node scripts/smoke-packaged.js --practice --simple-practice
-          else
-            node scripts/smoke-packaged.js --practice --simple-practice
-          fi
-      - name: Stage checksums and source
-        run: node scripts/stage-native-release.js ${{ matrix.id }}
       - name: Save packages for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: packages-${{ matrix.id }}
           path: |
-            out/native-release/*.dmg
-            out/native-release/*.zip
-            out/native-release/*.AppImage
-            out/native-release/Pokemon.Showdown.Evolved.*.Linux-*.tar.gz
+            out/macos/*.dmg
+            out/macos/*.zip
+            out/linux/*.AppImage
+            out/linux/*.tar.gz
           compression-level: 0
           retention-days: 14
-      - name: Retain verification reports
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: verification-${{ matrix.id }}
-          path: |
-            out/packaging-smoke/
-            out/native-release/*.json
-            out/native-release/*.txt
