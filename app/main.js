@@ -319,11 +319,15 @@ function createWindow() {
   dailyChallenge = new DailyChallenge(dailyStore, practice);
   practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
+    showdex: () => showdexBundle.installed && settings.get('showdexEnabled') ? { distDir: showdex.distDir } : null,
     battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),
     script: () => battleResizeScript(settings.get('battleWidth')),
     onConsole: text => saveBattleWidth(text, 'practice'),
     background: background(), onFailure: token => practice?.clientFailed(token) });
-  practice.on('ready', connection => { logger.write('practice-ready'); practiceView?.open(connection); });
+  practice.on('ready', connection => {
+    logger.write('practice-ready');
+    practiceView?.open(connection).catch(() => practice?.clientFailed(connection.token));
+  });
   practice.on('failure', code => {
     logger.write('practice-failed', { start: 1, exited: 2, timeout: 3, client: 4, integrity: 5, engine: 6 }[code] || 0);
     // Show the cloud server's real state right away instead of at the next periodic check.

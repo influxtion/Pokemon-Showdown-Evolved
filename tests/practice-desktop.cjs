@@ -10,6 +10,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
+// This harness starts main only after its local inference service is listening. Protocol
+// privileges still must be declared before Electron is ready, as in the normal app entry.
+require('../app/showdex-integration').registerShowdexScheme(require('electron').protocol);
 
 const root = path.join(__dirname, '..');
 const captures = path.join(root, 'out', 'desktop-smoke');
@@ -20,6 +23,7 @@ const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const deadline = Date.now() + 240000;
 const children = [];
 const diagnose = process.argv.includes('--diagnose-practice');
+const withShowdex = process.argv.includes('--showdex');
 const foulPlayDir = path.resolve(process.env.BOT_TEST_FOULPLAY_DIR || path.join(root, 'api', 'runtime'));
 const selection = { opponent: 'foulplay', preset: 'balanced' };
 let service;
@@ -100,6 +104,13 @@ async function capture(contents, name) {
 }
 
 async function smoke() {
+  if (withShowdex) app.on('web-contents-created', (_event, contents) => {
+    contents.on('console-message', details => {
+      if (details.level === 'error' && contents.getURL().includes('practice-client.html')) {
+        console.error(String(details.message).replace(/[a-f0-9]{32,128}/gi, '[session]'));
+      }
+    });
+  });
   blockNetwork(session.defaultSession);
   blockNetwork(session.fromPartition('persist:showdown'));
   if (diagnose) {
@@ -144,6 +155,7 @@ async function smoke() {
   const liveId = live.webContents.id;
   const practice = () => win.contentView.children.find(view => view !== live);
   assert.equal((await call('startPractice', 'balanced')).ok, false, 'Home cannot start Practice');
+  if (withShowdex) assert.equal((await call('installShowdex')).ok, true, 'install optional Showdex for practice');
 
   await load('practice.html');
   await until(async () => (await status()).installed, 'practice runtime ready');
@@ -194,6 +206,34 @@ async function smoke() {
     return state.battle?.room === browserRoom && view.getVisible() ? browserRoom : null;
   }, 'real battle with a move request', 18000);
   assert.equal(children.length, 2, 'simulator and Foul Play worker started');
+  if (withShowdex) {
+    await until(() => player.executeJavaScript("window.__SHOWDOWN_DESKTOP_SHOWDEX?.state === 'loaded'"), 'Showdex loaded in practice', 30000).catch(async error => {
+      console.error('Practice Showdex status', await player.executeJavaScript('({status:window.__SHOWDOWN_DESKTOP_SHOWDEX, requested:window.__SD_SHOWDEX_REQUESTED, app:typeof app, host:window.__SHOWDEX_HOST, rooms:Object.keys(app.rooms), scripts:[...document.scripts].filter(s=>s.src.startsWith("showdex:")).map(s=>s.src)})'));
+      throw error;
+    });
+    await until(() => player.executeJavaScript("!!document.querySelector('.sd-showdex-dock-toggle')"), 'practice calculator');
+    await player.executeJavaScript(`(() => {
+      const button = document.querySelector('.sd-showdex-dock-toggle');
+      if (button.getAttribute('aria-pressed') !== 'true') button.click();
+    })()`);
+    const damage = await until(() => player.executeJavaScript(`(() => {
+      const calc = document.querySelector('.sd-calcdex-docked [data-showdex-module=calcdex]');
+      if (!calc) return null;
+      const ranges = [...calc.querySelectorAll('[class*="PokeMoves-module-damageButtonLabel--"]')]
+        .map(n => n.textContent.trim()).filter(text => /\\d+(?:\\.\\d+)?\\s*-\\s*\\d+(?:\\.\\d+)?%/.test(text));
+      return ranges.length ? ranges : null;
+    })()`), 'actual practice damage ranges', 20000);
+    console.log('Practice Showdex damage ranges:', damage);
+    assert.ok(damage.some(range => /[1-9]/.test(range)), 'nonzero computed damage');
+    await capture(player, 'showdex-first-turn');
+    assert.equal(await player.executeJavaScript(`(() => {
+      const room = app.curRoom.el;
+      const field = room.querySelector('.battle').getBoundingClientRect();
+      const log = room.querySelector('.battle-log').getBoundingClientRect();
+      const calc = document.querySelector('.sd-calcdex-docked').getBoundingClientRect();
+      return log.left >= field.right && calc.left >= log.right && calc.right <= innerWidth;
+    })()`), true, 'practice order: battle, log, Showdex');
+  }
 
   const firstMove = await battleEval(player, `
     const move = control('chooseMove');

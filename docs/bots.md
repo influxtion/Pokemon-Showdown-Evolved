@@ -150,6 +150,8 @@ The API server ignores events whose `room` is not `battle-gen9randombattle-<digi
 
 The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
 
+The sandboxed practice renderer can optionally load installed Showdex. Each fresh practice partition registers its own verified asset handler before creating the view; online cookies, teams and account state remain in the separate online partition. With Showdex enabled, the request filter additionally permits only `showdex://assets/<filename>` (manifest/hash checked by the handler) and GET requests to the four `pkmn.github.io` JSON paths for Gen 9 Random Battle/OU presets and usage data. Queries, uploads, unrelated formats, account/ladder lookups, and other external API requests remain blocked. Showdex uses the player's visible battle state and public presets, not the bot's hidden team data. Its dock shows battle, log, then calculator; narrow windows put the log below controls. `npm run test:practice:showdex` verifies real Foul Play damage calculations and battle lifecycle in a disposable profile.
+
 ## 4. The search engine: poke-engine MCTS
 
 Foul Play calls the Rust function, `monte_carlo_tree_search(state, duration_ms, threads)`, on a fully specified battle state. It runs **decoupled UCT** for simultaneous moves:

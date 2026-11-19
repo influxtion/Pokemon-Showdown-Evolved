@@ -7,7 +7,9 @@ function installShowdexDock() {
   const root = document.documentElement;
   root.classList.add('sd-showdex-dock');
   const entries = new Map();
-  const enabled = () => root.classList.contains('sd-launcher-shell');
+  const practice = root.hasAttribute('data-practice-state');
+  const seeded = new WeakSet();
+  const enabled = () => practice || root.classList.contains('sd-launcher-shell');
   const panelId = (id) => 'view-calcdex-' + id.replace(/[^a-z0-9]/g, '');
   function clear(entry) {
     entry.room.el.classList.remove('sd-calcdex-battle', 'sd-calcdex-compact');
@@ -26,6 +28,29 @@ function installShowdexDock() {
   }
   function scan() {
     if (!window.app?.rooms) return;
+    if (practice) {
+      if (!app.singlePanelMode) { app.singlePanelMode = true; app.updateLayout(); }
+      if (!app.focusRoomRight.sdPracticeDock) {
+        const original = app.focusRoomRight;
+        const focusRight = function (id, ...args) {
+          if (openPanel(id)) return true;
+          // Hellodex/Honkdex must not replace the only visible practice battle.
+          if (app.curRoom?.battle) return false;
+          return original.call(this, id, ...args);
+        };
+        focusRight.sdPracticeDock = true;
+        app.focusRoomRight = focusRight;
+      }
+      // The battle may arrive before optional Showdex finishes booting. An empty receive
+      // lets its normal hook initialize from the existing battle, without replaying turns.
+      if (window.__SHOWDOWN_DESKTOP_SHOWDEX?.state === 'loaded') {
+        for (const room of Object.values(app.rooms)) {
+          if (!room.battle || seeded.has(room)) continue;
+          seeded.add(room);
+          if (!room.battle.calcdexInit) app.receive('>' + room.id + '\n');
+        }
+      }
+    }
     for (const [id, entry] of entries) {
       if (!app.rooms[id] || !entry.room.el.isConnected || !entry.calc.isConnected) {
         clear(entry);

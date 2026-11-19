@@ -37,3 +37,28 @@ test('practice requests stay in bundled files, authenticated loopback socket and
   assert(!allow('https://play.pokemonshowdown.com/action.php', 'xhr'));
   assert(!allow('https://example.com/sprites/pikachu.png', 'image'));
 });
+
+test('practice permits only exact Showdex asset URLs when opted in', () => {
+  const root = path.resolve('vendor/practice/dist/client');
+  const connection = { port: 41000, token: 'a'.repeat(64) };
+  const allow = (url, enabled) => allowRequest({ url, resourceType: 'script' }, root, connection, enabled);
+  assert(!allow('showdex://assets/main.js', false));
+  assert(allow('showdex://assets/main.js', true));
+  for (const url of ['showdex://other/main.js', 'showdex://assets/main.js?token=secret',
+    'showdex://assets/main.js#extra', 'showdex://assets/nested/main.js', 'https://example.com/main.js']) {
+    assert(!allow(url, true), url);
+  }
+});
+
+test('Showdex practice metadata is read-only and limited to supported formats', () => {
+  const root = path.resolve('vendor/practice/dist/client');
+  const connection = { port: 41000, token: 'a'.repeat(64) };
+  const url = 'https://pkmn.github.io/randbats/data/gen9randombattle.json';
+  const request = { url, resourceType: 'xhr', method: 'GET' };
+  assert(allowRequest(request, root, connection, true));
+  assert(!allowRequest(request, root, connection, false));
+  for (const change of [{ method: 'POST' }, { resourceType: 'script' }, { url: url + '?team=private' },
+    { url: url.replace('gen9', 'gen8') }, { url: 'https://play.pokemonshowdown.com/action.php' }]) {
+    assert(!allowRequest({ ...request, ...change }, root, connection, true));
+  }
+});

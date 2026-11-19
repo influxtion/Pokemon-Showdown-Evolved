@@ -39,6 +39,8 @@ class ShowdexIntegration {
     this.manifestFile = options.manifestFile || MANIFEST_FILE;
     this.registered = false;
     this.manifest = null;
+    // Non-default origins are used only in fresh, navigation-locked practice partitions.
+    this.origin = options.origin || SHOWDOWN_ORIGIN;
   }
 
   bundleInfo() {
@@ -63,7 +65,7 @@ class ShowdexIntegration {
     return { installed: true, version: PINNED_VERSION, error: '' };
   }
 
-  // Register only on the persistent Showdown session, after app.whenReady().
+  // One manager per session, registered before creating its renderer.
   async registerAssets(session) {
     const info = this.bundleInfo();
     // Register before creating the client view, even before the optional install. Existing
@@ -80,8 +82,9 @@ class ShowdexIntegration {
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405 });
     let referrerOrigin = '';
     try { referrerOrigin = new URL(request.referrer).origin; } catch {}
-    if (request.initiatorOrigin !== SHOWDOWN_ORIGIN &&
-      (request.initiatorOrigin || referrerOrigin !== SHOWDOWN_ORIGIN)) return new Response(null, { status: 403 });
+    const source = request.initiatorOrigin || request.headers?.get('Origin') || referrerOrigin;
+    const opaquePractice = this.origin === 'null' && ['', 'null', 'file://'].includes(source);
+    if (!opaquePractice && source !== this.origin) return new Response(null, { status: 403 });
     let url;
     try { url = new URL(request.url); } catch { return new Response(null, { status: 400 }); }
     if (url.protocol !== `${SHOWDEX_SCHEME}:` || url.hostname !== 'assets' || url.search || url.hash ||
@@ -90,7 +93,7 @@ class ShowdexIntegration {
     if (!Object.hasOwn(this.manifest.assets, name)) return new Response(null, { status: 404 });
     const file = path.join(this.distDir, name);
     const headers = {
-      'Access-Control-Allow-Origin': SHOWDOWN_ORIGIN,
+      'Access-Control-Allow-Origin': opaquePractice ? source || 'null' : this.origin,
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Cache-Control': 'no-store',
       'Content-Type': MIME[path.extname(name).toLowerCase()] || 'application/octet-stream',

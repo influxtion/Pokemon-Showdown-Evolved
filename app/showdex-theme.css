@@ -25,8 +25,8 @@
 }
 
 /* Keep the native Calcdex root beside its battle, with chat still available. */
-html.sd-launcher-shell .sd-calcdex-parked { display: none !important; }
-html.sd-launcher-shell .sd-calcdex-docked {
+:is(html.sd-launcher-shell, html[data-practice-state]) .sd-calcdex-parked { display: none !important; }
+:is(html.sd-launcher-shell, html[data-practice-state]) .sd-calcdex-docked {
   display: block !important;
   position: fixed !important;
   top: 40px !important;
@@ -41,21 +41,21 @@ html.sd-launcher-shell .sd-calcdex-docked {
   background: var(--sd-app) !important;
   overflow: hidden !important;
 }
-html.sd-launcher-shell .sd-showdex-dock-toggle {
+:is(html.sd-launcher-shell, html[data-practice-state]) .sd-showdex-dock-toggle {
   position: absolute !important;
   top: 6px !important;
   right: 12px !important;
   z-index: 16 !important;
 }
-html.sd-launcher-shell .sd-showdex-dock-toggle[aria-pressed="true"] {
+:is(html.sd-launcher-shell, html[data-practice-state]) .sd-showdex-dock-toggle[aria-pressed="true"] {
   background: var(--sd-hover) !important;
   color: var(--sd-accent) !important;
 }
 .sd-showdex-dock-toggle[hidden] { display: none !important; }
-html.sd-launcher-shell .ps-room:has(> .sd-showdex-dock-toggle) button[name="toggleCalcdexOverlay"] {
+:is(html.sd-launcher-shell, html[data-practice-state]) .ps-room:has(> .sd-showdex-dock-toggle) button[name="toggleCalcdexOverlay"] {
   display: none !important;
 }
-html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle {
+:is(html.sd-launcher-shell, html[data-practice-state]).sd-showdex-dock:root .ps-room.sd-calcdex-battle {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   & > .battle {
@@ -90,7 +90,7 @@ html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle {
 }
 /* At minimum width, chat sits below the battle controls and scrolls with that column.
    The calculator remains visible on the right; the field scales without clipping. */
-html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle.sd-calcdex-compact {
+:is(html.sd-launcher-shell, html[data-practice-state]).sd-showdex-dock:root .ps-room.sd-calcdex-battle.sd-calcdex-compact {
   & > .battle-log {
     top: var(--sd-dock-chat-top) !important;
     left: 12px !important;
@@ -382,4 +382,10 @@ html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle.sd-calcde
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Practice has a battle log but no message composer. */
+html[data-practice-state].sd-showdex-dock:root .ps-room.sd-calcdex-battle:not(.sd-calcdex-compact) > .battle-log {
+  bottom: 12px !important;
+  border-bottom: 1px solid var(--sd-border) !important;
 }

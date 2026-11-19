@@ -101,3 +101,20 @@ test('registers an inert handler before installation and activates verified asse
   assert.equal(registrations, 1);
   assert.equal(handler(request).status, 200);
 });
+
+test('opaque practice assets stay scoped to their isolated partition and retain hash checks', async t => {
+  const f = fixture(t);
+  const manager = new ShowdexIntegration({ ...f, origin: 'null' });
+  manager.bundleInfo();
+  const request = { method: 'GET', url: SHOWDEX_ENTRY_URL, referrer: '' };
+  assert.equal(manager.serveAsset(request).status, 200);
+  assert.equal(manager.serveAsset({ ...request, headers: new Headers({ Origin: 'null' }) }).headers.get('Access-Control-Allow-Origin'), 'null');
+  assert.equal(manager.serveAsset({ ...request, initiatorOrigin: 'https://example.com' }).status, 403);
+  assert.equal(manager.serveAsset({ ...request, url: 'showdex://assets/missing.js' }).status, 404);
+  fs.writeFileSync(path.join(f.distDir, 'main.js'), 'changed');
+  assert.equal(manager.serveAsset(request).status, 404);
+  const online = new ShowdexIntegration(f);
+  fs.writeFileSync(path.join(f.distDir, 'main.js'), f.bytes);
+  online.bundleInfo();
+  assert.equal(online.serveAsset(request).status, 403, 'opaque access is never enabled on the online session');
+});

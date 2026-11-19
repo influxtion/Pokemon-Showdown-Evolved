@@ -2,11 +2,21 @@
 
 const path = require('node:path');
 const { pathToFileURL, fileURLToPath } = require('node:url');
-const { WebContentsView } = require('electron');
+const { WebContentsView, session } = require('electron');
+const { ShowdexIntegration } = require('./showdex-integration');
+const { ShowdownBridge } = require('./showdown');
 
-function allowRequest(details, root, connection) {
+function allowRequest(details, root, connection, showdex = false) {
   let url;
   try { url = new URL(details.url); } catch { return false; }
+  if (showdex && url.protocol === 'showdex:' && url.hostname === 'assets' && !url.search && !url.hash &&
+      /^\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(url.pathname)) return true;
+  // Read-only format metadata for the two supported practice formats. No account lookups,
+  // arbitrary URLs, query strings, or uploads from the practice partition.
+  if (showdex && details.method === 'GET' && details.resourceType === 'xhr' &&
+      url.origin === 'https://pkmn.github.io' && !url.search && !url.hash &&
+      ['/randbats/data/gen9randombattle.json', '/randbats/data/stats/gen9randombattle.json',
+        '/smogon/data/sets/gen9ou.json', '/smogon/data/stats/gen9ou.json'].includes(url.pathname)) return true;
   if (connection.clientUrl) {
     if (url.href === connection.socketUrl) return true;
     if (url.origin === connection.serviceOrigin && url.pathname.startsWith(`/s/${connection.token}/`) &&
@@ -31,13 +41,15 @@ class PracticeView {
   // `battleCss()` returns the battle-room stylesheet while the launcher battle style is on, else ''.
   // `script()` returns JavaScript to run in each new document (the battle resize handle), and
   // `onConsole(text)` receives the page's console messages (how that handle reports a new size).
-  constructor({ window, root, css, battleCss = () => '', script = () => '', onConsole = () => {}, background, onFailure = () => {}, View = WebContentsView }) {
+  constructor({ window, root, css, battleCss = () => '', script = () => '', onConsole = () => {}, showdex = () => null, background, onFailure = () => {}, View = WebContentsView }) {
     this.window = window;
     this.root = root;
     this.css = css;
     this.battleCss = battleCss;
     this.script = script;
     this.onConsole = onConsole;
+    this.showdex = showdex;
+    this.generation = 0;
     this.battleCssKey = null;
     this.battleCssQueue = Promise.resolve();
     this.background = background;
@@ -51,9 +63,19 @@ class PracticeView {
     this.healthTimer = null;
   }
 
-  open(connection) {
+  async open(connection) {
     this.close();
-    const view = new this.View({ webPreferences: { partition: `practice-${connection.token}`,
+    const generation = this.generation;
+    const partition = session.fromPartition(`practice-${connection.token}`);
+    const showdexOptions = this.showdex();
+    let showdexReady = false;
+    if (showdexOptions) {
+      const integration = new ShowdexIntegration({ ...showdexOptions,
+        origin: connection.clientUrl ? new URL(connection.clientUrl).origin : 'null' });
+      try { showdexReady = (await integration.registerAssets(partition)).installed; } catch { /* Optional: practice still opens. */ }
+    }
+    if (generation !== this.generation) return;
+    const view = new this.View({ webPreferences: { session: partition,
       sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     this.view = view;
     this.state = 'connecting';
@@ -64,7 +86,7 @@ class PracticeView {
     contents.session.setPermissionCheckHandler(() => false);
     contents.session.setPermissionRequestHandler((_contents, _permission, respond) => respond(false));
     contents.session.on('will-download', event => event.preventDefault());
-    contents.session.webRequest.onBeforeRequest((details, respond) => respond({ cancel: !allowRequest(details, this.root, connection) }));
+    contents.session.webRequest.onBeforeRequest((details, respond) => respond({ cancel: !allowRequest(details, this.root, connection, showdexReady) }));
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
     contents.on('will-navigate', event => event.preventDefault());
     contents.on('will-frame-navigate', event => event.preventDefault());
@@ -75,6 +97,7 @@ class PracticeView {
         this.applyBattleCss({ reloaded: true });
         const code = this.script();
         if (code) contents.executeJavaScript(code).catch(() => {});
+        if (showdexReady) new ShowdownBridge(() => this.view === view ? contents : null).loadShowdex();
         // Artwork can finish much later than the usable battle document.
         pollHealth();
       }
@@ -165,6 +188,7 @@ class PracticeView {
   }
 
   close() {
+    this.generation++;
     this.battleCssKey = null;
     clearTimeout(this.healthTimer);
     this.healthTimer = null;
