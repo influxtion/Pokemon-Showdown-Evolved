@@ -6,6 +6,7 @@ const env = { ...process.env };
 env.SHOWDOWN_DESKTOP_BACKGROUND = '1';
 delete env.ELECTRON_RUN_AS_NODE;
 const liveFile = process.argv.includes('--showdex-live') ? 'showdex-live.cjs'
+  : process.argv.includes('--showdex-dock-live') ? 'showdex-dock-live.cjs'
   : process.argv.includes('--replay-review-live') ? 'replay-review-live.cjs'
     : process.argv.includes('--shell-live') ? 'shell-live.cjs'
       : process.argv.includes('--practice') ? 'practice-desktop.cjs' : null;

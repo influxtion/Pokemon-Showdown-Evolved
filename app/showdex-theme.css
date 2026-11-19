@@ -20,6 +20,93 @@
 
 /* User-origin colors alone do not suppress Windows' native button painting. */
 [data-showdex-module] button { appearance: none !important; }
+[data-showdex-module] [class*="PlayerInfo-module-usernameButton--"] {
+  color: var(--sd-text) !important;
+}
+
+/* Keep the native Calcdex root beside its battle, with chat still available. */
+html.sd-launcher-shell .sd-calcdex-parked { display: none !important; }
+html.sd-launcher-shell .sd-calcdex-docked {
+  display: block !important;
+  position: fixed !important;
+  top: 40px !important;
+  bottom: 12px !important;
+  left: var(--sd-dock-left) !important;
+  right: auto !important;
+  width: var(--sd-dock-width) !important;
+  height: auto !important;
+  min-width: 0 !important;
+  z-index: 15 !important;
+  border: 1px solid var(--sd-border) !important;
+  background: var(--sd-app) !important;
+  overflow: hidden !important;
+}
+html.sd-launcher-shell .sd-showdex-dock-toggle {
+  position: absolute !important;
+  top: 6px !important;
+  right: 12px !important;
+  z-index: 16 !important;
+}
+html.sd-launcher-shell .sd-showdex-dock-toggle[aria-pressed="true"] {
+  background: var(--sd-hover) !important;
+  color: var(--sd-accent) !important;
+}
+.sd-showdex-dock-toggle[hidden] { display: none !important; }
+html.sd-launcher-shell .ps-room:has(> .sd-showdex-dock-toggle) button[name="toggleCalcdexOverlay"] {
+  display: none !important;
+}
+html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  & > .battle {
+    top: 40px !important;
+    left: 12px !important;
+    transform: scale(var(--sd-dock-scale)) !important;
+    transform-origin: top left !important;
+  }
+  & > .battle-controls {
+    top: var(--sd-dock-controls) !important;
+    left: 12px !important;
+    width: var(--sd-dock-field) !important;
+    box-sizing: border-box !important;
+  }
+  & > :is(.sd-battle-backdrop, .sd-battle-resizer) { display: none !important; }
+  & > .battle-log {
+    top: 40px !important;
+    left: var(--sd-dock-chat) !important;
+    right: var(--sd-dock-chat-right) !important;
+    bottom: 69px !important;
+    width: auto !important;
+    opacity: 1 !important;
+  }
+  & > .battle-log-add {
+    left: var(--sd-dock-chat) !important;
+    right: var(--sd-dock-chat-right) !important;
+    bottom: 12px !important;
+    width: auto !important;
+    opacity: 1 !important;
+  }
+  & > .battle-userlist { display: none !important; }
+}
+/* At minimum width, chat sits below the battle controls and scrolls with that column.
+   The calculator remains visible on the right; the field scales without clipping. */
+html.sd-launcher-shell.sd-showdex-dock:root .ps-room.sd-calcdex-battle.sd-calcdex-compact {
+  & > .battle-log {
+    top: var(--sd-dock-chat-top) !important;
+    left: 12px !important;
+    width: var(--sd-dock-field) !important;
+    height: 240px !important;
+    bottom: auto !important;
+    box-sizing: border-box !important;
+  }
+  & > .battle-log-add {
+    top: calc(var(--sd-dock-chat-top) + 240px) !important;
+    left: 12px !important;
+    width: var(--sd-dock-field) !important;
+    bottom: auto !important;
+    box-sizing: border-box !important;
+  }
+}
 
 [data-showdex-module] [data-showdex-layout="card"]::before {
   background: none !important;

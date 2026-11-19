@@ -352,7 +352,7 @@ test('rooms are focused and left through the client, keeping its forfeit confirm
     leaveRoom: (id) => { calls.push(['leave', id]); return id !== 'battle-gen9ou-1'; },
     addPopup: (popup) => calls.push(['popup', popup]),
   };
-  const contents = fakeContents((code) => vm.runInNewContext(code, { app, SoundsPopup: 'sounds', OptionsPopup: 'options' }));
+  const contents = fakeContents((code) => vm.runInNewContext(code, { window: { app }, app, SoundsPopup: 'sounds', OptionsPopup: 'options' }));
   const bridge = new ShowdownBridge(() => contents);
   assert.equal(await bridge.act('focus-room', { room: '' }), true);
   assert.equal(await bridge.act('focus-room', { room: 'lobby' }), true);

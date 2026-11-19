@@ -6,6 +6,7 @@
 
 const { net } = require('electron');
 const { boundedJson } = require('./bounded-json');
+const { installShowdexDock } = require('./showdex-dock');
 
 const SHOWDOWN = 'https://play.pokemonshowdown.com/';
 const ID = /^[a-z0-9]{1,80}$/;
@@ -169,6 +170,7 @@ function readSession() {
       const original = app.focusRoomRight;
       const focusRight = function (...args) {
         if (this.singlePanelMode && root.classList.contains('sd-launcher-shell')) {
+          if (window.__sdShowdexDock?.openPanel(args[0])) return true;
           return this.focusRoom(args[0], true);
         }
         return original.apply(this, args);
@@ -373,6 +375,7 @@ function showMenu(tab) {
 
 function focusRoom(roomid) {
   if (!app.rooms[roomid]) return false;
+  if (window.__sdShowdexDock?.openPanel(roomid)) return true;
   app.focusRoom(roomid);
   return true;
 }
@@ -1515,6 +1518,7 @@ class ShowdownBridge {
     const contents = this.getContents();
     if (!contents) return false;
     try {
+      await contents.executeJavaScript(call(installShowdexDock));
       return await contents.executeJavaScript(call(loadShowdex, 'showdex://assets/main.js')) === true;
     } catch { return false; }
   }

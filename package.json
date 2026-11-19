@@ -19,6 +19,7 @@
     "test": "node --test tests/*.test.js api/test/*.test.js",
     "test:desktop": "node scripts/test-desktop.js",
     "test:showdex:live": "node scripts/test-desktop.js --showdex-live",
+    "test:showdex:dock": "node scripts/test-desktop.js --showdex-dock-live",
     "test:replays:live": "node scripts/test-desktop.js --replay-review-live",
     "test:shell:live": "node scripts/test-desktop.js --shell-live",
     "test:practice": "node scripts/test-desktop.js --practice",
