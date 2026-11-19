@@ -38,6 +38,7 @@
     "electron-builder": "26.18.0"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "ws": "8.23.0"
   },
   "overrides": {

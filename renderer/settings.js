@@ -95,3 +95,39 @@ runAction('open-logs', 'openLogs', 'Logs folder opened.');
 runAction('sign-out', 'signOutShowdown', 'Showdown data cleared.');
 runAction('reset-launcher', 'resetLauncher', 'Launcher data reset.');
 load();
+
+const updateCheck = document.getElementById('update-check');
+const updateRestart = document.getElementById('update-restart');
+const updateReleases = document.getElementById('update-releases');
+const updateError = document.getElementById('update-error');
+function showUpdate(state) {
+  if (!state) return;
+  document.getElementById('update-version').textContent = `Pokemon Showdown Evolved ${state.currentVersion}`;
+  document.getElementById('update-status').textContent = state.mode === 'manual'
+    ? 'Install updates from the Downloads page for this build.' : state.mode === 'development'
+      ? 'Automatic updates are available in installed Windows and Linux AppImage builds.'
+      : state.phase === 'downloading' ? `Downloading ${state.version}: ${state.percent}%`
+        : state.message || 'Checks automatically after startup and every six hours. Includes preview releases.';
+  updateCheck.hidden = state.mode !== 'automatic';
+  updateCheck.disabled = ['checking', 'downloading', 'ready'].includes(state.phase) || state.restarting;
+  updateRestart.hidden = state.phase !== 'ready';
+  updateReleases.hidden = state.mode === 'automatic' && state.phase !== 'error';
+}
+window.desktop.onUpdateChange(showUpdate);
+window.desktop.getUpdates().then(showUpdate).catch(() => {});
+updateCheck.addEventListener('click', () => {
+  updateError.hidden = true;
+  window.desktop.checkUpdates().then(showUpdate).catch(() => {});
+});
+updateReleases.addEventListener('click', () => window.desktop.openReleases());
+updateRestart.addEventListener('click', async () => {
+  updateRestart.disabled = true;
+  updateError.hidden = true;
+  try {
+    const result = await window.desktop.restartForUpdate();
+    if (!result?.ok) throw new Error(result?.error || 'Could not safely restart. Try again.');
+  } catch (error) {
+    updateError.textContent = error.message;
+    updateError.hidden = false;
+  } finally { updateRestart.disabled = false; }
+});

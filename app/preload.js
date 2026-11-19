@@ -4,6 +4,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktop', {
+  getUpdates: () => ipcRenderer.invoke('updates:status'),
+  checkUpdates: () => ipcRenderer.invoke('updates:check'),
+  restartForUpdate: () => ipcRenderer.invoke('updates:restart'),
+  openReleases: () => ipcRenderer.invoke('updates:releases'),
+  onUpdateChange: handler => { ipcRenderer.on('updates:changed', (_event, state) => handler(state)); },
   showClient: (bounds) => ipcRenderer.send('client:show', bounds),
   hideClient: () => ipcRenderer.send('client:hide'),
   reloadClient: () => ipcRenderer.invoke('client:reload'),

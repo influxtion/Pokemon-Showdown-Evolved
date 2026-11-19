@@ -423,7 +423,7 @@ npm run pack:win         # unsigned per-user x64 NSIS installer in out/windows/
 - **Dependency audit:** `npm audit` reports zero vulnerabilities for the app and `api/`.
 - **Fuses:** set in `electron-builder.yml` (see section 6); `npx @electron/fuses read --app <exe>` shows them.
 
-**Release path**, in order. Nothing is published, and there is no updater yet.
+**Release path** (original plan; see the automatic-update section below for current behavior).
 
 1. Prove a clean Windows 11 install, upgrade between two versions, uninstall and reinstall, as a standard user at 100% and 125% scaling.
 2. Decide Showdex inclusion and meet the AGPL/GPL source obligations (project license: AGPL-3.0-or-later, decided 2026-11-19).
@@ -498,9 +498,7 @@ publish as a prerelease. Keep each public version fixed; changes get a new
 version and tag. GitHub provides source archives for the tag, and the installer
 retains bundled upstream licenses and corresponding source archives.
 
-This release is unsigned, uses manual updates and still needs clean-PC
-installation/uninstallation and signed-in acceptance testing. Release notes
-must state those limits. No telemetry or automatic updater is added.
+The original public 0.2.0 files use manual updates. The replacement candidate below adds guarded updates. Clean-PC installation/uninstallation and signed-in acceptance testing remain pending. Windows remains unsigned. No app telemetry is added.
 
 Download counts are available without app telemetry through GitHub:
 
@@ -512,3 +510,16 @@ Count the installer asset separately from checksum/source downloads. Downloads
 are not unique users or successful installations. Repository Insights > Traffic
 provides a rolling 14-day visitor/clone window; save snapshots if long-term
 traffic history is needed.
+
+
+## Automatic updates (November 19, 2026)
+
+The replacement 0.2.0 candidate uses pinned `electron-updater` 6.8.11. Installed Windows NSIS and Linux AppImage builds check GitHub Releases 30 seconds after startup and every six hours, including preview releases. Downloads are automatic and hash-checked. Settings also offers Check for updates, shows progress/errors, and exposes Restart to update only after the download completes. A small rail label points to Settings when an update is ready. Development builds never check; Mac and unpacked Linux builds link to the Releases page. The owner chose manual Mac updates because no Developer ID certificate is available.
+
+`app/updates.js` owns update state and sets `autoInstallOnAppQuit=false` before any download. No download, ordinary quit, or elapsed timer installs anything. Installation requires an explicit click and a native confirmation. Main checks current session state both before and after that confirmation, with bounded reads. It refuses unknown/disconnected client state, all unfinished battle rooms (including spectators and rooms whose player names have not arrived), pending searches/challenges, starting/active practice, unsaved replay state or a cached draft, and conflicting installs/imports/exports. The restart action is available only while Settings is the current fully loaded page, so the user cannot type into a note during the final checks. Failed reads block installation. Existing profile paths and saved data stay unchanged.
+
+The updater follows the configured public GitHub repository without embedding credentials. Windows is unsigned: SHA-512 verifies downloaded bytes against GitHub metadata, not an independent publisher identity. Native code signing remains a future task. Mac automatic installation stays disabled. Linux tar.gz remains a manual alternative. The private publishing token is never shipped to clients.
+
+All packaging scripts use `--publish never`. The release-candidate workflow has only `contents: read` and uploads Actions artifacts for review. It builds pinned Showdex on Windows, then native Windows, Apple Silicon, Intel Mac, and Linux x64 packages. Generated Windows and Linux manifests (`latest.yml`, `latest-linux.yml`) and the Windows blockmap must accompany their corresponding binaries. Do not rename an update binary without regenerating metadata. Upload every binary first and metadata last, preferably to a draft release for future versions. Keep each future version increasing. The owner reports no current 0.2.0 users and requested a replacement candidate; replacing that tag/files requires explicit approval of the exact release text and file list. Never publish from a source push automatically.
+
+Tests cover automatic download without quit hooks, cancellation, duplicate requests, state changes during confirmation, practice/search/battle/draft blocking, retries, and manual builds. The Electron suite uses a loopback feed and the real updater to check a newer download, corrupt SHA-512 rejection, same/older versions, and actual launcher IPC/UI guards. Its payload is inert and is never executed. This does not claim a clean-machine installer upgrade or Mac signing test.

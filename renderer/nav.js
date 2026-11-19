@@ -789,5 +789,19 @@
     const last = JSON.parse(sessionStorage.getItem(lastSessionKey));
     if (last && last.ready && Array.isArray(last.rooms)) render(last);
   } catch {}
+  const updateLink = document.querySelector('a[href="settings.html"] .nav-text');
+  function updateStatus(state) {
+    if (updateLink) {
+      updateLink.textContent = state?.phase === 'ready' ? 'Update ready' : 'Settings';
+      updateLink.closest('a').title = state?.phase === 'ready' ? 'Settings: update ready to install' : 'Settings';
+    }
+    if (state?.currentVersion) {
+      for (const node of document.querySelectorAll('.rail-version, .rail-user-text > span')) {
+        node.textContent = `v${state.currentVersion}${state.mode === 'development' ? '-dev' : ''}`;
+      }
+    }
+  }
+  desktop.onUpdateChange?.(updateStatus);
+  desktop.getUpdates?.().then(updateStatus).catch(() => {});
   pollNow();
 })();

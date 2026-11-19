@@ -25,6 +25,9 @@ const { MessageAlerts } = require('./message-alerts');
 const { launcherUrl, launcherFrame, httpsHost, denyPermissions } = require('./security');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
 const { tabShortcut } = require('./shortcuts');
+const { Updates, restartBlocker, RELEASES_URL } = require('./updates');
+let updates = null;
+let updateInstalling = false;
 
 if (!app.isReady()) registerShowdexScheme(protocol);
 const { ShowdexInstaller } = require('./showdex-install');
@@ -385,6 +388,7 @@ function createWindow() {
   });
 
   win.on('close', (event) => {
+    if (updateInstalling) { persistWindow(); return; }
     if (allowClose) { persistWindow(); return; }
     event.preventDefault();
     if (confirmingClose) return;
@@ -489,6 +493,7 @@ ipcMain.handle('practice:check-team', async (event, value) => {
   return publicTeam(await practiceTeam(value.format, value.team));
 });
 ipcMain.handle('practice:start', async (event, options) => {
+  if (updates?.restarting || updateInstalling) return { ok: false, error: 'An update restart is being checked.' };
   if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
   if (dailyChallenge.starting || dailyChallenge.attempt) return { ok: false, error: 'End the daily challenge first.' };
   const { opponent, preset, format } = options;
@@ -687,7 +692,7 @@ async function openAlert(alert) {
 // leave-room answers 'needs-forfeit' for a battle still being played; the launcher confirms under
 // the tab and repeats the call with forfeit: true.
 ipcMain.handle('showdown:action', (event, action, args) => {
-  if (!isLauncherFrame(event) || typeof action !== 'string') return false;
+  if (!isLauncherFrame(event) || updates?.restarting || updateInstalling || typeof action !== 'string') return false;
   return bridge.act(action, args);
 });
 
@@ -1034,9 +1039,72 @@ app.whenReady().then(async () => {
   nativeTheme.themeSource = settings.get('theme');
   Menu.setApplicationMenu(null);
   createWindow();
+  setupUpdates();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+function setupUpdates() {
+  const mode = !app.isPackaged ? 'development' : process.platform === 'darwin' ||
+    (process.platform === 'linux' && !process.env.APPIMAGE) ? 'manual' : 'automatic';
+  const updater = mode === 'automatic' ? require('electron-updater').autoUpdater : null;
+  updates = new Updates({ updater, version: app.getVersion(), mode,
+    checkSafe: async () => {
+      if (!win || win.isDestroyed() || win.webContents.isLoading() ||
+          !parseUrl(win.webContents.getURL())?.pathname.endsWith('/settings.html')) {
+        return 'Open Settings to restart for an update.';
+      }
+      const [state, draft] = await Promise.all([
+        bounded(bridge.session()),
+        bounded(win.webContents.executeJavaScript("Boolean(sessionStorage.getItem('replayNote.editorDraft'))")),
+      ]);
+      if (!win || win.isDestroyed() || win.webContents.isLoading() ||
+          !parseUrl(win.webContents.getURL())?.pathname.endsWith('/settings.html')) return 'Open Settings to restart for an update.';
+      return restartBlocker({ session: state, dirty: replayDirty || draft !== false,
+        busy: maintenance || confirmingClose || exportingReplays || choosingReplayImport || undoingReplayImport ||
+          showdexInstalling || localEngine?.installing, practice });
+    },
+    confirm: async () => (await dialog.showMessageBox(win, {
+      type: 'question', title: 'Restart to update', message: 'Restart Pokemon Showdown Evolved to install the update?',
+      detail: 'Your saved notes, teams and settings will be kept.', buttons: ['Keep playing', 'Restart to update'],
+      defaultId: 0, cancelId: 0, noLink: true,
+    })).response === 1,
+    install: () => {
+      updateInstalling = true;
+      try { updater.quitAndInstall(false, true); }
+      catch (error) { updateInstalling = false; throw error; }
+    },
+  });
+  updater?.on('error', () => { updateInstalling = false; });
+  updates.on('change', state => {
+    if (win && !win.isDestroyed()) win.webContents.send('updates:changed', state);
+  });
+  updates.start();
+  app.on('will-quit', () => updates.dispose());
+}
+
+async function bounded(promise) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise(resolve => { timer = setTimeout(() => resolve(null), 2500); })]);
+  } catch { return null; }
+  finally { clearTimeout(timer); }
+}
+
+ipcMain.handle('updates:status', event => isLauncherFrame(event) ? updates?.status() : null);
+ipcMain.handle('updates:check', event => {
+  if (!isLauncherFrame(event)) return null;
+  void updates?.check();
+  return updates?.status();
+});
+ipcMain.handle('updates:restart', event => {
+  if (!isLauncherFrame(event)) return { ok: false };
+  return updates?.restart();
+});
+ipcMain.handle('updates:releases', event => {
+  if (!isLauncherFrame(event)) return false;
+  return shell.openExternal(RELEASES_URL).then(() => true, () => false);
 });
 
 app.on('window-all-closed', () => {

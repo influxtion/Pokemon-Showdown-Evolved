@@ -189,6 +189,25 @@
         </section>
 
         <section class="settings-section">
+          <h2>App updates</h2>
+          <div class="panel">
+            <div class="setting-row">
+              <div class="setting-text">
+                <div id="update-version">Pokemon Showdown Evolved</div>
+                <div class="setting-desc" id="update-status" role="status">Loading update status…</div>
+                <div class="setting-desc">Updates never restart the app automatically. Finish battles and save your notes before installing.</div>
+              </div>
+              <div class="setting-control">
+                <button class="btn" id="update-check" type="button">Check for updates</button>
+                <button class="btn" id="update-restart" type="button" hidden>Restart to update…</button>
+                <button class="btn" id="update-releases" type="button" hidden>View downloads</button>
+              </div>
+            </div>
+          </div>
+          <p class="field-error" id="update-error" role="alert" hidden></p>
+        </section>
+
+        <section class="settings-section">
           <h2>Troubleshooting</h2>
           <div class="panel">
             <div class="setting-row">

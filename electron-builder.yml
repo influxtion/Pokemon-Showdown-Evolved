@@ -1,5 +1,10 @@
 appId: com.influxtion.showdowndesktop
 productName: Pokemon Showdown Evolved
+publish:
+  provider: github
+  owner: influxtion
+  repo: Pokemon-Showdown-Launcher-App
+  releaseType: prerelease
 directories:
   output: out/windows
 asar: true
@@ -60,7 +65,7 @@ nsis:
   perMachine: false
   createDesktopShortcut: false
   createStartMenuShortcut: true
-  artifactName: Pokemon Showdown Evolved Setup ${version}-${arch}.${ext}
+  artifactName: Pokemon.Showdown.Evolved.Setup.${version}-${arch}.${ext}
 mac:
   icon: renderer/assets/logo.png
   category: public.app-category.games
