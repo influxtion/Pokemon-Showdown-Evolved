@@ -24,7 +24,16 @@ jobs:
           mkdir -p out/showdex-import
           curl --fail --location --retry 3 'https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/download/v0.2.0/Pokemon.Showdown.Evolved.Setup.0.2.0-x64.exe' -o out/showdex-import/windows.exe
           echo '8689e5e3147ba747fa88bc9d112edeb0915c94326568ba68a3dce23483c2218b  out/showdex-import/windows.exe' | sha256sum --check
-          7z x out/showdex-import/windows.exe resources/app.asar -oout/showdex-import -y
+          node <<'NODE'
+          const fs = require('fs');
+          const bytes = fs.readFileSync('out/showdex-import/windows.exe');
+          const offset = bytes.indexOf(Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]));
+          if (offset < 0) throw new Error('Missing installer payload');
+          const length = Number(32n + bytes.readBigUInt64LE(offset + 12) + bytes.readBigUInt64LE(offset + 20));
+          if (!Number.isSafeInteger(length) || offset + length > bytes.length) throw new Error('Invalid payload size');
+          fs.writeFileSync('out/showdex-import/payload.7z', bytes.subarray(offset, offset + length));
+          NODE
+          7z x out/showdex-import/payload.7z resources/app.asar -oout/showdex-import -y
           node scripts/import-showdex-payload.js out/showdex-import/resources/app.asar
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
