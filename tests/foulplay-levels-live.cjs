@@ -8,7 +8,7 @@
 //   node tests/foulplay-levels-live.cjs --runtime api/runtime [--games 20] [--parallel 4] [--threads 2]
 //     [--pair casual:heuristic] [--pair medium:casual] ...      (default: the three pairings above)
 //     [--format gen9ou --team tests/fixtures/ou-team.txt]      (OU: both sides use this team)
-// The simulator comes from out/bots/config.json (npm run bots:setup) or vendor/laplace/dist.
+// The simulator comes from vendor/practice/dist (npm run build:practice).
 
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -19,7 +19,6 @@ const { EventEmitter } = require('node:events');
 const { parseArgs } = require('node:util');
 const { WebSocket } = require('ws');
 const { inspect } = require('../api/install');
-const { readBotConfig } = require('../app/bot-config');
 const { LocalBot, loadData } = require('../app/simple-bots');
 
 const root = path.join(__dirname, '..');
@@ -29,8 +28,7 @@ const { values } = parseArgs({ options: { runtime: { type: 'string' }, games: { 
 if (!values.runtime) throw new Error('Pass --runtime <dir> (a Foul Play install from npm run api:setup).');
 const runtime = inspect(path.resolve(values.runtime));
 assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
-const config = readBotConfig(path.join(root, 'out/bots/config.json'));
-const simulatorRoot = config?.root || path.join(root, 'vendor/laplace/dist');
+const simulatorRoot = path.join(root, 'vendor/practice/dist');
 const FORMAT = values.format;
 const LEVELS = ['hard', 'medium', 'casual'];
 const SIMPLE = ['heuristic', 'greedy', 'random'];
@@ -84,7 +82,7 @@ function engine(kind, account) {
 
 function simulator() {
   const token = crypto.randomBytes(32).toString('hex');
-  const child = spawn(process.execPath, [path.join(root, 'scripts/laplace/server.cjs'), '--server-root',
+  const child = spawn(process.execPath, [path.join(root, 'scripts/practice/server.cjs'), '--server-root',
     path.join(simulatorRoot, 'server'), '--port', '0', '--token', token], { stdio: ['pipe', 'pipe', 'ignore'] });
   return { child, token, port: new Promise(resolve => lines(child.stdout, event => { if (event.type === 'ready') resolve(event.port); })) };
 }

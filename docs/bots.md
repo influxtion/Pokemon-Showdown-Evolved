@@ -1,4 +1,4 @@
-# Practice bots: how Foul Play and Laplace work
+# Practice bots: how they work
 
 This is the single reference for how the bots work.
 
@@ -7,31 +7,27 @@ This is the single reference for how the bots work.
 1. [Overview](#1-overview)
 2. [Where the bots run](#2-where-the-bots-run)
 3. [Protocols](#3-protocols)
-4. [The shared search engine](#4-the-shared-search-engine-poke-engine-mcts)
+4. [The search engine](#4-the-search-engine-poke-engine-mcts)
 5. [Foul Play](#5-foul-play)
-6. [Laplace](#6-laplace)
-7. [Performance](#7-performance)
-8. [Running and hosting](#8-running-and-hosting)
+6. [Running and hosting](#6-running-and-hosting)
 
 ## 1. Overview
 
-Both bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers six opponents**, hardest first: **Foul Play** (Hard), then **Foul Play Medium** and **Foul Play Casual** (Medium), whose moves all come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Foul Play (Hard) also plays **Gen 9 OU** (`gen9ou`), with both teams chosen by the player ([section 5](#ou)). Only the Foul Play cards show the cloud server's state. The rest of this document is about the two search bots. **Laplace** is kept as a development harness and is not offered on the Practice page for now. Neither bot sees hidden information. Both solve the hidden-information problem the same way, by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with the same Rust engine as if it were fully known, and combine the results. They differ in how worlds are sampled, how much time each world gets, and what happens after the search.
+All bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers six opponents**, hardest first: **Foul Play** (Hard), then **Foul Play Medium** and **Foul Play Casual** (Medium), whose moves all come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Foul Play (Hard) also plays **Gen 9 OU** (`gen9ou`), with both teams chosen by the player ([section 5](#ou)). Only the Foul Play cards show the cloud server's state. Most of this document is about Foul Play, the search bot. It does not see hidden information. It solves the hidden-information problem by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with a Rust engine as if it were fully known, and combine the results.
 
-| | Foul Play | Laplace |
-| --- | --- | --- |
-| Author, license | pmariglia, GPL-3.0 | Project owner, MIT |
-| Pinned revision | `8f541f8` | `8b4173d` |
-| Protocol client | Foul Play's own `websockets` client and battle parser | `poke-env` 0.15.0 |
-| Engine | poke-engine 0.0.48 | poke-engine 0.0.47 |
-| Worlds × time per decision | 4 × 50 ms early, else 2 × 100 ms | 8 × 150 ms |
-| Set data | pkmn/randbats counted sets | Counted joint sets (same source) and usage feed |
-| Unseen slots | Random species under team-generation rules | Random unseen species |
-| Combining | Weighted sum of visit shares | Average of visit shares |
-| After search | Random among options ≥ 75% of best | Guards, value re-rank, then random among un-vetoed options ≥ 90% of best |
-| Tera | Like any move | Only as the top pick |
-| Learned model | None | 368-feature MLP for near-ties |
-| Rejected choice | Session ends | Counted; server default used and surfaced |
-| Adapter | `api/worker/foulplay_worker.py` (through the practice API) | `scripts/laplace/runner.py` (harness) |
+| | Foul Play |
+| --- | --- |
+| Author, license | pmariglia, GPL-3.0 |
+| Pinned revision | `8f541f8` |
+| Protocol client | Foul Play's own battle parser, fed through a stdio link |
+| Engine | poke-engine 0.0.48 |
+| Worlds × time per decision | 4 × 50 ms early, else 2 × 100 ms (Hard) |
+| Set data | pkmn/randbats counted sets |
+| Unseen slots | Random species under team-generation rules |
+| Combining | Weighted sum of visit shares |
+| After search | Random among options ≥ 75% of best (Hard) |
+| Rejected choice | Session ends |
+| Adapter | `api/worker/foulplay_worker.py` (through the practice API) |
 
 Presets set the engine's search threads and nothing else: **Quiet** 1, **Balanced** 2, **Full** 8 (default; a cloud server may cap it with `MAX_THREADS`). They are CPU budgets, not difficulty levels. The Bots page offers no choice: the launcher always sends **Full**.
 
@@ -41,7 +37,7 @@ The **simulator always runs on the player's computer**, started by the launcher 
 
 For every session the launcher's `PracticeSession` (`app/practice-session.js`):
 
-1. starts the **simulator**, the pinned Showdown server (`scripts/laplace/server.cjs`), bound to `127.0.0.1` on an OS-chosen port and protected by a fresh 256-bit token;
+1. starts the **simulator**, the pinned Showdown server (`scripts/practice/server.cjs`), bound to `127.0.0.1` on an OS-chosen port and protected by a fresh 256-bit token;
 2. creates an **API session**, for which the server starts one Foul Play **worker** process (`api/worker/foulplay_worker.py`), and opens its socket;
 3. connects a **bridge** to the simulator as `FoulPlay`. The bridge accepts the player's challenge, forwards that battle room's frames to the API and sends back the choices it returns.
 
@@ -74,8 +70,6 @@ sequenceDiagram
   end
   S-->>M: |win|… or |tie
 ```
-
-The Laplace harness (`app/practice-runtime.js`) still starts the simulator and the Laplace runner as two child processes on one machine. It is used by development tests only ([section 8](#8-running-and-hosting)).
 
 ### Simple bots (`app/simple-bots.js`)
 
@@ -120,23 +114,23 @@ The simulator accepts a WebSocket only from `127.0.0.1`, with the exact `Host` h
 | Step | Direction | Messages |
 | --- | --- | --- |
 | Log in | server → bot | `\|challstr\|…` |
-| | bot → server | `\|/trn FoulPlay,0,` (bridge) or `\|/trn Laplace,0,` (harness) |
+| | bot → server | `\|/trn FoulPlay,0,` (or the simple bot's name) |
 | | server → bot | `\|updateuser\| FoulPlay\|1\|…` (the `1` means named); the bot is now ready |
-| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` (OU: `\|/utm <player's packed team>`) and `\|/challenge FoulPlay, gen9randombattle` (or `gen9ou`), sent by `vendor/laplace/client-bootstrap.js` |
+| Challenge | player → server | `\|/trn Player,0,`, then `\|/utm null` (OU: `\|/utm <player's packed team>`) and `\|/challenge FoulPlay, gen9randombattle` (or `gen9ou`), sent by `vendor/practice/client-bootstrap.js` |
 | | server → bot | `\|pm\| Player\| FoulPlay\|/challenge gen9randombattle\|gen9randombattle\|…` |
 | | bot → server | `\|/utm null` (OU: `\|/utm <Foul Play's packed team>`) then `\|/accept Player` |
 | Battle start | server → both | `>battle-gen9randombattle-N`, `\|init\|battle`, `\|title\|Player vs. FoulPlay`, team and `\|request\|{JSON}` |
 | Decision | server → bot | `\|request\|{JSON}` with the legal options and request ID (`rqid`); `"wait": true` means no decision is due |
-| | bot → server | Foul Play: `battle-…\|/choose move <moveid>[ terastallize]\|<rqid>` or `\|/switch <slot>\|<rqid>` · Laplace (poke-env): `battle-…\|/choose move <moveid>[ terastallize]` or `\|/choose switch <species>` |
+| | bot → server | Foul Play: `battle-…\|/choose move <moveid>[ terastallize]\|<rqid>` or `\|/switch <slot>\|<rqid>` |
 | Rejection | server → bot | `\|error\|[Invalid choice] …` or `\|error\|[Unavailable choice] …` |
 | Turn | server → both | Event lines (`\|move\|`, `\|switch\|`, `\|-damage\|`, `\|-terastallize\|` …) then `\|turn\|N` |
 | End | server → both | `\|win\|<name>` or `\|tie`, then the room closes (`\|deinit`) |
 
-The bridge accepts a challenge only if every field matches: sender `Player`, recipient `FoulPlay`, the session's format, and no battle in progress. OU battles open with team preview, where Foul Play answers `/team <order>`. It adopts only the battle room that opens after it accepts, and stops forwarding at `|win|` or `|tie`. Laplace additionally requires the battle room to appear within 15 s of accepting and its `|title|` to name exactly those two players. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped by the worker, so the battle timer stays off.
+The bridge accepts a challenge only if every field matches: sender `Player`, recipient `FoulPlay`, the session's format, and no battle in progress. OU battles open with team preview, where Foul Play answers `/team <order>`. It adopts only the battle room that opens after it accepts, and stops forwarding at `|win|` or `|tie`. Foul Play's upstream `hf`, `gg` and `/timer on` messages are dropped by the worker, so the battle timer stays off.
 
-### 3.3 Bot process ↔ supervisor (stdio)
+### 3.3 Worker ↔ API server (stdio)
 
-Each bot process writes **one JSON object per line** to stdout. stderr carries upstream logs and is never parsed or logged.
+The Foul Play worker writes **one JSON object per line** to stdout. stderr carries upstream logs and is never parsed or logged.
 
 **Foul Play worker** (supervised by the API server). Arguments: `--source <absolute Foul Play path> --threads <1-16> --level hard|medium|casual --format gen9randombattle|gen9ou`, or `--check` to verify the runtime for a format and exit. In OU the first stdin line is `{"type":"team","data":<export>}`; then stdin carries `{"type":"frame","data":…}` lines; `{"type":"stop"}` or closing stdin ends it.
 
@@ -150,28 +144,15 @@ Each bot process writes **one JSON object per line** to stdout. stderr carries u
 | `checked` | `protocol, engine, format` | `--check` only |
 | `error` | `code: "engine-failed"` or `"invalid-team"` | Fatal, including a rejected choice or an OU team Foul Play cannot read |
 
-**Laplace runner** (supervised by `PracticeRuntime`, harness only). Arguments: `--port` 1024–65535, `--token` 32–128 hex characters, `--bot Laplace`, `--human Player` (optional 10-hex suffix), `--threads` 1, 2, 4 or 8, and `--check` to verify the runtime. Writing `stop` to stdin, closing stdin, SIGINT or SIGTERM ends it.
-
-| Event | Fields | Meaning |
-| --- | --- | --- |
-| `ready` | `protocol: 1, bot, human, format, threads, determinizations: 8, searchMs: 150` | Logged in. The supervisor fails the session unless every field matches what it requested. |
-| `battle` | `room` | Challenge accepted, battle room opened |
-| `thinking` | `room, turn` | A decision is due |
-| `turn` | `room, turn, elapsedMs, visits, worlds, fallback` | A choice was sent |
-| `recovery` | `room, kind` (`rejected-choice` or `default-choice`), `rejectedChoices, defaultChoices` | The server rejected a choice or poke-env sent `/choose default` |
-| `end` | `room, result` (`win`, `loss` or `tie`, from the **player's** side) | Battle finished |
-| `checked` | `protocol, runtime` | `--check` only |
-| `error` | `code` | Fatal: `runtime-invalid`, `connection-failed`, `session-failed`, `invalid-message`, `login-rejected`, `login-lost`, `battle-lost`, `disconnected` |
-
-Supervisors ignore events whose `room` is not `battle-gen9randombattle-<digits>` and clamp numbers to sane ranges. The simulator speaks the same framing: its only event is `{"type":"ready","port":P}`.
+The API server ignores events whose `room` is not `battle-gen9randombattle-<digits>` and clamp numbers to sane ranges. The simulator speaks the same framing: its only event is `{"type":"ready","port":P}`.
 
 ### 3.4 Network confinement
 
-The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The Laplace runner installs the same kind of hook (`local_socket_only` in `runner.py`) and opens a raw TCP socket to the simulator first, so no proxy setting or redirect can dial elsewhere. The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
+The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
 
-## 4. The shared search engine: poke-engine MCTS
+## 4. The search engine: poke-engine MCTS
 
-Both bots call the same Rust function, `monte_carlo_tree_search(state, duration_ms, threads)`, on a fully specified battle state. It runs **decoupled UCT** for simultaneous moves:
+Foul Play calls the Rust function, `monte_carlo_tree_search(state, duration_ms, threads)`, on a fully specified battle state. It runs **decoupled UCT** for simultaneous moves:
 
 1. **Select.** At each node, each side independently picks the option with the highest UCB1 score. The pair identifies a child group; one child is drawn in proportion to its probability (damage rolls, crits, accuracy and secondary effects are separate weighted branches) and its instructions are applied.
 2. **Expand.** At the first unseen pair, `generate_instructions_from_move_pair` produces every chance outcome. Damage-roll branching is enabled only at the root and its children, to keep the tree small. One outcome is sampled.
@@ -185,7 +166,7 @@ $$
 \sigma(x) = \frac{1}{1 + e^{-0.0125x}}
 $$
 
-Q is an option's total score, n its visits and N the parent's visits; unvisited options score infinity. The 0.0125 scale puts a 200-point evaluation lead close to 1.0. When time runs out, the engine returns each root option's visits and total score for both sides. With `threads > 1`, workers grow the tree in parallel. Both bots build poke-engine from source with Gen 9 Terastallization.
+Q is an option's total score, n its visits and N the parent's visits; unvisited options score infinity. The 0.0125 scale puts a 200-point evaluation lead close to 1.0. When time runs out, the engine returns each root option's visits and total score for both sides. With `threads > 1`, workers grow the tree in parallel. Foul Play builds poke-engine from source with Gen 9 Terastallization.
 
 ## 5. Foul Play
 
@@ -232,7 +213,7 @@ Foul Play Medium and Foul Play Casual are the same worker with a smaller budget 
 | Medium | 40 ms | Upstream count | Weighted among moves with ≥ 50% of the best move's share |
 | Casual | 15 ms | 1: one guess about the opponent's team | As Hard, except 35% of the time the second- or third-best move, if it has ≥ 20% of the best move's share |
 
-The weaker levels only ever play moves the search itself rated: they never pick at random from all legal moves, so mistakes look like misreads, not nonsense. The levels are checked against each other with `tests/foulplay-levels-live.cjs` (section 8).
+The weaker levels only ever play moves the search itself rated: they never pick at random from all legal moves, so mistakes look like misreads, not nonsense. The levels are checked against each other with `tests/foulplay-levels-live.cjs` (section 6).
 
 *(2026-11-17)* On the private simulator, 100 Random Battles per pairing, 2 search threads each (as on the cloud server), no rejected choices:
 
@@ -248,99 +229,7 @@ Only Foul Play (Hard) plays OU. There are no built-in teams: on the Bots page th
 
 Foul Play's OU play relies on Smogon's monthly usage stats (`gen9ou-0`) and set data, pinned in `api/lock.json` and refreshed by hand with `npm run refresh-ou` ([api/README.md](../api/README.md#refreshing-the-ou-data)).
 
-## 6. Laplace
-
-The owner's MIT project, pinned at `8b4173d`. It peaked at 2231 Elo / ~83.3 GXE on the public Gen 9 Random Battle ladder; that figure is not claimed for this integration.
-
-**In one sentence:** sample 8 complete guesses of the opponent's team, run 150 ms of MCTS on each in poke-engine 0.0.47, average the root visit shares, then pass the ranking through deterministic guards, a small learned value net and a mixed-strategy sampler.
-
-### Components
-
-| Component | File (Laplace repo) | Role |
-| --- | --- | --- |
-| `poke-env` 0.15.0 | dependency | Parses the Showdown protocol into a `Battle` object |
-| `EnginePlayer` | `agent/engine_search.py` | The bot: one `choose_move(battle)` per decision |
-| State builder | `agent/poke_engine_adapter.py` | Converts a `Battle` into a fully specified `poke_engine.State`, sampling hidden parts |
-| `poke-engine` 0.0.47 | Rust, Gen 9 Tera | Exact Gen 9 mechanics, MCTS, one-ply `generate_instructions` |
-| Value net | `value/net.py`, `value/value_features.py` | MLP 368 → 256 → 128 → 1, sigmoid = P(win) |
-| Data | `JOINT_SETS`, `RANDBATS_STATS`, `RANDBATS_SETS` | Counted complete randbats sets (from Foul Play's public dataset), usage feed and set sheet |
-
-### One decision
-
-1. **Track evidence** that `poke-env` does not keep:
-   - Moves the opposing active has used since switching in. One move plus a Choice item means locked; two different moves means not Choice.
-   - **Choice Scarf from turn order.** Randbats spreads are fixed (85 EVs, 31 IVs, neutral nature), so raw Speed is effectively known. Moving first at equal priority when it should not (5% tolerance; Trick Room and Prankster excluded) marks `scarf`, which overrides `noscarf`, never the reverse.
-   - **Heavy-Duty Boots from hazards.** Took Stealth Rock damage → not Boots. Switched into rocks and took none → Boots (barring Magic Guard). Hazards are tracked in protocol order.
-   - Delayed effects: Wish (landing turn, amount) and Future Sight.
-2. **Build 8 worlds.** Our side is exact, from the server's request. For each opposing Pokémon seen, a complete joint set (level, item, ability, 4 moves, Tera type) is drawn by generator frequency, narrowed in order by revealed moves, then known or inferred item, then known ability. Each filter applies only if some set survives, so stale data degrades to "less informed", never "no set". Unseen slots are filled to 6 with random unseen species and sampled sets.
-3. **Search each world.** `monte_carlo_tree_search(state, 150 ms, threads=T)` runs sequentially per world. A world that makes the engine panic is skipped rather than losing the turn.
-4. **Pool.** Each root option's visit share is averaged across successful worlds (`robust_vote=False`). Because joint sets are drawn in proportion to their counts, a uniform average is already likelihood-weighted.
-5. **Guard and re-rank** in order: absorb → futility → damage tiebreak → value re-rank → no-op → dead-lock (table below).
-6. **Mix.** From the top, take the unbroken run of un-vetoed options scoring at least 90% of the top (`mix_frac=0.9`); Tera options only as the top pick. If 2 or more remain, sample in proportion to score. If 3 or more are eligible and their scores span ≤ 0.03, the position is treated as noise and the ranked order stands.
-7. **Play** the first ranked option that is legal now. If none is usable, play the highest-damage move (counted as a fallback and surfaced).
-
-$$
-\mathrm{score}(a) = \frac{1}{N}\sum_{w=1}^{N}\frac{\mathrm{visits}_w(a)}{\mathrm{total\_visits}_w}
-$$
-
-### Guards and re-rankers
-
-| Stage | Fires when | Effect |
-| --- | --- | --- |
-| Absorb | An attack is certainly nullified by the opponent's revealed typing or absorb ability (or every surviving set agrees) | Demoted at any score gap and vetoed from the mix; stands down if nothing else remains |
-| Futility | Repeated clicks of the same move in the same matchup were erased (opponent HP back to an earlier snapshot), or repeated self-boosts gained nothing | Demoted at any score gap |
-| Damage tiebreak | Top two scores within 0.03 | Prefer the option that damages the revealed opponent; switches rank below damaging moves |
-| Value re-rank | 2+ options within 0.11 of the top (top 3 considered; Tera only if already top) | See below |
-| No-op | Against the opponent's likeliest reply, every chance outcome equals doing nothing (e.g. full-HP recovery, rocks onto rocks), polled over 3 worlds | Demoted below every option that does something |
-| Dead-lock | Unlocked Choice item, no switches left, a status move on top while an attack also scored | Swap so the last Pokémon locks into an attack |
-
-**Value re-rank.** For each near-tied candidate, in up to 4 searched worlds, Laplace takes the opponent's 2 most-visited replies and calls `generate_instructions(state, ours, theirs)`, which returns every chance branch with its probability. Each successor state is featurized into 368 numbers (field; per side: team aggregates, side conditions, active stats, status, boosts, item and ability flags, best damage into the opposing active, speed race; five canonically sorted bench blocks) and scored by the net. A candidate's value is the win probability weighted by reply visits × branch probability. If any candidate yields no valued successor, the re-rank stands down. Most turns skip it because no near-tie exists.
-
-### Configuration (`scripts/laplace/runner.py`)
-
-The runner refuses to start if versions or the model hash differ.
-
-| Setting | Value |
-| --- | --- |
-| Worlds per decision | 8 (sequential) |
-| Search time per world | 150 ms |
-| Engine threads | Quiet 1 · Balanced 2 · Full 8 |
-| Pooling | Plain average (`robust_vote=False`) |
-| Mixed root | On, `mix_frac=0.9`, collapse eps 0.03 |
-| Value net | SHA-256 `502a47a5…`, Torch 1 thread, margin 0.11, boost margin off |
-| Guards | Absorb, futility, tiebreak, no-op, dead-lock on; gamble off |
-| Versions | poke-env 0.15.0, poke-engine 0.0.47 |
-
-*(snapshot)* On a 20-thread development CPU a warm decision takes a median 1.28 s (Quiet) to 1.64 s (Full). See [section 7](#7-performance).
-
-**Connection.** `poke-env` parses every battle message into a `Battle` and calls `choose_move` on each request; the runner wraps its client to handle login, challenge filtering and telemetry (sections 3.2–3.3). A rejected choice is counted as a `recovery` event and poke-env's `/choose default` is sent instead. After each game all per-battle memory (poke-env battles and Laplace's evidence trackers) is cleared so a rematch starts fresh.
-
-## 7. Performance
-
-*(snapshot, 2026-11-10)* `scripts/laplace/benchmark.py` runs Laplace's full move-selection pipeline (set sampling, 8 × 150 ms search, pooling, guards, optional re-rank, order conversion) on three synthetic positions: an opening with unrevealed opponents, a midgame with hazards and a boosted opponent, and a forced switch. It creates no rooms and needs no server. Every one of the 192 decisions was legal, with no engine fallback.
-
-| Logical CPUs | Search threads | Median wall, ms | Median CPU, ms | Median visits | Peak memory, MiB |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 20 | 1 (Quiet) | 1,276 | 1,266 | 538,000 | 293 |
-| 20 | 2 (Balanced) | 1,371 | 2,562 | 981,000 | 327 |
-| 20 | 8 (Full) | 1,637 | 9,828 | 2,353,000 | 408 |
-| 4 | 8 | 1,431 | 5,062 | 1,266,000 | 337 |
-| 2 | 8 | 1,355 | 2,578 | 762,000 | 305 |
-
-- **Host:** Intel Core i9-13900H (14 cores, 20 logical CPUs, 16 GiB), Windows 11, AC power. The 4- and 2-CPU rows use CPU affinity masks on the same chip. Each row is 15 warm decisions in a fresh process.
-- **Measured build:** Python 3.12.16 Windows x64; poke-engine 0.0.47 for `x86_64-pc-windows-gnu` (Rust 1.96.0, GCC 13.2.0); runtime manifest SHA-256 `e83e0864…`, engine binary `55da8bd3…`, value model `502a47a5…`.
-- **Cold start:** 3.19 s median to a loaded agent, 2.22 s of it Torch and feature imports. The first decision then takes 1.41 s median.
-- **Value re-rank:** skipped by all 180 warm decisions (no near-tie). Forced on a three-way tie, it costs 16–31 ms over 45–87 successor states; the net's forward pass is under 0.4 ms of that.
-- **What it means for hosting.** Search is time-limited, so fewer CPUs give similar wall times but shallower search: Full collects 46% fewer visits on 4 CPUs and 68% fewer on 2. A server's CPU cap therefore limits Full, which is one reason the practice API caps threads (`MAX_THREADS`). Size the API host by measurement.
-- **What it does not mean.** Timings and visits measure compute cost only. Playing strength needs controlled matches with paired seeds and uncertainty intervals; none have been completed.
-
-Reproduce with the staged runtime and the pinned Laplace checkout (writes ignored `out/laplace/benchmark.json`; `--repeats 1` for a short run):
-
-```powershell
-& '.\out\laplace-runtime\python\python.exe' -I -B scripts/laplace/benchmark.py --laplace-root '<path to the Laplace checkout>'
-```
-
-## 8. Running and hosting
+## 6. Running and hosting
 
 ### Pins
 
@@ -349,12 +238,10 @@ Reproduce with the staged runtime and the pinned Laplace checkout (writes ignore
 | Foul Play | `8f541f8`, GPL-3.0, source tarball SHA-256 in `api/lock.json`; poke-engine 0.0.48 built with Terastallization; packages in `api/lock.json` |
 | Foul Play runtime | Standalone Python 3.12.16 (`python-build-standalone` 20261026, per platform, SHA-256 pinned); Rust 1.96.0 via rustup 1.29.3 if no `cargo` is found |
 | Random-battle data (Foul Play) | `pkmn/randbats` `684abfa`, SHA-256 in `api/lock.json` |
-| Laplace (harness) | `8b4173d`, MIT; model SHA-256 `502a47a5…`; poke-env 0.15.0, NumPy 2.4.6, Torch 2.12.0+cpu |
-| poke-engine (Laplace) | 0.0.47 from hashed sdist, Rust 1.96.0, Gen 9 Tera feature |
 | Showdown simulator | `smogon/pokemon-showdown` `a9caa4c`, MIT |
 | Classic client (practice view) | `smogon/pokemon-showdown-client` `49b5420`, AGPL-3.0, recorded patches |
 
-Source, license and build records: [`vendor/laplace/SOURCE.md`](../vendor/laplace/SOURCE.md) and [`api/lock.json`](../api/lock.json). Hashes detect corruption; they are not publisher signatures.
+Source, license and build records: [`vendor/practice/SOURCE.md`](../vendor/practice/SOURCE.md) and [`api/lock.json`](../api/lock.json). Hashes detect corruption; they are not publisher signatures.
 
 ### Practice API
 
@@ -370,17 +257,13 @@ To point a development launcher at a server, set `SHOWDOWN_PRACTICE_API_URL` (an
 
 ### Development setup
 
-The app needs only the practice simulator and battle client, which `build:practice` builds with Node and Git. The Laplace harness needs a separate runtime with Python, the Rust engine and the model; it is never packaged. Its prerequisites: Python 3.12, a Rust toolchain, and on Windows the compiler listed in `vendor/laplace/SOURCE.md`. Rust builds use at most 4 parallel compilers (`CARGO_BUILD_JOBS` overrides), since one per CPU thread can exhaust memory.
+The app needs the practice simulator and battle client, which `build:practice` builds with Node and Git. Foul Play's own runtime is installed separately for the API.
 
 ```powershell
 npm ci
-npm run build:practice      # simulator and battle client under ignored vendor/laplace/dist/ (what releases ship)
-npm run build:laplace       # Laplace harness runtime under ignored out/laplace-runtime/ (dev only)
-npm run bots:setup          # harness config for that runtime
+npm run build:practice      # simulator and battle client under ignored vendor/practice/dist/ (what releases ship)
 npm run api:setup           # Foul Play into ignored api/runtime/
 ```
-
-On Linux, `npm run bots:setup -- --build-linux --python python3` builds the simulator, client and Laplace environment under `out/bots/`. `bots:setup` writes `out/bots/config.json` and `integrity.json` (override with `SHOWDOWN_BOT_CONFIG`); a development launcher uses that runtime's simulator. Generated files stay out of Git.
 
 | Command | Covers |
 | --- | --- |
@@ -389,7 +272,6 @@ On Linux, `npm run bots:setup -- --build-linux --python python3` builds the simu
 | `node tests/foulplay-levels-live.cjs --runtime api/runtime` | Level separation: plays Casual vs. Heuristic, Medium vs. Casual and Hard vs. Medium (20 games each by default, `--games`, `--pair a:b`) on private simulators and prints win rates. `--format gen9ou --team <export>` plays OU |
 | `npm run test:practice` | A real Foul Play battle through the desktop: move, switch, Tera, navigation, Stop, Forfeit, rematch, renderer-crash cleanup, against a loopback copy of the API server |
 | `npm run test:bots` | Runs the desktop suite above as a standalone check |
-| `tests/bots-games.py` (run with the Laplace runtime's Python) | Two complete Laplace harness games against a heuristic player; result agreement and pipe shutdown |
 | `npm run smoke:practice-packaged` | A short practice game inside the unpacked package, with moves from the hosted cloud API (`SHOWDOWN_PRACTICE_API_URL` overrides) |
 
 All of these use disposable profiles and private servers, never the player's account or the public server. They are integration checks, not strength benchmarks. Test windows run with `SHOWDOWN_DESKTOP_BACKGROUND=1` (non-focusing, transparent, ignores the mouse).
@@ -397,4 +279,4 @@ All of these use disposable profiles and private servers, never the player's acc
 ### Not yet verified
 
 - The Docker image build (`api/deploy/`), and the in-app install on Windows and macOS. The systemd and Caddy setup is verified on the hosted Google Cloud VM. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
-- Server sizing: a decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.
+- Server sizing: search is time-limited, so fewer CPUs give similar decision times but shallower search; that is one reason the API caps threads (`MAX_THREADS`). A decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.

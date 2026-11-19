@@ -207,7 +207,7 @@ The first HTTPS request can take about 20 seconds while Caddy gets the certifica
 curl -s https://203-0-113-7.sslip.io/v1/info; echo
 ```
 
-From a development checkout of the app with the simulator built (`npm run bots:setup`, see [bots.md](../docs/bots.md#development-setup)), play two real battles against the server:
+From a development checkout of the app with the simulator built (`npm run build:practice`, see [bots.md](../docs/bots.md#development-setup)), play two real battles against the server:
 
 ```sh
 node tests/practice-api-live.cjs --url https://203-0-113-7.sslip.io

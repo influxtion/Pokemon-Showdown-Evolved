@@ -7,7 +7,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { createInterface } = require('node:readline');
 const test = require('node:test');
-const { localConfig, parseOptions, restrictListener } = require('../scripts/laplace/server.cjs');
+const { localConfig, parseOptions, restrictListener } = require('../scripts/practice/server.cjs');
 
 const token = 'a'.repeat(32);
 const root = path.resolve('runtime-server');
@@ -57,11 +57,11 @@ test('practice listener forwards only authenticated raw WebSocket upgrades', asy
 });
 
 test('staged Showdown server accepts a practice guest and exits when the parent pipe closes', {
-  skip: !process.env.LAPLACE_TEST_SERVER_ROOT,
+  skip: !process.env.PRACTICE_TEST_SERVER_ROOT,
   timeout: 30_000,
 }, async t => {
-  const launcher = path.resolve(__dirname, '../scripts/laplace/server.cjs');
-  const child = spawn(process.execPath, [launcher, '--server-root', process.env.LAPLACE_TEST_SERVER_ROOT,
+  const launcher = path.resolve(__dirname, '../scripts/practice/server.cjs');
+  const child = spawn(process.execPath, [launcher, '--server-root', process.env.PRACTICE_TEST_SERVER_ROOT,
     '--port', '0', '--token', token], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   const exited = once(child, 'exit');
   t.after(async () => {

@@ -4,20 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { buildServer } = require('./laplace/build-server.cjs');
-const { buildClient, clientRevision, clientDataRevision } = require('./laplace/build-client.cjs');
+const { buildServer } = require('./practice/build-server.cjs');
+const { buildClient, clientRevision, clientDataRevision } = require('./practice/build-client.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const VENDOR = path.join(ROOT, 'vendor/laplace');
-const CACHE = path.join(ROOT, 'out/laplace');
-// The app ships only the simulator and battle client. `--laplace` builds the developer harness
-// runtime (Python, the Rust engine and the Laplace model) into out/, which is never packaged.
+const VENDOR = path.join(ROOT, 'vendor/practice');
+const CACHE = path.join(ROOT, 'out/practice');
+// The app ships the local Showdown simulator and battle client; bots connect to it as players.
 const APP_RUNTIME = path.join(VENDOR, 'dist');
-const LAPLACE_RUNTIME = path.join(ROOT, 'out/laplace-runtime');
 const ADAPTER_SOURCES = ['server.cjs', 'build-server.cjs', 'build-client.cjs'];
-const LOCK = JSON.parse(fs.readFileSync(path.join(VENDOR, 'runtime-lock.json'), 'utf8'));
-// Git Bash puts GNU tar first on PATH, and it reads `C:\...` as a remote host; Windows' bsdtar does not.
-const TAR = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 
 function run(executable, args, options = {}) {
   return execFileSync(executable, args, { cwd: ROOT, windowsHide: true, stdio: 'inherit',
@@ -31,50 +26,6 @@ function insideWorkspace(target) {
   const relative = path.relative(fs.realpathSync(ROOT), existing);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Build path must stay inside the workspace.');
   return existing;
-}
-
-async function bootstrapPython() {
-  fs.mkdirSync(CACHE, { recursive: true });
-  insideWorkspace(CACHE);
-  const archive = path.join(CACHE, LOCK.python.filename);
-  if (!fs.existsSync(archive) || sha(archive) !== LOCK.python.sha256) {
-    const response = await fetch(LOCK.python.url);
-    if (!response.ok) throw new Error('Python runtime download failed.');
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (crypto.createHash('sha256').update(bytes).digest('hex') !== LOCK.python.sha256) throw new Error('Python runtime checksum mismatch.');
-    fs.writeFileSync(`${archive}.tmp`, bytes);
-    fs.renameSync(`${archive}.tmp`, archive);
-  }
-  const directory = fs.mkdtempSync(path.join(CACHE, 'bootstrap-'));
-  insideWorkspace(directory);
-  try {
-    run(TAR, ['-xzf', archive, '-C', directory]);
-    const executable = path.join(directory, 'python/python.exe');
-    run(executable, ['-I', '-B', '-c', `import sys; assert sys.version_info[:3] == (${LOCK.python.version.split('.').join(',')})`]);
-    return { directory, executable };
-  } catch (error) {
-    insideWorkspace(directory);
-    fs.rmSync(directory, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-function prepareLaplace() {
-  const source = path.join(ROOT, 'out/laplace-source');
-  fs.mkdirSync(source, { recursive: true });
-  const git = args => run('git', ['-C', source, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
-  if (!fs.existsSync(path.join(source, '.git'))) {
-    git(['init', '--quiet']);
-    git(['config', 'core.autocrlf', 'false']);
-  }
-  if (!git(['rev-list', '-1', '--all'])) {
-    git(['fetch', '--quiet', '--depth=1', LOCK.laplace.url, LOCK.laplace.revision]);
-    git(['checkout', '--quiet', '--detach', 'FETCH_HEAD']);
-  }
-  if (git(['rev-parse', 'HEAD']) !== LOCK.laplace.revision || git(['status', '--porcelain', '-uno'])) {
-    throw new Error('Laplace build source differs from the pinned revision.');
-  }
-  return source;
 }
 
 function inventory(directory) {
@@ -94,72 +45,41 @@ function inventory(directory) {
   return files;
 }
 
-function preserveSources(pending, laplaceSource) {
+function preserveSources(pending) {
   const sourceDir = path.join(pending, 'sources');
   fs.mkdirSync(sourceDir);
   for (const [name, source] of [
-    ...(laplaceSource ? [['laplace', laplaceSource]] : []),
     ['showdown-client', path.join(ROOT, 'out/practice-client-source')],
-    ['showdown-server', path.join(ROOT, 'out/laplace-server-source')],
+    ['showdown-server', path.join(ROOT, 'out/practice-server-source')],
     ['showdown-client-data', path.join(ROOT, 'out/practice-client-source/caches/pokemon-showdown')],
   ]) run('git', ['-C', source, 'archive', '--format=tar', '--output', path.join(sourceDir, `${name}.tar`), 'HEAD']);
   fs.copyFileSync(__filename, path.join(sourceDir, 'build-practice.js'));
   const adapter = path.join(sourceDir, 'desktop-adapter');
-  if (laplaceSource) {
-    fs.cpSync(path.join(ROOT, 'scripts/laplace'), adapter, { recursive: true,
-      filter: file => !file.includes('__pycache__') && !file.endsWith('.pyc') });
-  } else {
-    fs.mkdirSync(adapter);
-    for (const name of ADAPTER_SOURCES) fs.copyFileSync(path.join(ROOT, 'scripts/laplace', name), path.join(adapter, name));
-  }
-  // Laplace's license and pins describe files only the harness runtime contains.
-  const laplaceOnly = new Set(['LICENSE-LAPLACE', 'runtime-lock.json']);
+  fs.mkdirSync(adapter);
+  for (const name of ADAPTER_SOURCES) fs.copyFileSync(path.join(ROOT, 'scripts/practice', name), path.join(adapter, name));
   for (const file of fs.readdirSync(VENDOR)) {
     const source = path.join(VENDOR, file);
-    if (fs.statSync(source).isFile() && (laplaceSource || !laplaceOnly.has(file))) fs.copyFileSync(source, path.join(sourceDir, file));
+    if (fs.statSync(source).isFile()) fs.copyFileSync(source, path.join(sourceDir, file));
   }
 }
 
 async function main() {
   if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Practice runtime build currently supports Windows x64.');
   const args = process.argv.slice(2);
-  if (args.some(argument => !['--stage-only', '--laplace'].includes(argument))) {
-    throw new Error('Usage: node scripts/build-practice.js [--laplace] [--stage-only]');
-  }
+  if (args.some(argument => argument !== '--stage-only')) throw new Error('Usage: node scripts/build-practice.js [--stage-only]');
   const stageOnly = args.includes('--stage-only');
-  const laplace = args.includes('--laplace');
-  const dist = laplace ? LAPLACE_RUNTIME : APP_RUNTIME;
+  const dist = APP_RUNTIME;
   let keepPending = false;
   fs.mkdirSync(path.dirname(dist), { recursive: true });
   const pending = path.join(path.dirname(dist), `pending-${Date.now()}`);
   insideWorkspace(pending);
-  const bootstrap = laplace ? await bootstrapPython() : null;
   try {
-    const source = laplace ? prepareLaplace() : null;
-    if (laplace) {
-      console.log('Building the isolated Python engine runtime…');
-      run(bootstrap.executable, ['-I', '-B', path.join(ROOT, 'scripts/laplace/build-python.py'), '--output', pending, '--source', source]);
-    }
     console.log('Building the local simulator…');
     const server = buildServer(path.join(pending, 'server'));
-    if (laplace) {
-      const sets = 'data/random-battles/gen9/sets.json';
-      const targetSets = path.join(pending, 'laplace/server', sets);
-      fs.mkdirSync(path.dirname(targetSets), { recursive: true });
-      fs.copyFileSync(path.join(pending, 'server', sets), targetSets);
-    }
     console.log('Building the sandboxed battle client…');
     buildClient(path.join(pending, 'client'));
-    preserveSources(pending, source);
-    if (laplace) {
-      const python = path.join(pending, 'python/python.exe');
-      const env = { SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR,
-        PATH: path.join(process.env.SystemRoot, 'System32'), PYTHONUTF8: '1' };
-      run(python, ['-I', '-B', path.join(ROOT, 'scripts/laplace/runner.py'), '--check'], { env });
-    }
-    const manifest = { version: 3, kind: laplace ? 'laplace' : 'simulator', platform: 'win32', arch: 'x64',
-      ...(laplace ? { laplace: LOCK.laplace, lockSha256: sha(path.join(VENDOR, 'runtime-lock.json')),
-        python: JSON.parse(fs.readFileSync(path.join(pending, 'python-build.json'), 'utf8')) } : {}),
+    preserveSources(pending);
+    const manifest = { version: 3, kind: 'simulator', platform: 'win32', arch: 'x64',
       server, client: { revision: clientRevision, dataRevision: clientDataRevision }, files: inventory(pending) };
     fs.writeFileSync(path.join(pending, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     const { verifyRuntime } = require('../app/practice-manifest');
@@ -179,13 +99,8 @@ async function main() {
       if (fs.existsSync(previous) && !fs.existsSync(dist)) fs.renameSync(previous, dist);
       throw error;
     }
-    const what = laplace ? 'Laplace harness runtime' : 'Practice simulator runtime';
-    console.log(`Built and verified ${what} at ${path.relative(ROOT, dist)}: ${Object.keys(manifest.files).length} files; manifest ${verification.identity}`);
+    console.log(`Built and verified the practice simulator runtime at ${path.relative(ROOT, dist)}: ${Object.keys(manifest.files).length} files; manifest ${verification.identity}`);
   } finally {
-    if (bootstrap) {
-      insideWorkspace(bootstrap.directory);
-      fs.rmSync(bootstrap.directory, { recursive: true, force: true });
-    }
     if (!keepPending && fs.existsSync(pending)) {
       insideWorkspace(pending);
       fs.rmSync(pending, { recursive: true, force: true });
@@ -194,4 +109,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { inventory, insideWorkspace, APP_RUNTIME, LAPLACE_RUNTIME };
+module.exports = { inventory, insideWorkspace, APP_RUNTIME };

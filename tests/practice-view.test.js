@@ -21,7 +21,7 @@ test('hosted practice isolates assets and socket to the exact session', () => {
 });
 
 test('practice requests stay in bundled files, authenticated loopback socket and artwork paths', () => {
-  const root = path.resolve('vendor/laplace/dist/client');
+  const root = path.resolve('vendor/practice/dist/client');
   const connection = { port: 41000, token: 'a'.repeat(64) };
   const allow = (url, resourceType = 'other') => allowRequest({ url, resourceType }, root, connection);
   assert(allow(pathToFileURL(path.join(root, 'js/client.js')).href, 'script'));

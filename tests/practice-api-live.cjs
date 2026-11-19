@@ -8,7 +8,7 @@
 //   node tests/practice-api-live.cjs --url https://host [--key KEY]       (a deployed API)
 // Add --opponent foulplay-medium|foulplay-casual for a weaker level, or --format gen9ou --team <export>
 // for OU, where both sides use that team (the player plays it too).
-// The simulator comes from out/bots/config.json (npm run bots:setup) or vendor/laplace/dist.
+// The simulator comes from vendor/practice/dist (npm run build:practice).
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -19,7 +19,6 @@ const crypto = require('node:crypto');
 const { CloudEngine } = require('../app/practice-engines');
 const { inspect } = require('../api/install');
 const { createApiServer } = require('../api/server');
-const { readBotConfig } = require('../app/bot-config');
 const { PracticeTeams } = require('../app/practice-teams');
 const fs = require('node:fs');
 
@@ -28,8 +27,7 @@ const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { ty
   preset: { type: 'string', default: 'quiet' }, opponent: { type: 'string', default: 'foulplay' },
   format: { type: 'string', default: 'gen9randombattle' }, team: { type: 'string' } } });
 if (!values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
-const config = readBotConfig(path.join(root, 'out/bots/config.json'));
-const simulatorRoot = config?.root || path.join(root, 'vendor/laplace/dist');
+const simulatorRoot = path.join(root, 'vendor/practice/dist');
 const FORMAT = values.format;
 // OU: one team, checked the way the app checks teams, used for both sides.
 const team = FORMAT === 'gen9randombattle' ? null
@@ -84,7 +82,7 @@ async function main() {
     target = { url: await service.listen(), key };
   }
   const cloud = new CloudEngine(target);
-  const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/laplace'),
+  const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/practice'),
     target: () => cloud.target(),
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }), installed: () => true });
   const decisions = [];

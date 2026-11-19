@@ -5,7 +5,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { PracticeTeams } = require('../app/practice-teams');
-const { readBotConfig } = require('../app/bot-config');
 
 // A stand-in for the simulator's team code: "Name|moves" lines, and "Uber" is banned.
 const fakeSim = {
@@ -40,8 +39,7 @@ test('says so when the simulator is missing', () => {
 });
 
 // With a built practice simulator, the real validator: the fixture team is legal, Koraidon is not.
-const config = (() => { try { return readBotConfig(path.join(__dirname, '../out/bots/config.json')); } catch { return null; } })();
-const simulatorRoot = config?.root || path.join(__dirname, '../vendor/laplace/dist');
+const simulatorRoot = path.join(__dirname, '../vendor/practice/dist');
 test('checks teams with the practice simulator', { skip: !fs.existsSync(path.join(simulatorRoot, 'server/dist/sim')) }, () => {
   const real = new PracticeTeams({ root: simulatorRoot });
   const fixture = real.check('gen9ou', 'export', fs.readFileSync(path.join(__dirname, 'fixtures/ou-team.txt'), 'utf8'));
