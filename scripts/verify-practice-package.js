@@ -107,7 +107,7 @@ function verifyApiFiles(resources) {
 }
 
 async function verifyCopiedPracticePackage(context) {
-  const resources = path.join(context.appOutDir, 'resources');
+  const resources = context.packager.getResourcesDir(context.appOutDir);
   const { manifest, identity } = checkedRuntime(path.join(resources, 'practice'),
     'The copied Practice runtime failed integrity verification.');
   const sourceManifest = path.join(configuredResource(context, 'practice'), 'manifest.json');

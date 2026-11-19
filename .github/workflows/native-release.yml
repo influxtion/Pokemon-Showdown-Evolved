@@ -1,0 +1,98 @@
+name: Native preview builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/native-platform-releases]
+
+permissions:
+  contents: read
+
+jobs:
+  showdex:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Reuse the pinned platform-independent Showdex payload
+        shell: bash
+        run: |
+          mkdir -p out/showdex-import
+          curl --fail --location --retry 3 'https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/download/v0.2.0/Pokemon.Showdown.Evolved.Setup.0.2.0-x64.exe' -o out/showdex-import/windows.exe
+          echo '8689e5e3147ba747fa88bc9d112edeb0915c94326568ba68a3dce23483c2218b  out/showdex-import/windows.exe' | sha256sum --check
+          node <<'NODE'
+          const fs = require('fs');
+          const bytes = fs.readFileSync('out/showdex-import/windows.exe');
+          const offset = bytes.indexOf(Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]));
+          if (offset < 0) throw new Error('Missing installer payload');
+          const length = Number(32n + bytes.readBigUInt64LE(offset + 12) + bytes.readBigUInt64LE(offset + 20));
+          if (!Number.isSafeInteger(length) || offset + length > bytes.length) throw new Error('Invalid payload size');
+          fs.writeFileSync('out/showdex-import/payload.7z', bytes.subarray(offset, offset + length));
+          NODE
+          7z x out/showdex-import/payload.7z resources/app.asar -oout/showdex-import -y
+          node scripts/import-showdex-payload.js out/showdex-import/resources/app.asar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pinned-showdex
+          path: vendor/showdex/dist/
+          retention-days: 14
+  package:
+    needs: showdex
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: mac
+            arch: arm64
+            id: macOS-arm64
+          - runner: macos-15-intel
+            platform: mac
+            arch: x64
+            id: macOS-x64
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x64
+            id: Linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Linux test display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libfuse2t64
+          # Allow Chromium's user-namespace sandbox on this disposable CI runner.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run check
+      - run: npm test
+      - run: npm run build:practice
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pinned-showdex
+          path: vendor/showdex/dist/
+      - name: Build native packages
+        run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
+      - name: Save packages for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: packages-${{ matrix.id }}
+          path: |
+            out/macos/*.dmg
+            out/macos/*.zip
+            out/linux/*.AppImage
+            out/linux/*.tar.gz
+          compression-level: 0
+          retention-days: 14

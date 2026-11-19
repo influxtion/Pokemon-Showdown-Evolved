@@ -64,7 +64,9 @@ function preserveSources(pending) {
 }
 
 async function main() {
-  if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Practice runtime build currently supports Windows x64.');
+  if (!['win32', 'darwin', 'linux'].includes(process.platform) || !['x64', 'arm64'].includes(process.arch)) {
+    throw new Error('Practice runtime builds require Windows, macOS or Linux on x64 or arm64.');
+  }
   const args = process.argv.slice(2);
   if (args.some(argument => argument !== '--stage-only')) throw new Error('Usage: node scripts/build-practice.js [--stage-only]');
   const stageOnly = args.includes('--stage-only');
@@ -79,7 +81,7 @@ async function main() {
     console.log('Building the sandboxed battle client…');
     buildClient(path.join(pending, 'client'));
     preserveSources(pending);
-    const manifest = { version: 3, kind: 'simulator', platform: 'win32', arch: 'x64',
+    const manifest = { version: 3, kind: 'simulator', platform: process.platform, arch: process.arch,
       server, client: { revision: clientRevision, dataRevision: clientDataRevision }, files: inventory(pending) };
     fs.writeFileSync(path.join(pending, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     const { verifyRuntime } = require('../app/practice-manifest');

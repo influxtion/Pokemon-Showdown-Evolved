@@ -61,3 +61,21 @@ nsis:
   createDesktopShortcut: false
   createStartMenuShortcut: true
   artifactName: Pokemon Showdown Evolved Setup ${version}-${arch}.${ext}
+mac:
+  icon: renderer/assets/logo.png
+  category: public.app-category.games
+  identity: '-'
+  hardenedRuntime: false
+  notarize: false
+  artifactName: Pokemon.Showdown.Evolved.${version}.macOS-${arch}.${ext}
+  target:
+    - dmg
+    - zip
+linux:
+  icon: renderer/assets/logo.png
+  category: Game
+  executableName: pokemon-showdown-evolved
+  artifactName: Pokemon.Showdown.Evolved.${version}.Linux-${arch}.${ext}
+  target:
+    - AppImage
+    - tar.gz
