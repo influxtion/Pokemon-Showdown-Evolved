@@ -1,4 +1,4 @@
-name: Native platform previews
+name: Native preview builds
 
 on:
   workflow_dispatch:
@@ -28,8 +28,6 @@ jobs:
             id: Linux-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    permissions:
-      contents: write
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
@@ -63,10 +61,17 @@ jobs:
           fi
       - name: Stage checksums and source
         run: node scripts/stage-native-release.js ${{ matrix.id }}
-      - name: Upload verified preview assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload v0.2.0 out/native-release/* --repo "$GITHUB_REPOSITORY"
+      - name: Save packages for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: packages-${{ matrix.id }}
+          path: |
+            out/native-release/*.dmg
+            out/native-release/*.zip
+            out/native-release/*.AppImage
+            out/native-release/*Linux-*.tar.gz
+          compression-level: 0
+          retention-days: 14
       - name: Retain verification reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
