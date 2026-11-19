@@ -6,9 +6,9 @@
 
 Pokemon Showdown Evolved is a free, open-source desktop app for [Pokémon Showdown](https://play.pokemonshowdown.com/). It includes a modernized look with a convenient system and additional features, like playable bots, replay notes, and team building tools.
 
-[Download Pokemon Showdown Evolved v0.2.0](https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/tag/v0.2.0). Open the release and download the `.exe` under **Assets**. No Git or Node.js is needed to install it.
+[Download Pokemon Showdown Evolved v0.2.0](https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/tag/v0.2.0). Choose the Windows installer, Mac DMG (Apple Silicon or Intel), or Linux AppImage under **Assets**. A Linux tar.gz is also available. No Git or Node.js is needed to install it.
 
-This is an unsigned early release for Windows x64. Windows may show an unknown-publisher or SmartScreen warning. Clean-PC installation and signed-in acceptance testing are still pending. Updates are manual: download a newer installer from the same Releases page.
+This is an early preview. Windows is unsigned, and Mac builds are not Apple-notarized, so your operating system may show a warning or block launch. Clean-PC installation and signed-in acceptance testing are still pending. Windows and Linux AppImage builds automatically download updates; choose **Restart to update** in Settings when ready. Update restarts are blocked during battles, searches, practice preparation, or while replay notes are unsaved. Mac and Linux tar.gz builds use manual downloads from the Releases page.
 
 ## Home preview
 
