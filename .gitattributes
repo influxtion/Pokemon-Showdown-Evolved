@@ -1,2 +1,5 @@
 # Unified patch context lines intentionally contain one space.
 *.patch text eol=lf whitespace=-blank-at-eol
+# These reviewed build inputs are compared byte-for-byte with the runtime inventory.
+vendor/laplace/server-package*.json text eol=lf
+scripts/laplace/build-server.cjs text eol=lf

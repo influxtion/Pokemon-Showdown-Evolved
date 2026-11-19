@@ -299,6 +299,13 @@ session IPC round trip and 31 ms main-loop p99 delay. These do not measure
 network latency or clean-machine performance. No real-account actions or
 production server changes were made.
 
+The follow-up unpacked Windows build passed both packaged smokes, including a
+real move through the hosted practice API, navigation retention, forfeit/rematch
+and process cleanup with a restricted PATH. Its isolated startup sample was
+429 ms; the practice battle was ready in 3.1 s. New dependency pins and their
+builder use fixed LF line endings so Git checkout does not invalidate the byte
+inventory. This is not a clean-machine installer or signed-in acceptance test.
+
 Earlier November 18 launch audit: 222 unit tests (one optional skip), all seven desktop
 suites, the practice suite (a real Foul Play battle), live shell and replay checks,
 two battles against the hosted API (median 240 ms per decision), and both packaged
