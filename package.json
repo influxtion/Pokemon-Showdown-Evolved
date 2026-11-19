@@ -29,7 +29,9 @@
     "smoke:packaged": "node scripts/smoke-packaged.js",
     "smoke:practice-packaged": "node scripts/smoke-packaged.js --practice",
     "check": "node scripts/check.js",
-    "test:startup:live": "node scripts/test-desktop.js --startup-live"
+    "test:startup:live": "node scripts/test-desktop.js --startup-live",
+    "pack:mac": "electron-builder --mac --publish never -c.directories.output=out/macos",
+    "pack:linux": "electron-builder --linux --publish never -c.directories.output=out/linux"
   },
   "devDependencies": {
     "electron": "45.3.4",

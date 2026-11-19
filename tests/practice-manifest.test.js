@@ -21,7 +21,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const root = path.join(base, 'runtime');
   const filename = path.join(root, 'manifest.json');
-  const manifest = { version: 3, kind: 'simulator', platform: 'win32', arch: 'x64', files: {} };
+  const manifest = { version: 3, kind: 'simulator', platform: process.platform, arch: process.arch, files: {} };
   const add = (name, contents) => {
     const target = path.join(root, name);
     const bytes = Buffer.from(contents);
@@ -68,6 +68,17 @@ test('full verification catches same-size corruption after a successful check', 
   assert.equal(verifyRuntime(root).ok, true);
   fs.writeFileSync(path.join(root, REQUIRED[0]), 'Placeholder');
   assert.deepEqual(inspectRuntime(root), { ok: true }, 'status inspection does not hash payload files');
+  assert.deepEqual(verifyRuntime(root), INVALID);
+});
+
+test('rejects a runtime built for another operating system or architecture', t => {
+  const { root, manifest, save } = fixture(t);
+  manifest.platform = process.platform === 'linux' ? 'darwin' : 'linux';
+  save();
+  assert.deepEqual(verifyRuntime(root), INVALID);
+  manifest.platform = process.platform;
+  manifest.arch = process.arch === 'x64' ? 'arm64' : 'x64';
+  save();
   assert.deepEqual(verifyRuntime(root), INVALID);
 });
 

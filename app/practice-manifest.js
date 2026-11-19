@@ -92,7 +92,7 @@ function readManifest(location) {
   });
   const manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   if (!manifest || manifest.version !== 3 || !Object.hasOwn(KINDS, manifest.kind) ||
-      manifest.platform !== 'win32' || manifest.arch !== 'x64' ||
+      manifest.platform !== process.platform || manifest.arch !== process.arch ||
       !manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) invalid();
   const names = Object.keys(manifest.files);
   if (names.length > MAX_FILES) invalid();

@@ -80,6 +80,8 @@ function buildServer(target) {
     }
     // The compiled server uses no optional add-ons in the isolated local config.
     npm(staging, 'ci', '--omit=dev', '--omit=optional', '--ignore-scripts', '--no-audit', '--no-fund');
+    // CLI launchers are not used by the compiled simulator; Unix npm creates symlinks here.
+    fs.rmSync(path.join(staging, 'node_modules', '.bin'), { recursive: true, force: true });
     fs.mkdirSync(path.join(staging, 'config'));
     fs.writeFileSync(path.join(staging, 'config/config.js'),
       "'use strict';\n// Configuration is injected by the desktop's isolated server entry point.\n");

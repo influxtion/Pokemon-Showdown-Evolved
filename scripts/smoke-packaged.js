@@ -1,6 +1,6 @@
 'use strict';
 
-// Runs the unpacked Windows build with a temporary profile and outbound web traffic blocked.
+// Runs a native unpacked build with a temporary profile and outbound web traffic blocked.
 // --practice plays a short game against the hosted API (from main, outside the renderer proxy);
 // SHOWDOWN_PRACTICE_API_URL overrides it.
 const assert = require('node:assert/strict');
@@ -14,8 +14,15 @@ const { Replays } = require('../app/replays');
 
 const ROOT = path.join(__dirname, '..');
 const appDirectory = process.argv.find(argument => argument.startsWith('--app-dir='))?.slice('--app-dir='.length);
-const EXE = path.join(appDirectory ? path.resolve(appDirectory) : path.join(ROOT, 'out', 'windows', 'win-unpacked'), 'Pokemon Showdown Evolved.exe');
+const defaultDirectory = process.platform === 'darwin'
+  ? path.join(ROOT, 'out', 'macos', process.arch === 'arm64' ? 'mac-arm64' : 'mac')
+  : process.platform === 'linux' ? path.join(ROOT, 'out', 'linux', 'linux-unpacked')
+    : path.join(ROOT, 'out', 'windows', 'win-unpacked');
+const EXE = path.join(appDirectory ? path.resolve(appDirectory) : defaultDirectory,
+  process.platform === 'darwin' ? 'Pokemon Showdown Evolved.app/Contents/MacOS/Pokemon Showdown Evolved'
+    : process.platform === 'linux' ? 'pokemon-showdown-evolved' : 'Pokemon Showdown Evolved.exe');
 const WITH_PRACTICE = process.argv.includes('--practice');
+const PRACTICE_OPPONENT = process.argv.includes('--simple-practice') ? 'heuristic' : 'foulplay';
 const OUTPUT = path.join(ROOT, 'out', 'packaging-smoke');
 const VERSION = require('../package.json').version;
 const INSTALLER = path.join(ROOT, 'out', 'windows', `Pokemon Showdown Evolved Setup ${VERSION}-x64.exe`);
@@ -129,6 +136,15 @@ async function until(check, label, timeout = 30000) {
 }
 
 function runtimeChildren(pid) {
+  if (process.platform !== 'win32') {
+    return execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }).split('\n').flatMap(line => {
+      const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+      if (!match || Number(match[2]) !== pid) return [];
+      const kind = /practice-adapter\/server\.cjs/.test(match[3]) ? 'server'
+        : /python/.test(match[3]) ? 'python' : null;
+      return kind ? [{ pid: Number(match[1]), kind }] : [];
+    });
+  }
   const output = execFileSync('powershell.exe', ['-NoProfile', '-Command',
     `@(Get-CimInstance Win32_Process -Filter "ParentProcessId = ${pid}" | ForEach-Object {
       if ($_.Name -eq 'python.exe') { [pscustomobject]@{pid=$_.ProcessId;kind='python'} }
@@ -148,7 +164,7 @@ async function practiceSmoke(cdp, debugPort, child) {
   await evaluate(cdp, "location.href = 'practice.html'; 0");
   await until(() => evaluate(cdp, "location.pathname.endsWith('/practice.html') && document.readyState === 'complete' && !!window.desktop"), 'Practice page');
   const start = performance.now();
-  assert.equal((await evaluate(cdp, "window.desktop.startPractice({ opponent: 'foulplay', preset: 'quiet' })")).ok, true);
+  assert.equal((await evaluate(cdp, `window.desktop.startPractice({ opponent: ${JSON.stringify(PRACTICE_OPPONENT)}, preset: 'quiet' })`)).ok, true);
   const state = async () => {
     const value = await evaluate(cdp, 'window.desktop.getPractice()');
     if (value.error || value.clientError) throw new Error(value.error || value.clientError);
@@ -219,6 +235,9 @@ async function practiceSmoke(cdp, debugPort, child) {
 
 function workingSetBytes(pid) {
   try {
+    if (process.platform !== 'win32') {
+      return Number(execFileSync('ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' }).trim()) * 1024;
+    }
     const output = execFileSync('powershell.exe', ['-NoProfile', '-Command',
       `(Get-Process -Id ${pid} -ErrorAction Stop).WorkingSet64`], { encoding: 'utf8' });
     const bytes = Number(output.trim());
@@ -227,16 +246,19 @@ function workingSetBytes(pid) {
 }
 
 async function main() {
-  assert.equal(process.platform, 'win32', 'Packaged smoke requires Windows.');
   assert.ok(fs.existsSync(EXE), `Build the unpacked app first: ${EXE}`);
   fs.mkdirSync(OUTPUT, { recursive: true });
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'showdown-packaged-smoke-'));
   const debugPort = await port();
   const started = performance.now();
   const childEnv = {
+    ...(process.platform === 'win32' ? {
     SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR, TEMP: profile, TMP: profile,
     PATH: path.join(process.env.SystemRoot, 'System32'),
-    APPDATA: profile, LOCALAPPDATA: profile, SHOWDOWN_DESKTOP_USER_DATA: profile,
+    APPDATA: profile, LOCALAPPDATA: profile,
+    } : { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: profile, TMPDIR: profile,
+      DISPLAY: process.env.DISPLAY, XAUTHORITY: process.env.XAUTHORITY }),
+    SHOWDOWN_DESKTOP_USER_DATA: profile,
     ...(process.env.SHOWDOWN_PRACTICE_API_URL ? { SHOWDOWN_PRACTICE_API_URL: process.env.SHOWDOWN_PRACTICE_API_URL } : {}),
     ...(process.env.SHOWDOWN_PRACTICE_API_KEY ? { SHOWDOWN_PRACTICE_API_KEY: process.env.SHOWDOWN_PRACTICE_API_KEY } : {}),
   };
@@ -299,7 +321,10 @@ async function main() {
     cdp?.close();
     const forcedClose = Boolean(child.pid && child.exitCode === null);
     if (child.pid && child.exitCode === null) {
-      try { execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }); } catch {}
+      try {
+        if (process.platform === 'win32') execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+        else child.kill('SIGTERM');
+      } catch {}
     }
     if (practiceReport) {
       await until(() => practiceReport.childPids.every(pid => !alive(pid)), 'packaged runtime child cleanup', 10000);
@@ -323,7 +348,7 @@ async function main() {
     try {
       fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch {
-      console.warn(`Windows retained locked test files in ${profile}`);
+      console.warn(`The OS retained locked test files in ${profile}`);
     }
   }
 }

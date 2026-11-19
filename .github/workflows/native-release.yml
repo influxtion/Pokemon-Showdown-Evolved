@@ -1,0 +1,78 @@
+name: Native platform previews
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/native-platform-releases]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: mac
+            arch: arm64
+            id: macOS-arm64
+          - runner: macos-15-intel
+            platform: mac
+            arch: x64
+            id: macOS-x64
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x64
+            id: Linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm install --global corepack@0.34.6
+      - name: Linux test display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libfuse2t64
+          # Allow Chromium's user-namespace sandbox on this disposable CI runner.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run check
+      - run: npm test
+      - run: npm run build:practice
+      - run: npm run build:showdex
+      - name: Build native packages
+        run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
+      - name: Packaged smoke and real local practice
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a node scripts/smoke-packaged.js --practice --simple-practice
+          else
+            node scripts/smoke-packaged.js --practice --simple-practice
+          fi
+      - name: Stage checksums and source
+        run: node scripts/stage-native-release.js ${{ matrix.id }}
+      - name: Upload verified preview assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v0.2.0 out/native-release/* --repo "$GITHUB_REPOSITORY"
+      - name: Retain verification reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verification-${{ matrix.id }}
+          path: |
+            out/packaging-smoke/
+            out/native-release/*.json
+            out/native-release/*.txt
