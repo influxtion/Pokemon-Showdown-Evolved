@@ -17,6 +17,7 @@ const { PracticeSession } = require('./practice-session');
 const { CloudEngine, LocalEngine } = require('./practice-engines');
 const { readBotConfig, runtimeOptions } = require('./bot-config');
 const { PracticeView } = require('./practice-view');
+const { battleResizeScript, widthFromMessage } = require('./battle-resize');
 const { PracticeTeams, FORMATS: TEAM_FORMATS } = require('./practice-teams');
 const { Logger } = require('./logging');
 const { WindowState } = require('./window-state');
@@ -82,6 +83,18 @@ function applyClientBattleCss(contents, { reloaded = false } = {}) {
       await contents.removeInsertedCSS(key);
     }
   }).catch(() => {});
+}
+// The battle column width: a drag in either the live client or a practice battle reports it on
+// its console. It is saved and passed to the other view, so both match.
+function saveBattleWidth(text, from) {
+  const value = widthFromMessage(text);
+  if (value === null || value === settings.get('battleWidth')) return;
+  try { settings.set('battleWidth', value); } catch { /* The width still applies; it just is not kept. */ }
+  const code = `window.__sdBattleResize && window.__sdBattleResize.set(${value})`;
+  if (from !== 'client' && client && !client.webContents.isDestroyed() && !client.webContents.isLoading()) {
+    client.webContents.executeJavaScript(code).catch(() => {});
+  }
+  if (from !== 'practice') practiceView?.run(code);
 }
 let choosingReplayImport = false;
 let undoingReplayImport = false;
@@ -196,10 +209,14 @@ function ensureClient() {
     if (isMainFrame) logger.write('client-load-failed', code);
   });
   contents.on('render-process-gone', () => logger.write('client-process-gone'));
+  contents.on('console-message', (event, _level, legacy) => {
+    saveBattleWidth(typeof event?.message === 'string' ? event.message : legacy, 'client');
+  });
   // Re-applied on every load; the stylesheet follows prefers-color-scheme, which tracks nativeTheme.
   contents.on('dom-ready', () => {
     contents.insertCSS(CLIENT_CSS, { cssOrigin: 'user' }).catch(() => {});
     applyClientBattleCss(contents, { reloaded: true });
+    contents.executeJavaScript(battleResizeScript(settings.get('battleWidth'))).catch(() => {});
     bridge.installFormatModal();
     bridge.installTeamsView();
     bridge.installTeamEditor();
@@ -307,6 +324,8 @@ function createWindow() {
   practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
     battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),
+    script: () => battleResizeScript(settings.get('battleWidth')),
+    onConsole: text => saveBattleWidth(text, 'practice'),
     background: background(), onFailure: token => practice?.clientFailed(token) });
   practice.on('ready', connection => { logger.write('practice-ready'); practiceView?.open(connection); });
   practice.on('failure', code => {

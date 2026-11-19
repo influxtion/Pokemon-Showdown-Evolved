@@ -15,9 +15,11 @@ const PRACTICE_ENGINES = new Set(['cloud', 'local']);
 const HOME_LAYOUTS = new Set(['classic', 'modern']);
 // Battle screen: 'launcher' (app/client-battle-room.css) or 'showdown' (Showdown's own, untouched).
 const BATTLE_STYLES = new Set(['launcher', 'showdown']);
+// How wide the battle column is, set by dragging the handle beside the log.
+const { validWidth } = require('./battle-resize');
 const DEFAULTS = Object.freeze({
   theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null,
-  battleStyle: 'launcher', practiceEngine: 'cloud',
+  battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640,
 });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
@@ -28,6 +30,7 @@ function valid(key, value) {
   if (key === 'homeLayout') return value === null || HOME_LAYOUTS.has(value);
   if (key === 'battleStyle') return BATTLE_STYLES.has(value);
   if (key === 'practiceEngine') return PRACTICE_ENGINES.has(value);
+  if (key === 'battleWidth') return validWidth(value);
   if (key === 'confirmOnClose') return typeof value === 'boolean';
   if (key === 'showdexEnabled') return typeof value === 'boolean';
   if (key === 'notifyMessages') return typeof value === 'boolean';

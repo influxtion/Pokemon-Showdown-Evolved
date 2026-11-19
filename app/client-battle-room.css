@@ -500,20 +500,43 @@
 
 /* ----- Card layout (the client's full layout only) ----- */
 
+/* The resize handle and the field's backdrop only work in the card layout below. */
+.sd-battle-resizer,
+.sd-battle-backdrop {
+  display: none;
+}
+
 @media (min-height: 571px) {
   :is(html.sd-launcher-shell, html[data-practice-state]) .ps-room:not(.small-layout):not(.tiny-layout) {
     background: var(--sd-app) !important;
 
+    /* The left column is --sd-battle-width wide (640px unless the handle beside the log is
+       dragged; app/battle-resize.js). The controls stretch to it; the field keeps its size,
+       centred on a backdrop as wide as the column. */
+    --sd-bw: var(--sd-battle-width, 640px);
+    --sd-log-left: calc(44px + var(--sd-bw));
+
     .battle {
       top: 24px !important;
+      left: calc(24px + (var(--sd-bw) - 640px) / 2) !important;
+    }
+    .sd-battle-backdrop {
+      display: block !important;
+      position: absolute !important;
+      top: 24px !important;
       left: 24px !important;
+      width: var(--sd-bw) !important;
+      height: 360px !important;
+      box-sizing: border-box !important;
+      border: 1px solid var(--sd-border) !important;
+      background: var(--sd-panel) !important;
     }
 
     /* The client sets the controls' top inline; the card sits 16px under the field. */
     .battle-controls {
       top: 400px !important;
       left: 24px !important;
-      width: 640px !important;
+      width: var(--sd-bw) !important;
       box-sizing: border-box !important;
       padding: 16px !important;
       border: 1px solid var(--sd-border) !important;
@@ -522,7 +545,7 @@
 
     .battle-log {
       top: 24px !important;
-      left: 684px !important;
+      left: var(--sd-log-left) !important;
       right: 24px !important;
       bottom: 81px !important;
       border: 1px solid var(--sd-border) !important;
@@ -530,7 +553,7 @@
       border-radius: 0 !important;
     }
     .battle-log-add {
-      left: 684px !important;
+      left: var(--sd-log-left) !important;
       right: 24px !important;
       bottom: 24px !important;
       min-height: 57px !important;
@@ -541,8 +564,42 @@
     }
     .battle-userlist {
       top: 25px !important;
-      left: 685px !important;
+      left: calc(var(--sd-log-left) + 1px) !important;
     }
+
+    /* The handle fills the gap between the field and the log; a line shows on hover and drag. */
+    .sd-battle-resizer {
+      display: block !important;
+      position: absolute !important;
+      z-index: 5 !important;
+      top: 24px !important;
+      bottom: 24px !important;
+      left: calc(24px + var(--sd-bw)) !important;
+      width: 20px !important;
+      cursor: col-resize !important;
+      touch-action: none !important;
+    }
+    .sd-battle-resizer::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 9px;
+      width: 2px;
+      background: transparent;
+      transition: background-color 0.15s ease;
+    }
+    .sd-battle-resizer:hover::after {
+      background: var(--sd-border-strong);
+    }
+  }
+  html.sd-battle-resizing,
+  html.sd-battle-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+  html.sd-battle-resizing .sd-battle-resizer::after {
+    background: var(--sd-accent) !important;
   }
 
   /* Practice battles have no message box, so the log card runs to the bottom margin. */

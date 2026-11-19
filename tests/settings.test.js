@@ -42,8 +42,10 @@ test('defaults, validation and all settings persist across restarts', (t) => {
   assert.equal(settings.set('battleStyle', 'showdown'), true);
   assert.equal(settings.set('practiceEngine', 'laptop'), false);
   assert.equal(settings.set('practiceEngine', 'local'), true);
+  for (const bad of [639, 2001, 900.5, NaN, '900', null]) assert.equal(settings.set('battleWidth', bad), false, String(bad));
+  assert.equal(settings.set('battleWidth', 900), true);
   const expected = { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true, homeLayout: 'classic',
-    battleStyle: 'showdown', practiceEngine: 'local' };
+    battleStyle: 'showdown', practiceEngine: 'local', battleWidth: 900 };
   assert.deepEqual(new Settings(dir).snapshot(), expected);
   assert.deepEqual(disk(dir), expected);
   const snapshot = settings.snapshot();
@@ -55,7 +57,7 @@ test('legacy theme-only settings gain new defaults and reset persists defaults',
   const dir = fixture(t);
   fs.writeFileSync(path.join(dir, 'settings.json'), '{"theme":"light"}');
   const settings = new Settings(dir);
-  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud' });
+  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640 });
   assert.deepEqual(settings.reset(), DEFAULTS);
   assert.deepEqual(disk(dir), DEFAULTS);
 });
@@ -123,7 +125,7 @@ test('failed write or rename preserves previous settings on disk and in memory',
     const settings = new Settings(dir, fileSystem);
     assert.throws(() => settings.set('theme', 'light'), /failed/);
     assert.equal(settings.get('theme'), 'dark');
-    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud' });
+    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640 });
     assert.equal(fs.readdirSync(dir).some((file) => file.includes('.tmp-')), false);
   }
 });

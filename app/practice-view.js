@@ -29,11 +29,15 @@ function allowRequest(details, root, connection) {
 
 class PracticeView {
   // `battleCss()` returns the battle-room stylesheet while the launcher battle style is on, else ''.
-  constructor({ window, root, css, battleCss = () => '', background, onFailure = () => {}, View = WebContentsView }) {
+  // `script()` returns JavaScript to run in each new document (the battle resize handle), and
+  // `onConsole(text)` receives the page's console messages (how that handle reports a new size).
+  constructor({ window, root, css, battleCss = () => '', script = () => '', onConsole = () => {}, background, onFailure = () => {}, View = WebContentsView }) {
     this.window = window;
     this.root = root;
     this.css = css;
     this.battleCss = battleCss;
+    this.script = script;
+    this.onConsole = onConsole;
     this.battleCssKey = null;
     this.battleCssQueue = Promise.resolve();
     this.background = background;
@@ -69,6 +73,8 @@ class PracticeView {
       if (this.view === view) {
         contents.insertCSS(this.css, { cssOrigin: 'user' }).catch(() => {});
         this.applyBattleCss({ reloaded: true });
+        const code = this.script();
+        if (code) contents.executeJavaScript(code).catch(() => {});
         // Artwork can finish much later than the usable battle document.
         pollHealth();
       }
@@ -98,6 +104,9 @@ class PracticeView {
       this.healthTimer = setTimeout(pollHealth, 500);
       this.healthTimer.unref();
     };
+    contents.on('console-message', (event, _level, legacy) => {
+      if (this.view === view) this.onConsole(typeof event?.message === 'string' ? event.message : legacy);
+    });
     contents.on('render-process-gone', loadFailed);
     contents.on('did-fail-load', (_event, code, _description, _url, main) => { if (main && code !== -3) loadFailed(); });
     const url = connection.clientUrl ? new URL(connection.clientUrl) : pathToFileURL(path.join(this.root, 'practice-client.html'));
@@ -124,6 +133,12 @@ class PracticeView {
   hide() { this.visible = false; this.place(); }
 
   status() { return { state: this.state, error: this.error }; }
+
+  // Runs JavaScript in the open battle document, if there is one.
+  run(code) {
+    const contents = this.view && !this.view.webContents.isDestroyed() ? this.view.webContents : null;
+    if (contents && !contents.isLoading()) contents.executeJavaScript(code).catch(() => {});
+  }
 
   // Adds or removes the battle-room stylesheet to match the Battle screen setting, in order.
   applyBattleCss({ reloaded = false } = {}) {
