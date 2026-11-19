@@ -523,3 +523,40 @@ The updater follows the configured public GitHub repository without embedding cr
 All packaging scripts use `--publish never`. The release-candidate workflow has only `contents: read` and uploads Actions artifacts for review. It builds pinned Showdex on Windows, then native Windows, Apple Silicon, Intel Mac, and Linux x64 packages. Generated Windows and Linux manifests (`latest.yml`, `latest-linux.yml`) and the Windows blockmap must accompany their corresponding binaries. Do not rename an update binary without regenerating metadata. Upload every binary first and metadata last, preferably to a draft release for future versions. Keep each future version increasing. The owner reports no current 0.2.0 users and requested a replacement candidate; replacing that tag/files requires explicit approval of the exact release text and file list. Never publish from a source push automatically.
 
 Tests cover automatic download without quit hooks, cancellation, duplicate requests, state changes during confirmation, practice/search/battle/draft blocking, retries, and manual builds. The Electron suite uses a loopback feed and the real updater to check a newer download, corrupt SHA-512 rejection, same/older versions, and actual launcher IPC/UI guards. Its payload is inert and is never executed. This does not claim a clean-machine installer upgrade or Mac signing test.
+
+## Home design exploration (November 19, 2026)
+
+The owner requested a new UI direction with more color, personality, and slightly
+rounded edges, inspired by the Pokémon TCG apps. Branch `feat/home-ui-rehaul`
+contains the reviewable Home concept in `mockups/home-rehaul.html`. This is an
+interactive design fragment, separate from the running launcher. It does not
+change other pages, settings, accounts, matchmaking, or packaged assets.
+
+The concept takes the light, tactile direction of
+[Pokémon TCG Pocket](https://tcgpocket.pokemon.com/en-us/): pearl surfaces, aqua
+battle controls, a warm yellow Battle button, a peach Daily Foul Play panel, and
+Pokémon artwork. Rounded corners and subtle depth are intentional explorations
+beyond the previous flat design rules. The existing navigation and Home tasks
+remain recognizable. Dark mode uses deep blue with aqua and warm accents.
+
+The format selector demonstrates OU with a clearly labeled sample team and
+Random Battle with six unknown Pokémon. Battle/Cancel demonstrate a local
+search state; other actions explain their destination without connecting to
+Showdown. Appearance can be toggled in the preview. The inline design controls
+also expose accent color, panel radius, and artwork visibility. No ratings,
+online counts, or progress are fabricated as live data.
+
+The owner logo is referenced from this repository at `c961530`. Pokémon artwork
+is referenced from the [PokeAPI sprite archive](https://github.com/PokeAPI/sprites)
+through jsDelivr, under `sprites/pokemon/other/official-artwork/`. Pokémon artwork
+belongs to its respective owners. These references are preview assets, not a
+new shipping asset dependency. The visualization host supplies Lucide icons.
+
+Review evidence: `npm run check` passed, the inline script parsed, and Electron
+rendered all nine images and 24 icons. Light/dark desktop and compact/mobile
+captures were inspected. Layout checks found no horizontal overflow or
+offscreen controls at desktop, minimum-window, and narrow preview widths.
+Format changes, search/cancel, and appearance switching passed interaction
+checks. The smaller window scrolls vertically. Generated standalone preview
+and captures are under ignored `out/mockups/`. This is design review, not
+verification of a production Home implementation.
