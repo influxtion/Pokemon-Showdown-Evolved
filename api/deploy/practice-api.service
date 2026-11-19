@@ -2,7 +2,7 @@
 #   sudo cp deploy/practice-api.service /etc/systemd/system/ && sudo systemctl enable --now practice-api
 # Put a TLS reverse proxy (Caddy, nginx) in front and keep TRUST_PROXY=1 only behind it.
 [Unit]
-Description=Showdown Desktop practice API (Foul Play inference)
+Description=Pokemon Showdown Evolved practice API (Foul Play inference)
 After=network-online.target
 Wants=network-online.target
 

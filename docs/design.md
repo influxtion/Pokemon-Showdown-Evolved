@@ -1,6 +1,6 @@
-# Showdown Desktop: design
+# Pokemon Showdown Evolved: design
 
-This document describes what Showdown Desktop is, how it is built, and why. It is the single reference for the app. Everything about the practice bots lives in [bots.md](bots.md).
+This document describes what Pokemon Showdown Evolved is, how it is built, and why. It is the single reference for the app. Everything about the practice bots lives in [bots.md](bots.md).
 ## Contents
 
 1. [Summary](#1-summary)
@@ -16,7 +16,7 @@ This document describes what Showdown Desktop is, how it is built, and why. It i
 
 ## 1. Summary
 
-Showdown Desktop is a free, open-source Electron app for Windows that hosts the **unmodified** official Pokémon Showdown client and adds tools around it.
+Pokemon Showdown Evolved is a free, open-source Electron app for Windows that hosts the **unmodified** official Pokémon Showdown client and adds tools around it.
 
 A browser tab gives Showdown no stable home for tools, and offers no safe way to practise against bots: automated play on the public server would use a real account and the public ladder. The app keeps the client and its tools in one window and keeps practice entirely off the public server.
 
@@ -28,7 +28,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - Overhaul of the Showdown **UI** and **navigation**
 - Pinned Showdex **damage calculator**
 - **Replay notes**, with in-app replay review and backup/restore
-- Game **analysis** against an engine's expected best play
+- Planned: game **analysis** against an engine's expected best play (not implemented)
 - **Practice** battles against **Foul Play**, a top ladder engine, and three simple offline bots
 
 ### Showdown client
@@ -48,7 +48,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 ### Showdex
 - `npm run build:showdex` builds Showdex 1.4.2 at a pinned revision and verifies every asset against a SHA-256 manifest.
 - Enabled in Settings, then an explicit client reload; a battle is never reloaded automatically. Failure leaves normal play intact.
-- Excluded from packages until its distribution licensing is decided.
+- Packaged as an inert, verified payload with license and corresponding source; installed and enabled only on explicit opt-in.
 
 ### Replay notes
 - **Notes:** a replay link plus title, format and notes. **Save replay note** on a battle prefills players and format; it never uploads.
@@ -57,7 +57,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - **Review:** the official replay page opens beside the note, locked to that one replay. Showdown's player does all playback.
 - **Backup:** **Export** to versioned JSON; **Import** previews new / unchanged / conflict notes (existing kept by default) and applies in one atomic write. **Undo import** works for the current session only.
 
-### Analysis
+### Analysis (planned, not implemented)
 Reviews a finished game turn by turn and shows where the player's choices differed from an engine's.
 
 - **Input:** a just-finished practice or online battle, or a saved replay note. The analysis reads the battle's protocol log, never a live battle.
@@ -284,6 +284,44 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 - **Explicit destructive actions.** Sign out, reset, discarding drafts and undoing imports all confirm first.
 
 ## 7. Testing
+
+### November 19 final Evolved audit
+
+The visible product name is **Pokemon Showdown Evolved**, including page titles,
+onboarding, notifications and future Windows package names. The application ID,
+npm package name, environment variables and profile directory remain stable for
+existing users. The profile test covers both old and new product names.
+
+Verified on the development PC:
+
+- Syntax checks and 241 tests passed with no skips when
+  `PRACTICE_TEST_SERVER_ROOT` points at `vendor/practice/dist/server`.
+- All nine isolated desktop suites passed, as did guest live shell, Showdex,
+  Showdex dock, official replay playback and real Foul Play/Showdex practice.
+- Two full hosted Medium Random Battles completed (26 and 22 turns; 50 decisions,
+  median 118 ms). Two loopback Hard OU battles completed (16 and 32 turns;
+  52 decisions, median 235 ms). Rematches and cleanup passed.
+- The new `npm run test:startup:live` checks guest startup, both themes, all six
+  launcher pages, horizontal overflow, broken images and launcher console errors.
+  Its sample measured Home ready 239 ms from harness entry, connected client and
+  formats at 2.23 s, and page navigation at 19–83 ms. These are warm development
+  measurements, not cold installed-app or low-end hardware guarantees.
+- App (full and production), API and bundled simulator production npm audits
+  reported zero known vulnerabilities. Package source/runtime verification passed.
+- README media were visually inspected: actual guest/practice captures, the owner
+  logo and an attributed Showdown Eevee sprite. Generated test output stays ignored.
+
+Fixed deprecated Electron console handlers and bounded practice API JSON while
+streaming, so an oversized response is cancelled before buffering the rest.
+Regression tests cover cancellation, UTF-8 byte counts and invalid responses.
+Practice's blocked ladder/account and unrelated Showdex API requests are expected
+isolation behavior; actual calculations and battle controls passed.
+
+No public account battles, account challenges, server deployment, installer rebuild
+or clean-machine acceptance were performed. Signed-in verification and installer
+acceptance remain release requirements. This audit is not a guarantee against
+future upstream client changes.
+
 
 Electron is pinned to 45.3.4. The dependency override upgrades only affected
 `minimatch` versions (7 through 11.0.0) to 11.0.1 for GHSA-g3hv-75wg-m249;

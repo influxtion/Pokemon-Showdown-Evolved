@@ -14,11 +14,11 @@ const { Replays } = require('../app/replays');
 
 const ROOT = path.join(__dirname, '..');
 const appDirectory = process.argv.find(argument => argument.startsWith('--app-dir='))?.slice('--app-dir='.length);
-const EXE = path.join(appDirectory ? path.resolve(appDirectory) : path.join(ROOT, 'out', 'windows', 'win-unpacked'), 'Showdown Desktop.exe');
+const EXE = path.join(appDirectory ? path.resolve(appDirectory) : path.join(ROOT, 'out', 'windows', 'win-unpacked'), 'Pokemon Showdown Evolved.exe');
 const WITH_PRACTICE = process.argv.includes('--practice');
 const OUTPUT = path.join(ROOT, 'out', 'packaging-smoke');
 const VERSION = require('../package.json').version;
-const INSTALLER = path.join(ROOT, 'out', 'windows', `Showdown Desktop Setup ${VERSION}-x64.exe`);
+const INSTALLER = path.join(ROOT, 'out', 'windows', `Pokemon Showdown Evolved Setup ${VERSION}-x64.exe`);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function port() {

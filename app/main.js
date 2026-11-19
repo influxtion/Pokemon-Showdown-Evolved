@@ -214,8 +214,8 @@ function ensureClient() {
     if (isMainFrame) logger.write('client-load-failed', code);
   });
   contents.on('render-process-gone', () => logger.write('client-process-gone'));
-  contents.on('console-message', (event, _level, legacy) => {
-    saveBattleWidth(typeof event?.message === 'string' ? event.message : legacy, 'client');
+  contents.on('console-message', (event) => {
+    saveBattleWidth(event.message, 'client');
   });
   // Re-applied on every load; the stylesheet follows prefers-color-scheme, which tracks nativeTheme.
   contents.on('dom-ready', () => {
@@ -290,7 +290,7 @@ function createWindow() {
     ...savedBounds,
     minWidth: 1024,
     minHeight: 640,
-    title: 'Showdown Desktop',
+    title: 'Pokemon Showdown Evolved',
     backgroundColor: background(),
     show: false,
     opacity: process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1' ? 0 : 1,

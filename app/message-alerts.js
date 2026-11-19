@@ -26,7 +26,7 @@ class MessageAlerts {
         challenges.add(key);
         if (!baseline && !this.challenges.has(key)) {
           alerts.push({ kind: 'challenge', user: m.userid, title: `Challenge from ${m.name}`,
-            body: c.formatName ? `${c.formatName} · Accept or decline in Showdown Desktop` : 'Accept or decline in Showdown Desktop' });
+            body: c.formatName ? `${c.formatName} · Accept or decline in Pokemon Showdown Evolved` : 'Accept or decline in Pokemon Showdown Evolved' });
         }
       }
       if (m.unread) {

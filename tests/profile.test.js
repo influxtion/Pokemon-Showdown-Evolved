@@ -20,6 +20,9 @@ test('packaged profiles stay stable and explicit test/portable profiles remain i
   const app = { getName: () => 'Showdown Desktop', getPath: (key) => key === 'appData' ? root : userData,
     setPath: (_key, value) => { userData = value; } };
   assert.equal(configureProfile(app), path.join(root, 'showdown-desktop'));
+  userData = path.join(root, 'Pokemon Showdown Evolved');
+  app.getName = () => 'Pokemon Showdown Evolved';
+  assert.equal(configureProfile(app), path.join(root, 'showdown-desktop'), 'renamed app retains the existing profile');
   userData = path.join(root, 'test-isolated');
   assert.equal(configureProfile(app), userData);
   process.env.SHOWDOWN_DESKTOP_USER_DATA = path.join(root, 'portable');

@@ -1,11 +1,11 @@
 # Practice API
 
-Computes the practice bot's moves for Showdown Desktop. The bot is **Foul Play**, at three levels: **Foul Play** (Hard, upstream as it ships), **Foul Play Medium** and **Foul Play Casual**. All three play Gen 9 Random Battle. Hard also plays Gen 9 OU with a team the client sends.
+Computes the practice bot's moves for Pokemon Showdown Evolved. The bot is **Foul Play**, at three levels: **Foul Play** (Hard, upstream as it ships), **Foul Play Medium** and **Foul Play Casual**. All three play Gen 9 Random Battle. Hard also plays Gen 9 OU with a team the client sends.
 
 The battle itself always runs inside the desktop app, on its own private Showdown simulator. The app plays the bot's seat by streaming the bot's view of the battle to this API and sending back the move it returns. By default the app uses it as a cloud server, a host you deploy from this folder ([Host it on a server](#host-it-on-a-server)). A player can also opt in to running Foul Play on their computer: the app then installs it with `install.js` into its user data folder and runs this same server on `127.0.0.1`. Tests run the same server on `127.0.0.1` as a stand-in.
 
 ```
-Showdown Desktop (always local)                  Practice API (cloud)            
+Pokemon Showdown Evolved (always local)                  Practice API (cloud)
 ┌──────────────────────────────────┐            ┌────────────────────────────────────┐
 │ practice client ──► simulator    │            │ HTTP: sessions, limits, API key    │
 │                        ▲         │  frames →  │ WS /v1/sessions/:id/socket         │
@@ -153,7 +153,7 @@ echo "node: $NODE   api: $API_DIR"   # both must be non-empty
 
 sudo tee /etc/systemd/system/practice-api.service >/dev/null <<EOF
 [Unit]
-Description=Showdown Desktop practice API
+Description=Pokemon Showdown Evolved practice API
 After=network-online.target
 Wants=network-online.target
 

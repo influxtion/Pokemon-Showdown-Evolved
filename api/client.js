@@ -18,9 +18,24 @@ class ApiError extends Error {
 }
 
 async function readJson(response, limit = 65536) {
-  const text = await response.text();
-  if (text.length > limit) throw new ApiError('The practice server sent an unexpectedly large reply.', { status: response.status, code: 'invalid-reply' });
-  try { return JSON.parse(text); } catch { throw new ApiError('The practice server sent an invalid reply.', { status: response.status, code: 'invalid-reply' }); }
+  const reader = response.body?.getReader();
+  const invalid = () => new ApiError('The practice server sent an invalid reply.', { status: response.status, code: 'invalid-reply' });
+  if (!reader) throw invalid();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new ApiError('The practice server sent an unexpectedly large reply.', { status: response.status, code: 'invalid-reply' });
+      chunks.push(Buffer.from(value));
+    }
+    try { return JSON.parse(Buffer.concat(chunks, size).toString('utf8')); } catch { throw invalid(); }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
 
 // One session's socket. Emits protocol.js's server messages (`error` as `failure`, so an

@@ -1,5 +1,5 @@
 appId: com.influxtion.showdowndesktop
-productName: Showdown Desktop
+productName: Pokemon Showdown Evolved
 directories:
   output: out/windows
 asar: true
@@ -56,4 +56,4 @@ nsis:
   perMachine: false
   createDesktopShortcut: false
   createStartMenuShortcut: true
-  artifactName: Showdown Desktop Setup ${version}-${arch}.${ext}
+  artifactName: Pokemon Showdown Evolved Setup ${version}-${arch}.${ext}

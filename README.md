@@ -1,38 +1,75 @@
-# Showdown Desktop
+<p align="center">
+  <img src="renderer/assets/logo.png" alt="Pokemon Showdown Evolved logo" width="160">
+</p>
 
-A Windows app for playing [Pokémon Showdown](https://play.pokemonshowdown.com/). It runs the official Showdown client in its own window and adds a few tools around it.
+# Pokemon Showdown Evolved
 
-**This is a work in progress.** Nothing has been released yet. A Windows installer is coming, but until then expect missing features, rough edges and things that change between versions.
+A free, open-source Windows desktop app for [Pokémon Showdown](https://play.pokemonshowdown.com/). Play online, calculate damage with Showdex, practise against bots, and keep notes on your replays in one workspace.
 
-Showdown Desktop is a fan project. It is not made by or affiliated with Pokémon Showdown, Smogon, Nintendo or The Pokémon Company.
+**Development preview.** Run from source today. A public Windows installer has not been released yet.
 
-## What it does
+## Demo
 
-- **The real client.** You play on the official Showdown site with your own account. The app restyles it to match, but battles, teams and chat work exactly as they do on the website. If something in the app breaks, you're back to plain Showdown.
-- **Home.** Pick a format and team and start a battle. Home also shows your rating and record for that format, plus news, your friends and chat rooms.
-- **Stats.** Your ladder record across every format: rating, win rate, wins, losses and GXE.
-- **Replay notes.** Save replays, write notes on them, rewatch them in the app, and back them up to a file.
-- **Showdex.** Optionally turn on the [Showdex](https://github.com/doshidak/showdex) damage calculator inside battles.
-- **Practice bot.** Play Gen 9 Random Battles against Foul Play on a private battle server inside the app. It never touches your Showdown account or the public ladder. Foul Play's moves come from a cloud server by default, or you can install it on your computer with one click and play offline. The cloud server hasn't gone live yet.
-- **Light and dark themes.** Pick one in Settings or let the app follow Windows.
+![App walkthrough: Home, a real bot battle with Showdex, Bots, and Settings](assets/readme/demo.gif)
 
-The app never searches for battles, challenges anyone or plays on your account by itself.
+A short slideshow of actual app captures: Home in dark mode, a Foul Play battle with Showdex, and Bots and Settings in light mode. Captured in isolated test profiles; no personal account data is shown. [View the battle screenshot](assets/readme/battle.png).
 
-## For developers
+## Features
 
-- [docs/design.md](docs/design.md) covers how the app is built, how to run it from source, testing and packaging.
-- [docs/bots.md](docs/bots.md) explains how the practice bots work.
-- [api/README.md](api/README.md) covers the practice API: running it, rate limits, protocol and deployment.
+- **Online play:** the official Showdown client, your existing account, teambuilder, chat, friends, and ladder stats. Battles stay connected while you switch pages.
+- **Showdex:** optional damage calculations beside online and bot battles. Install it on first launch or from Settings.
+- **Bot practice:** Foul Play in Gen 9 Random Battle and OU, with Medium and Casual variants for Random Battle. Use the cloud service or explicitly download Foul Play for local play. Three simpler bots are also available.
+- **Daily Foul Play:** three attempts each UTC day against Medium, with local streaks and clear history.
+- **Replay notes:** bookmark replay links, write notes, watch replays alongside them, and import or export backups with conflict review.
+- **Your workspace:** light and dark themes, two Home layouts, adjustable battle width, and keyboard shortcuts for tabs and notes.
+
+Online play requires an internet connection. Cloud practice depends on service availability. Practice is separate from your Showdown account and the public ladder; the app never searches, challenges, or chooses moves on your online account automatically.
+
+## Run from source
+
+Requires **Windows x64**, **Node.js 24**, and **Git**. The first builds need internet access to retrieve the pinned upstream sources.
+
+```powershell
+git clone https://github.com/influxtion/Pokemon-Showdown-Launcher-App.git
+cd Pokemon-Showdown-Launcher-App
+npm ci
+npm run build:practice
+npm run build:showdex
+npm start
+```
+
+Choose a Home layout on first launch, then install Showdex or skip it. Sign in through Showdown for online play, or open **Bots** for practice. Foul Play runs in the cloud by default; its local download is optional.
+
+Settings and replay notes stay on your computer. Replays themselves remain hosted by Showdown. Existing profiles continue using `%APPDATA%\showdown-desktop` after the rename to Evolved.
+
+## Development
+
+```powershell
+npm run check
+npm test
+npm run test:desktop
+```
+
+Optional live checks include `test:startup:live`, `test:shell:live`, `test:showdex:live`, `test:showdex:dock`, and `test:replays:live`. These use isolated profiles. `test:practice:showdex` also requires the developer Foul Play runtime installed with `npm run api:setup`.
+
+- [App design, security, testing, and packaging](docs/design.md)
+- [Practice bots and runtime setup](docs/bots.md)
+- [Practice API and deployment](api/README.md)
+
+Signed-in account flows and clean-machine installer acceptance still need manual verification. Automated checks do not replace those release checks.
+
+## Mascot and credits
+
+<img src="assets/readme/eevee.png" alt="Pixel-art Eevee, our mascot" width="96" height="96">
+
+Eevee is our mascot. The logo is supplied by the project owner; the pixel sprite comes from [Pokémon Showdown](https://play.pokemonshowdown.com/sprites/gen5/eevee.png).
+
+Built with [Electron](https://www.electronjs.org/), [Pokémon Showdown](https://github.com/smogon/pokemon-showdown), [Showdex](https://github.com/doshidak/showdex), and [Foul Play](https://github.com/pmariglia/foul-play).
+
+This is an independent fan project, not affiliated with Pokémon Showdown, Smogon, Nintendo, Game Freak, or The Pokémon Company.
 
 ## License
 
-Showdown Desktop is free software under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`).
+The app is licensed under [AGPL-3.0-or-later](LICENSE). Third-party components retain their own licenses: the practice client and Showdex use AGPL-3.0, the simulator uses MIT, and Foul Play uses GPL-3.0. Bundled components include their license and required source materials. Showdex is included as an optional install payload; Foul Play is downloaded only when requested.
 
-It ships or downloads third-party code under its own licenses, kept beside each component:
-
-- Pokémon Showdown classic client (patched for practice): AGPL-3.0, `vendor/practice/SHOWDOWN-CLIENT-LICENSE`. The installer includes its corresponding source.
-- Pokémon Showdown simulator: MIT, `vendor/practice/LICENSE-SHOWDOWN-SERVER`.
-- Showdex (optional, not in the installer): AGPL-3.0, `vendor/showdex/LICENSE`.
-- Foul Play (downloaded only on the hosted API or when a player opts in to local play): GPL-3.0.
-
-Pokémon names and artwork belong to their owners and are not covered by this license.
+Pokémon names and artwork belong to their respective owners and are not covered by the app's software license.

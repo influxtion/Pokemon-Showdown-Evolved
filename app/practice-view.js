@@ -127,8 +127,8 @@ class PracticeView {
       this.healthTimer = setTimeout(pollHealth, 500);
       this.healthTimer.unref();
     };
-    contents.on('console-message', (event, _level, legacy) => {
-      if (this.view === view) this.onConsole(typeof event?.message === 'string' ? event.message : legacy);
+    contents.on('console-message', (event) => {
+      if (this.view === view) this.onConsole(event.message);
     });
     contents.on('render-process-gone', loadFailed);
     contents.on('did-fail-load', (_event, code, _description, _url, main) => { if (main && code !== -3) loadFailed(); });
