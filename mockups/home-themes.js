@@ -64,10 +64,10 @@ function setupHomePreview() {
   document.querySelector('[data-nav="rooms"]').innerHTML = '<div class="nav-item nav-page" aria-current="page"><button class="nav-room-main" type="button">Home</button></div><div class="nav-item nav-tab"><button class="nav-room-main" type="button">Main menu</button></div><div class="nav-item nav-tab"><button class="nav-room-main" type="button">Lobby</button></div>';
   // Sample content is clearly identified in the chrome, with existing component markup.
   const posts = [
-    ['Showdex in practice','Showdex','Damage calculations and matchup information alongside your practice battles.'],
-    ['Replay notes','Pokemon Showdown Evolved','Save useful notes from your battles and open the replay to review them.'],
+    ['Showdex in practice','Showdex','Damage calculations and matchup information alongside your practice battles.','Install and enable Showdex in Settings before starting your next bot session. The calculator opens beside the battle and log.'],
+    ['Replay notes','Pokemon Showdown Evolved','Save useful notes from your battles and open the replay to review them.','Paste a replay link to save it with a title and your notes. Open Review replay to watch it alongside your notes.'],
   ];
-  $('news').innerHTML = posts.map(([title,meta,text], i) => `<article class="post"><button class="post-toggle" type="button" aria-expanded="false" aria-controls="sample-post-${i}"><span class="post-title">${title}</span><span class="post-meta">${meta}</span><span class="post-text">${text}</span></button><div class="post-body" id="sample-post-${i}" hidden><p>${text}</p></div></article>`).join('');
+  $('news').innerHTML = posts.map(([title,meta,text,detail], i) => `<article class="post"><button class="post-toggle" type="button" aria-expanded="false" aria-controls="sample-post-${i}"><span class="post-title">${title}</span><span class="post-meta">${meta}</span><span class="post-text">${text}</span></button><div class="post-body" id="sample-post-${i}" hidden><p>${text}</p><p>${detail}</p></div></article>`).join('');
   $('rooms').innerHTML = ['Lobby','OverUsed','Random Battles','Tournaments','Help'].map(title => `<a class="room-row" href="#"><span class="room-row-head"><span class="room-row-title">${title}</span></span></a>`).join('');
   $('friends').innerHTML = '<div class="friends-note"><p>Sign in to Showdown to see your friends and who is online.</p><button class="btn btn-primary" type="button">Sign in</button></div>';
   for (const dialog of document.querySelectorAll('dialog')) dialog.remove();
@@ -75,7 +75,12 @@ function setupHomePreview() {
     const link = event.target.closest('a');
     if (link) { event.preventDefault(); }
     const post = event.target.closest('.post-toggle');
-    if (post) { const expanded = post.getAttribute('aria-expanded') === 'true'; post.setAttribute('aria-expanded', String(!expanded)); $(post.getAttribute('aria-controls')).hidden = expanded; }
+    if (post) {
+      const opening = post.getAttribute('aria-expanded') !== 'true';
+      post.closest('.post').classList.toggle('is-open', opening);
+      post.setAttribute('aria-expanded', String(opening));
+      $(post.getAttribute('aria-controls')).hidden = !opening;
+    }
   });
   $('format').addEventListener('change', () => {
     const random = $('format').value === 'random';
