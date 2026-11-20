@@ -4,7 +4,8 @@
 :root :is(.button, .textbox, input[type="text"], input[type="search"], input[type="password"], textarea) {
   border-radius: var(--sd-control-radius) !important;
 }
-html.sd-launcher-shell:root :is(#room-ladder, #room-battles, [id^="room-view-friends"]) {
+html.sd-launcher-shell:root :is(#room-ladder, #room-rooms, #room-battles, [id^="room-view-friends"]),
+html.sd-launcher-shell.sd-menu-community:root #room- {
   background-color: var(--sd-app) !important;
   background-image: linear-gradient(var(--sd-wallpaper-tint), var(--sd-wallpaper-tint)), var(--sd-wallpaper) !important;
   background-size: 100% 100%, var(--sd-wallpaper-fit) !important;
@@ -12,13 +13,11 @@ html.sd-launcher-shell:root :is(#room-ladder, #room-battles, [id^="room-view-fri
   background-repeat: no-repeat !important;
   background-attachment: scroll !important;
 }
-/* These tabs always use plain palette colors, regardless of the saved artwork choice. */
-html.sd-launcher-shell:root :is(#room-teambuilder, #room-rooms),
-html.sd-launcher-shell.sd-menu-community:root #room- {
+/* Teambuilder always uses plain palette colors, regardless of the saved artwork choice. */
+html.sd-launcher-shell:root #room-teambuilder {
   background: var(--sd-app) !important;
   --sd-card: var(--sd-panel) !important;
 }
-html.sd-launcher-shell.sd-menu-community:root .mainmenuwrapper { background: none !important; }
 html.sd-launcher-shell:root #room-teambuilder :is(.teamlist .team, .sd-tb-banner),
 html.sd-launcher-shell:root #room-ladder :is(.ladder > h3 + ul, .ladder table),
 html.sd-launcher-shell:root :is(#room-rooms, #room-battles) .blocklink,

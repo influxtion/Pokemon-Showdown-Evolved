@@ -28,8 +28,7 @@ let resultFormat = '';
 function renderRoom(session) {
   const rooms = session.rooms || [];
   const current = typeof session.current === 'string' ? session.current : '';
-  window.HomeAppearance.setPlainBackground(!session.ready || current === 'teambuilder' || current === 'rooms' ||
-    (current === '' && session.menuTab === 'community'));
+  window.HomeAppearance.setPlainBackground(!session.ready || current === 'teambuilder');
   const room = rooms.find((r) => r.id === current);
   const me = session.me || '';
   let title = 'Showdown';

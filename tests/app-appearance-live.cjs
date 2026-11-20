@@ -58,12 +58,16 @@ app.whenReady().then(async()=>{
           background:getComputedStyle(root).backgroundImage};})()`);
         assert.equal(chrome.palette,theme==='dark'?'#25334e':'#e6eaf3',room+' palette');
         assert.equal(chrome.overflow,false,room+' fits '+width);
-        if(['teambuilder','community','rooms'].includes(room)) {
+        if(room==='teambuilder') {
           assert.equal(chrome.background,'none',room+' always plain');
           await until(()=>page('document.documentElement.dataset.backgroundPolicy === "plain"'),'plain launcher shell');
           assert.equal(await page('document.getElementById("background-credit").hidden'),true,'no artwork credit for '+room);
-          if(room==='community') assert.equal(await js('getComputedStyle(document.querySelector(".mainmenuwrapper")).backgroundImage'),'none','Community has no gradient');
-        } else if(room!=='lobby') assert.match(chrome.background,/client-bg-ocean/,room+' artwork');
+        } else if(room!=='lobby') {
+          assert.match(chrome.background,/client-bg-ocean/,room+' artwork');
+          await until(()=>page('document.documentElement.dataset.backgroundPolicy === "selected"'),'selected launcher background');
+          await page('window.HomeAppearance.ready.then(()=>true)');
+          assert.equal(await page('document.getElementById("background-credit").hidden'),false,room+' artwork credit');
+        }
         fs.writeFileSync(path.join(output,room+'-'+width+'-'+theme+'.png'),(await client.capturePage()).toPNG());
       }
     }
