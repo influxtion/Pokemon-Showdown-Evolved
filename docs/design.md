@@ -838,3 +838,10 @@ and its existing expandable rules stay below. Home and the Medium card's daily
 shortcut keep their layouts and behavior.
 Syntax checks and the Daily/app appearance desktop suites passed; both desktop
 sizes and themes were visually checked with the compact strip above the cards.
+
+The Medium card footer now keeps its connection status and both actions on one
+row. The action buttons have narrower horizontal padding, smaller text and no
+fixed minimum width; their height is retained. Long connection messages can
+wrap within the status area without pushing the buttons onto another row.
+Syntax and the Daily desktop suite passed, with light/dark footer captures
+inspected, including the longer Cleared today label.

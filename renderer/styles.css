@@ -1042,10 +1042,11 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .bot-card-cloud--warn { color: var(--warn); }
 .bot-play.btn-primary { flex: none; height: 34px; min-width: 84px; padding: 0 16px; border-radius: 3px; font-weight: 600; }
 .bots-grid:has(.bot-daily) > .bot-card { height: auto; min-height: 228px; }
-.bot-card-foot--daily { flex-wrap: wrap; gap: 8px; }
-.bot-card-foot--daily .bot-card-cloud { flex-basis: 100%; }
-.bot-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; width: 100%; }
+.bot-card-foot--daily { gap: 8px; padding: 12px; }
+.bot-card-foot--daily .bot-card-cloud { gap: 4px; }
+.bot-card-actions { display: flex; flex: none; align-items: center; gap: 6px; }
 .bot-daily { flex: none; height: 34px; padding: 0 12px; font-weight: 600; }
+.bot-card-actions :is(.bot-play, .bot-daily) { min-width: 0; padding: 0 8px; font-size: var(--fs-sm); }
 
 /* Opt-in local Foul Play: one flat panel above the groups. Download, then choose where it runs. */
 .bots-local {
