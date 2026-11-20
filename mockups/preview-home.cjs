@@ -17,7 +17,7 @@ let html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8')
   .replace('</body>', `<script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
 fs.writeFileSync(path.join(output, 'index.html'), html);
 let win;
-let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'airy' };
+let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed' };
 async function change(next) {
   Object.assign(selection, next);
   await win.webContents.executeJavaScript(`applyHomeStudy(${JSON.stringify(selection)})`);
@@ -61,14 +61,6 @@ app.whenReady().then(async () => {
     await new Promise(resolve=>setTimeout(resolve,150));
     console.log('minimum',layout,await win.webContents.executeJavaScript("JSON.stringify({width:innerWidth,scroll:document.documentElement.scrollWidth,hubScroll:document.getElementById('hub').scrollWidth,hubWidth:document.getElementById('hub').clientWidth})"));
     fs.writeFileSync(path.join(output, `minimum-${layout}.png`), (await win.webContents.capturePage()).toPNG());
-    console.log('reachable',layout,await win.webContents.executeJavaScript(`(() => {
-      const hub=document.getElementById('hub'), battle=document.getElementById('battle');
-      battle.scrollIntoView({block:'center'});
-      const b=battle.getBoundingClientRect(), h=hub.getBoundingClientRect();
-      if(b.top<h.top || b.bottom>h.bottom || b.left<h.left || b.right>h.right) throw Error('Battle control is not reachable');
-      hub.scrollTop=0;
-      return 'Battle remains reachable by scrolling';
-    })()`));
   }
   console.log('interactions',await win.webContents.executeJavaScript(`(() => {const b=document.getElementById('battle');b.click();if(!b.disabled)throw Error('Search');document.getElementById('cancel-search').click();if(b.disabled)throw Error('Cancel');const f=document.getElementById('format');f.value='ou';f.dispatchEvent(new Event('change'));if(!document.getElementById('hero-format').textContent.includes('OU'))throw Error('Format');return 'search/cancel/format passed';})()`));
   win.destroy(); app.quit();

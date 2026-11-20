@@ -543,7 +543,7 @@ was removed; its historical source remains in commit `b9ef00d`.
 The desktop menus offer six palettes (Hearth, Garden, Seaside, Rosewood, Amber,
 Twilight), light/dark versions of each, four border finishes (fine, soft inset,
 double frame, stitched), three corner sizes, and Current/Relaxed/Airy spacing.
-Hearth with Airy spacing is the initial suggestion. Classic and the existing
+Hearth with Relaxed spacing is the initial suggestion. Classic and the existing
 Revamped layout can both be inspected. The palette uses cream or deep colored
 surfaces, differently tinted panel headers, colored rail icons, warmer yellow
 actions, and optional subtle texture. These are intentional explorations beyond
@@ -555,14 +555,12 @@ the compact desktop rail, room tabs, daily strip, and Classic's battle/news/
 rooms/friends arrangement. Home scrolls vertically at smaller window sizes.
 The menus are design-review controls, not a proposed production navigation bar.
 
-Following the owner's request for substantially more separation, Airy now uses
-64 px horizontal outer margins, 48 px between major columns, 36 px between
-panel rows, and 32–36 px padding inside the battle panel at larger desktop
-sizes. Labels, fields, team slots, actions, news, rooms, and friends each have
-larger internal gaps too. At minimum width it retains 36 px margins and 32 px
-between columns; vertical scrolling preserves that space instead of squeezing
-everything into the initial viewport. Current and Relaxed remain comparison
-options.
+The owner clarified that the additional space should be between boxes. The
+subsequent increase in outer margins, panel padding, and control spacing was
+reverted. Relaxed retains its earlier outer and internal spacing, with 48 px
+between main columns, 40 px between panel rows, and 36 px between Chat rooms
+and Friends. Airy increases only those panel gaps further. Minimum-width
+layouts use 32 px between major columns and 28 px between the lower panels.
 
 The preview has no launcher preload or account session and performs no
 matchmaking, bot startup, or external navigation. Its only artwork is the
