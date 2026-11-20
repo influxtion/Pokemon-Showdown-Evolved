@@ -846,9 +846,10 @@ wrap within the status area without pushing the buttons onto another row.
 Syntax and the Daily desktop suite passed, with light/dark footer captures
 inspected, including the longer Cleared today label.
 
-Classic Home's battle panel now uses tighter internal spacing and shorter
-controls, with team previews capped at 48px. The separate panels retain their
-spacing. Tournament, Ladder and Spectate fit below it at 1366x768, including
-the ladder-record state. Minimum-height windows retain normal Home scrolling.
-Syntax and the Home appearance desktop suite passed; light/dark desktop
-captures were inspected and the shortcut bounds checked with simulated stats.
+Classic Home's battle panel uses a middle ground after the owner found the
+compact revision too short: 16px vertical padding, 14px section gaps, 36px
+selects, a 50px Battle button and team previews capped at 52px. This restores
+about 56px of height while remaining shorter than the original. The separate
+panels retain their spacing; shorter windows use normal Home scrolling.
+Syntax and the Home appearance desktop suite passed; light/dark captures
+were inspected with the restored spacing.
