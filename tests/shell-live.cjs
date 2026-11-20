@@ -129,12 +129,24 @@ app.whenReady().then(async () => {
       window.__sdCloseFrames.push(app.curRoom.id);
       if (window.__sdWatchClose) requestAnimationFrame(watch);
     }); 0`);
-  for (const [title, next] of [['Lobby', 'battles'], ['Battles', battleId]]) {
-    assert.equal(await clickRow(title, '.nav-close'), true);
-    await until(async () => !(await rail()).some((row) => row.title === title), `${title} closed`);
-    assert.equal(await js('app.curRoom.id'), next, 'right neighbor selected');
+  // Transparent background test windows may stop producing frames until capture requests one.
+  let capturing = false;
+  const frameTimer = setInterval(async () => {
+    if (capturing) return;
+    capturing = true;
+    try { await client.capturePage(); } catch {} finally { capturing = false; }
+  }, 100);
+  try {
+    await until(() => js('window.__sdCloseFrames.length > 1'), 'paint observer running', 10000);
+    for (const [title, next] of [['Lobby', 'battles'], ['Battles', battleId]]) {
+      assert.equal(await clickRow(title, '.nav-close'), true);
+      await until(async () => !(await rail()).some((row) => row.title === title), `${title} closed`);
+      assert.equal(await js('app.curRoom.id'), next, 'right neighbor selected');
+    }
+    await pause(1200);
+  } finally {
+    clearInterval(frameTimer);
   }
-  await pause(1200);
   const frames = await js('window.__sdWatchClose = false; window.__sdCloseFrames');
   assert.ok(frames.length > 1);
   assert.equal(frames.includes(''), false, 'client never paints the fallback main menu');

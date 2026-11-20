@@ -323,6 +323,53 @@ test('stopping while queued leaves the queue', async t => {
   assert.equal(session.status().state, 'idle');
 });
 
+test('a cancelled startup cannot publish a late queue reply over a new session', async t => {
+  const { session } = await setup(t);
+  let reply;
+  const left = [];
+  session.Client = class {
+    createSession() { return new Promise(resolve => { reply = resolve; }); }
+    leaveQueue(ticket) { left.push(ticket); return Promise.resolve(); }
+  };
+  const starting = session.start({ opponent: 'foulplay' });
+  await until(() => reply, 'pending API request');
+  session.stop();
+  session.timeoutMs = 400;
+  let verified;
+  let cancelled = false;
+  session.verify = () => ({ promise: new Promise(resolve => { verified = resolve; }), cancel() { cancelled = true; verified({ ok: false }); } });
+  const replacement = session.start({ opponent: 'heuristic' });
+  reply({ queued: true, ticket: 'a'.repeat(64), position: 1, waiting: 1, checkInMs: 15000 });
+  assert.equal((await starting).cancelled, true);
+  assert.equal(session.queue, null, 'old queue state must not appear in the new startup');
+  assert.deepEqual(left, ['a'.repeat(64)]);
+  await until(() => session.state === 'failed', 'replacement startup timeout');
+  assert.match(session.error, /too long/);
+  assert.equal(cancelled, true);
+  await replacement;
+});
+
+test('a cancelled verification cannot clear the new startup cancellation handle', async t => {
+  const { session } = await setup(t);
+  const checks = [];
+  session.verify = () => {
+    let resolve;
+    const check = { promise: new Promise(done => { resolve = done; }), cancel() { this.cancelled = true; }, resolve: result => resolve(result) };
+    checks.push(check);
+    return check;
+  };
+  const first = session.start({ opponent: 'heuristic' });
+  session.stop();
+  const second = session.start({ opponent: 'heuristic' });
+  checks[0].resolve({ ok: true });
+  assert.equal((await first).cancelled, true);
+  assert.equal(session.verification, checks[1]);
+  session.stop();
+  assert.equal(checks[1].cancelled, true);
+  checks[1].resolve({ ok: false });
+  await second;
+});
+
 test('a queued player can move to Foul Play on this computer', async t => {
   let localUrl = null;
   const { session, api, url, engines } = await setup(t, { server: { maxSessions: 1, maxSessionsPerClient: 2 }, localUrl: () => localUrl });

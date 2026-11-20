@@ -315,7 +315,13 @@ async function smoke() {
   assert.equal(live.getVisible(), false);
   assert.equal(live.webContents.id, liveId);
 
-  win.showInactive();
+  // Transparent background test windows can pause Showdex's color transitions.
+  // Paint a real visible surface before checking themes and capturing evidence.
+  win.setOpacity(1);
+  win.setFocusable(true);
+  win.show();
+  win.setAlwaysOnTop(true);
+  win.focus();
   fs.mkdirSync(captures, { recursive: true });
   const turnBeforeResize = await battleEval(player, 'return room.battle.turn;');
   const layoutFailures = [];
@@ -347,6 +353,26 @@ async function smoke() {
       assert.equal(await battleEval(player, 'return room.battle.turn;'), turnBeforeResize);
       assert.equal(practice().webContents.id, playerId);
       await pause(250);
+      if (withShowdex) {
+        const chrome = await until(() => player.executeJavaScript(`(() => {
+          const root = document.querySelector('.sd-calcdex-docked [data-showdex-module=calcdex]');
+          const moves = root?.querySelector('[class*="PokeMoves-module-container--"]');
+          const damage = moves?.querySelector('[class*="PokeMoves-module-damageButtonLabel--"]');
+          if (!damage) return null;
+          const probe = document.createElement('span');
+          root.append(probe);
+          const color = token => { probe.style.color = 'var(' + token + ')'; return getComputedStyle(probe).color; };
+          const result = { background: getComputedStyle(moves).backgroundColor,
+            color: getComputedStyle(damage).color, panel: color('--sd-panel'), text: color('--sd-text'),
+            rootBackground: getComputedStyle(root, '::before').backgroundColor, app: color('--sd-app') };
+          probe.remove();
+          return result.background === result.panel && result.rootBackground === result.app ? result : null;
+        })()`), `${theme} practice calculator finished its color transition`);
+        assert.ok(chrome, 'practice calculator remains available');
+        assert.equal(chrome.background, chrome.panel, `${theme} practice damage panel follows theme`);
+        assert.equal(chrome.color, chrome.text, `${theme} practice damage ranges follow theme`);
+        assert.equal(chrome.rootBackground, chrome.app, `${theme} practice calculator follows theme`);
+      }
       await until(() => battleEval(player, `return [...room.el.querySelectorAll('.innerbattle img')].some(img => img.naturalWidth > 0);`), 'official battle artwork loaded', 30000);
       const layout = await battleEval(player, `
         const box = element => {
@@ -381,6 +407,10 @@ async function smoke() {
         layoutFailures.push({ windowWidth: width, theme, ...layout });
       }
       for (const [surface, contents] of [['shell', renderer], ['battle', player]]) {
+        // Wait for the compositor as well as computed styles before keeping a capture.
+        await contents.capturePage();
+        await contents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+        await pause(300);
         await capture(contents, `practice-${width}-${theme}-${surface}`);
       }
     }

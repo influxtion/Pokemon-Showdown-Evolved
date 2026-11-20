@@ -32,17 +32,20 @@
     if (!desktop || typeof desktop[method] !== 'function') throw new Error('Replay notes are unavailable.');
     return desktop[method](...args);
   };
+  // Reuse locale formatters when filtering up to 1,000 notes on each keystroke.
+  const fullDateFormat = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+  const shortDateFormat = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
   const dateText = (value) => {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
+    return Number.isNaN(date.getTime()) ? '—' : fullDateFormat.format(date);
   };
   const shortDate = (value) => {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
+    return Number.isNaN(date.getTime()) ? '' : shortDateFormat.format(date);
   };
   const fields = () => ({
     id: selectedId, title: ui.title.value, format: ui.format.value,

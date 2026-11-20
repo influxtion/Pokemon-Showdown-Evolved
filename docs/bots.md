@@ -146,6 +146,15 @@ The Foul Play worker writes **one JSON object per line** to stdout. stderr carri
 
 The API server ignores events whose `room` is not `battle-gen9randombattle-<digits>` and clamp numbers to sane ranges. The simulator speaks the same framing: its only event is `{"type":"ready","port":P}`.
 
+The worker's stdin reader waits for space in a 16-frame queue before reading
+further. This preserves OS pipe backpressure when the engine falls behind,
+allowing the API's existing writable-buffer limit to close a flooding session.
+The previous unbounded Python queue bypassed that protection. The November 20
+audit covers slow consumers, frame order, malformed/oversized input and API pipe
+overflow; `npm test` runs the Python checks with `api/runtime`, a system Python,
+or an interpreter path supplied in `PRACTICE_TEST_PYTHON`. Deploy the updated worker to
+apply this protection on a hosted API; the audit did not deploy it.
+
 ### 3.4 Network confinement
 
 The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
@@ -276,7 +285,7 @@ npm run api:setup           # Foul Play into ignored api/runtime/
 | `npm run test:bots` | Runs the desktop suite above as a standalone check |
 | `npm run smoke:practice-packaged` | A short practice game inside the unpacked package, with moves from the hosted cloud API (`SHOWDOWN_PRACTICE_API_URL` overrides) |
 
-All of these use disposable profiles and private servers, never the player's account or the public server. They are integration checks, not strength benchmarks. Test windows run with `SHOWDOWN_DESKTOP_BACKGROUND=1` (non-focusing, transparent, ignores the mouse).
+All of these use disposable profiles and private servers, never the player's account or the public server. They are integration checks, not strength benchmarks. Test windows start with `SHOWDOWN_DESKTOP_BACKGROUND=1` (non-focusing, transparent, ignores the mouse). Practice screenshot checks temporarily show and focus an opaque window so Chromium paints theme transitions before capture.
 
 ### Not yet verified
 

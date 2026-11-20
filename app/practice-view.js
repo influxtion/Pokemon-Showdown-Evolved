@@ -130,7 +130,7 @@ class PracticeView {
       this.healthTimer.unref();
     };
     contents.on('console-message', (event) => {
-      if (this.view === view) this.onConsole(event.message);
+      if (this.view === view && event.frame === contents.mainFrame) this.onConsole(event.message);
     });
     contents.on('render-process-gone', loadFailed);
     contents.on('did-fail-load', (_event, code, _description, _url, main) => { if (main && code !== -3) loadFailed(); });
