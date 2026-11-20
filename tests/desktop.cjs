@@ -92,12 +92,19 @@ app.whenReady().then(async () => {
   await until(() => run("document.getElementById('friends').textContent.includes('Busy Friend')"), 'friends rendered');
   assert.doesNotMatch(await run("document.getElementById('friends').textContent"), /Battling/);
   const actions = [];
+  let simulateCloses = false;
   ipcMain.removeHandler('showdown:action');
   ipcMain.handle('showdown:action', (_event, action, args) => {
     actions.push({ action, args });
     // The simulated client follows focus changes, as the real one does.
     if (action === 'focus-room') current = { ...current, current: args.room };
     if (action === 'show-menu') current = { ...current, current: '', menuTab: args.tab };
+    if (simulateCloses && action === 'leave-room') {
+      current = { ...current, rooms: current.rooms.filter(room => room.id !== args.room),
+        ...(current.current === args.room ? { current: '', menuTab: 'battle' } : {}) };
+      if (args.next?.room) current.current = args.next.room;
+      else if (args.next?.tab) { current.current = ''; current.menuTab = args.next.tab; }
+    }
     return true;
   });
   await run("document.getElementById('edit-team').click(); 0");
@@ -402,6 +409,7 @@ app.whenReady().then(async () => {
   assert.match(renderer.getURL(), /settings\.html$/);
 
   // Ctrl+1 to Ctrl+9 jump to a tab; Ctrl+W and a middle click close one, but never Home.
+  simulateCloses = true;
   const chord = (contents, keyCode) => {
     contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
     contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
@@ -417,17 +425,17 @@ app.whenReady().then(async () => {
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+2 opens the second tab');
   await stripReady();
   chord(renderer, 'W');
-  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+W closes the open page tab');
+  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+W selects Community to the right of Settings');
   await stripReady();
   assert.deepEqual(await run(titles), ['Home', 'Community', 'vs. Opponent', 'Lobby']);
-  chord(renderer, '2');
-  await until(() => /play\.html$/.test(renderer.getURL()), 'Ctrl+2 opens Community');
+  await until(() => run("document.querySelector('.nav-page[aria-current=page] .nav-room-title')?.textContent === 'Community'"), 'Community selected directly');
   await until(() => client.getVisible(), 'client shown after Ctrl+2');
   await stripReady();
   actions.length = 0;
   chord(client.webContents, 'W');
-  await until(() => /index\.html$/.test(renderer.getURL()), 'Ctrl+W closes Community and returns Home');
-  assert.deepEqual(actions.filter((a) => a.action === 'show-menu'), [{ action: 'show-menu', args: { tab: 'battle' } }]);
+  await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'vs. Opponent'"), 'Ctrl+W closes Community and selects the battle to its right');
+  assert.deepEqual(actions.filter((a) => a.action === 'show-menu'), []);
+  assert.deepEqual(actions.filter((a) => a.action === 'focus-room'), [{ action: 'focus-room', args: { room: 'battle-test-2' } }]);
   assert.equal(actions.some((a) => a.action === 'leave-room'), false);
   await stripReady();
   assert.deepEqual(await run(titles), ['Home', 'vs. Opponent', 'Lobby']);
@@ -437,7 +445,10 @@ app.whenReady().then(async () => {
   await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'Lobby'"), 'Lobby is the open tab');
   chord(client.webContents, 'W');
   await until(() => actions.some((a) => a.action === 'leave-room'), 'Ctrl+W inside the client closes the open room');
-  assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'lobby' } }]);
+  assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'lobby', next: { room: 'battle-test-2' } } }]);
+  await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'vs. Opponent'"), 'last room falls back to its left neighbor');
+  await pause(1200);
+  assert.match(renderer.getURL(), /play\.html$/, 'later polls do not bounce to Home');
   // Real middle clicks: on Home nothing happens, on a room it closes.
   const middle = async (selector) => {
     const { x, y } = await run(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.left + 12), y: Math.round(r.top + r.height / 2) }; })()`);
@@ -448,11 +459,15 @@ app.whenReady().then(async () => {
   await middle('[data-nav=rooms] .nav-page:not([aria-current])');
   await pause(400);
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [], 'a middle click leaves a fixed tab open');
+  chord(renderer, '1');
+  await until(() => /index\.html$/.test(renderer.getURL()), 'Home before closing a background room');
+  await stripReady();
   await middle('[data-nav=rooms] .nav-room:not([aria-current])');
   await until(() => actions.some((a) => a.action === 'leave-room'), 'a middle click closes a room tab');
   assert.deepEqual(actions.filter((a) => a.action === 'leave-room'), [{ action: 'leave-room', args: { room: 'battle-test-2' } }]);
   // The client's own main menu has no tab: the Showdown screen hands it back to Home.
   current = { ...current, current: '', menuTab: 'battle' };
+  await load('play.html');
   await until(() => /index\.html$/.test(renderer.getURL()), 'main menu returns to Home');
   assert.equal(client.getVisible(), false);
 

@@ -72,7 +72,9 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   for (const name of ['rooms', 'sign-in', 'account', 'me', 'teambuilder', 'community']) nav[name] = new Node('x');
   nav['sign-in'].hidden = true;
   nav.account.hidden = true;
-  const location = { href: onPlay ? 'play.html' : page };
+  let href = onPlay ? 'play.html' : page;
+  const navigations = [];
+  const location = { get href() { return href; }, set href(value) { href = value; navigations.push(value); } };
   // The challenge bars are inserted after the top bar; the fake records what lands there.
   const topbar = new Node('header');
   const currentPage = onPlay ? null : new Node('a');
@@ -112,7 +114,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
     clearTimeout: (t) => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); },
   });
   return {
-    location, nav, events, timers, saved, calls, currentPage,
+    location, navigations, nav, events, timers, saved, calls, currentPage, desktop: window.desktop,
     bars: () => after[0],
     // What the main process sends for Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+W and Ctrl+1 to Ctrl+9.
     shortcut: (value) => { assert.equal(cycleHandlers.length, 1); return cycleHandlers[0](value); },
@@ -344,7 +346,7 @@ test('Teambuilder opens from the icon bar as a small page tab that follows its r
   await open.settle();
   assert.deepEqual(open.calls, [{ action: 'leave-room', args: { room: 'teambuilder' } }]);
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
-  assert.equal(open.nav.teambuilder.getAttribute('aria-current'), null);
+  assert.equal(open.location.href, 'stats.html', 'the last tab falls back to its left neighbor');
   open.calls.length = 0;
 });
 
@@ -391,7 +393,7 @@ test('closing Community while it shows goes Home; elsewhere it only drops the ta
   await shown.settle();
   shown.close(shown.tab('Community')).click();
   await shown.settle();
-  assert.deepEqual(shown.calls, [{ action: 'show-menu', args: { tab: 'battle' } }]);
+  assert.deepEqual(shown.calls, [], 'Home opens directly without an intermediate client menu');
   assert.equal(shown.location.href, 'index.html');
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), []);
 
@@ -513,7 +515,7 @@ test('close answered false changes nothing', async () => {
   assert.equal(h.location.href, 'unchanged');
 });
 
-test('close answered true re-polls and leaves play only when no rooms remain', async () => {
+test('closing selects the right room and uses Home only when it is the remaining neighbor', async () => {
   const empty = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' }), session([])], { onPlay: true });
   await empty.settle();
   empty.close(empty.row(0)).click();
@@ -530,15 +532,17 @@ test('close answered true re-polls and leaves play only when no rooms remain', a
   assert.equal(left.location.href, 'play.html');
   assert.equal(left.title(left.row(0)), 'Help');
 
-  // Rooms remain, but the client fell back to its main menu, which has no tab.
+  // A transient main-menu read must not replace the explicitly selected neighbor.
   const menu = harness([
     session([chat('lobby', 'Lobby'), chat('help', 'Help')], { current: 'lobby' }),
     session([chat('help', 'Help')], { current: '', menuTab: 'battle' }),
+    session([chat('help', 'Help')], { current: 'help' }),
   ], { onPlay: true });
   await menu.settle();
   menu.close(menu.row(0)).click();
   await menu.settle();
-  assert.equal(menu.location.href, 'index.html');
+  assert.equal(menu.location.href, 'play.html');
+  assert.deepEqual(menu.calls, [{ action: 'leave-room', args: { room: 'lobby', next: { room: 'help' } } }]);
 
   const elsewhere = harness([session([chat('lobby', 'Lobby')]), session([])]);
   await elsewhere.settle();
@@ -667,11 +671,9 @@ test('Home is the first small tab, and opened launcher pages follow it until clo
   const h = harness([session([])], { saved });
   await h.settle();
   assert.deepEqual(pageTabs(h).map((t) => h.title(t)), ['Home', 'Stats', 'Settings']);
-  h.main(pageTabs(h)[1]).click();
-  assert.equal(h.location.href, 'stats.html');
-  h.location.href = 'index.html';
   assert.equal(h.close(pageTabs(h)[1]).getAttribute('aria-label'), 'Close Stats');
   h.close(pageTabs(h)[1]).click();
+  await h.settle();
   assert.deepEqual(pageTabs(h).map((t) => h.title(t)), ['Home', 'Settings']);
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['settings.html']);
   assert.equal(h.location.href, 'index.html');
@@ -748,11 +750,11 @@ test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', as
 
   // Community closes like its close button, including while it shows the room list.
   for (const extra of [{ current: '', menuTab: 'community' }, { current: 'rooms' }]) {
-    const community = harness([session([chat('lobby', 'Lobby')], extra)], { onPlay: true });
+    const community = harness([session([chat('lobby', 'Lobby')], extra), session([chat('lobby', 'Lobby')], { current: 'lobby' })], { onPlay: true });
     await community.settle();
     await community.closeOpen();
-    assert.deepEqual(community.calls, [{ action: 'show-menu', args: { tab: 'battle' } }], JSON.stringify(extra));
-    assert.equal(community.location.href, 'index.html');
+    assert.deepEqual(community.calls, [{ action: 'focus-room', args: { room: 'lobby' } }], JSON.stringify(extra));
+    assert.equal(community.location.href, 'play.html');
   }
 
   // A room closes through the client, exactly like its close button.
@@ -762,7 +764,7 @@ test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', as
   ], { onPlay: true });
   await inRoom.settle();
   await inRoom.closeOpen();
-  assert.deepEqual(inRoom.calls, [{ action: 'leave-room', args: { room: 'lobby' } }]);
+  assert.deepEqual(inRoom.calls, [{ action: 'leave-room', args: { room: 'lobby', next: { room: 'help' } } }]);
   assert.equal(inRoom.location.href, 'play.html');
   assert.equal(inRoom.title(inRoom.row(0)), 'Help');
 
@@ -775,7 +777,7 @@ test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', as
   const team = harness([session([tb, chat('lobby', 'Lobby')], { current: 'teambuilder' })], { onPlay: true });
   await team.settle();
   await team.closeOpen();
-  assert.deepEqual(team.calls, [{ action: 'leave-room', args: { room: 'teambuilder' } }]);
+  assert.deepEqual(team.calls, [{ action: 'leave-room', args: { room: 'teambuilder', next: { room: 'lobby' } } }]);
 
   // Off the Showdown screen no room is the open tab, so rooms are never closed from there.
   const off = harness([session([chat('lobby', 'Lobby')], { current: 'lobby' })]);
@@ -784,7 +786,7 @@ test('Ctrl+W closes the open tab and does nothing on tabs that cannot close', as
   assert.deepEqual(off.calls, []);
 });
 
-test('Ctrl+W on a launcher page tab closes it and moves to the tab on its left', async () => {
+test('Ctrl+W on the rightmost launcher tab falls back to the tab on its left', async () => {
   const saved = new Map([['nav.pages', '["stats.html","settings.html"]']]);
   const h = harness([session([])], { saved, page: 'settings.html' });
   await h.settle();
@@ -792,6 +794,101 @@ test('Ctrl+W on a launcher page tab closes it and moves to the tab on its left',
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
   assert.equal(h.location.href, 'stats.html');
   assert.deepEqual(h.calls, []);
+});
+
+test('page closes select the tab on the right for the close button, middle click and Ctrl+W', async () => {
+  for (const method of ['button', 'middle', 'shortcut']) {
+    const saved = new Map([['nav.pages', '["stats.html","settings.html","replays.html"]']]);
+    const h = harness([session([])], { saved, page: 'settings.html' });
+    await h.settle();
+    if (method === 'button') h.close(h.tab('Settings')).click();
+    else if (method === 'middle') h.middleClick(h.tab('Settings'));
+    else await h.closeOpen();
+    await h.settle();
+    assert.deepEqual(h.navigations, ['replays.html'], method);
+    assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html', 'replays.html']);
+  }
+});
+
+test('the right neighbor can cross from a page into a room or conversation', async () => {
+  for (const [state, expected] of [
+    [session([chat('lobby', 'Lobby')], { current: 'lobby' }), { action: 'focus-room', args: { room: 'lobby' } }],
+    [session([], { menuTab: 'pm', pmOpen: 'misty', messages: [convo('misty')] }), { action: 'open-pm', args: { user: 'misty' } }],
+  ]) {
+    const h = harness([state], { page: 'stats.html' });
+    await h.settle();
+    await h.closeOpen();
+    assert.deepEqual(h.calls, [expected]);
+    assert.deepEqual(h.navigations, ['play.html']);
+    assert.equal(JSON.parse(h.saved.get('nav.lastSession')).current, state.current);
+  }
+});
+
+test('Community closes directly to the native page on its right', async () => {
+  const saved = new Map([['nav.pages', '["community","stats.html"]']]);
+  const h = harness([session([], { menuTab: 'community' })], { saved, onPlay: true });
+  await h.settle();
+  await h.closeOpen();
+  assert.deepEqual(h.navigations, ['stats.html']);
+  assert.deepEqual(h.calls, [], 'no client Battle-menu detour');
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
+});
+
+test('stale reads and client-change events cannot render an intermediate tab or redirect during a close', async () => {
+  let finishRead, finishClose;
+  const h = harness([session([chat('lobby', 'Lobby'), chat('help', 'Help')], { current: 'lobby' })], {
+    onPlay: true, act: () => new Promise(resolve => { finishClose = resolve; }),
+  });
+  await h.settle();
+  h.desktop.getSession = () => new Promise(resolve => { finishRead = resolve; });
+  h.clientChange();
+  await h.settle();
+  const pending = h.closeOpen();
+  await h.settle();
+  h.clientChange();
+  const settled = session([chat('help', 'Help')], { current: 'help' });
+  h.desktop.getSession = async () => settled;
+  finishRead(session([chat('help', 'Help')], { menuTab: 'battle' }));
+  await h.settle();
+  assert.equal(h.row(0).getAttribute('aria-current'), 'page', 'old selection stays until close finishes');
+  finishClose(true);
+  await pending;
+  await h.settle();
+  assert.deepEqual(h.navigations, []);
+  assert.equal(h.title(h.row(0)), 'Help');
+  assert.equal(h.row(0).getAttribute('aria-current'), 'page');
+  assert.equal(h.events.some(e => e.detail?.menuTab === 'battle'), false, 'no transient session reaches the page');
+});
+
+test('a late main-menu read cannot override a close that navigated to a native page', async () => {
+  let finishRead;
+  const tb = chat('teambuilder', 'Teambuilder');
+  const saved = new Map([['nav.pages', '["teambuilder","stats.html"]']]);
+  const h = harness([session([tb], { current: 'teambuilder' })], { onPlay: true, saved });
+  await h.settle();
+  h.desktop.getSession = () => new Promise(resolve => { finishRead = resolve; });
+  h.clientChange();
+  await h.settle();
+  const pending = h.closeOpen();
+  await h.settle();
+  assert.deepEqual(h.navigations, ['stats.html']);
+  finishRead(session([], { menuTab: 'battle' }));
+  await pending;
+  assert.deepEqual(h.navigations, ['stats.html']);
+  assert.deepEqual(JSON.parse(saved.get('nav.pages')), ['stats.html']);
+  assert.deepEqual(JSON.parse(saved.get('nav.lastSession')).rooms, []);
+});
+
+test('closing a bot battle uses the right neighbor only after stopping succeeds', async () => {
+  for (const ok of [false, true]) {
+    const saved = new Map([['nav.pages', '["practice.html","practice-battle.html","settings.html"]']]);
+    const h = harness([session([])], { page: 'practice-battle.html', saved });
+    h.desktop.stopPractice = async () => ({ ok });
+    await h.settle();
+    await h.closeOpen();
+    assert.deepEqual(h.navigations, ok ? ['settings.html'] : []);
+    assert.equal(JSON.parse(saved.get('nav.pages')).includes('practice-battle.html'), !ok);
+  }
 });
 
 test('a middle click closes a closable tab and leaves the fixed tabs alone', async () => {
@@ -816,6 +913,7 @@ test('a middle click closes a closable tab and leaves the fixed tabs alone', asy
   assert.deepEqual(h.calls, [{ action: 'close-pm', args: { user: 'misty' } }]);
 
   h.middleClick(pageTabs()[1]);
+  await h.settle();
   assert.deepEqual(pageTabs().map((t) => h.title(t)), ['Home']);
   assert.deepEqual(JSON.parse(saved.get('nav.pages')), []);
   assert.equal(h.location.href, 'index.html', 'closing a page tab that is not open stays put');
@@ -866,7 +964,7 @@ test('Ctrl+1 to Ctrl+8 open that tab from the left and Ctrl+9 opens the last one
   assert.equal(home.location.href, 'index.html', 'Ctrl+1 is always Home');
 });
 
-test('closing the page being shown opens the tab on its left, even a client room', async () => {
+test('closing the rightmost page falls back to its left neighbor, even a client room', async () => {
   // Community (a client room, not a file) sits left of Stats: closing Stats opens Community
   // through the client instead of loading a file called "community", which left Stats showing.
   const saved = new Map([['nav.pages', '["community","stats.html"]']]);
