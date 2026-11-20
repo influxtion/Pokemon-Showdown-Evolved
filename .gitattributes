@@ -3,3 +3,4 @@
 # These reviewed build inputs are compared byte-for-byte with the runtime inventory.
 vendor/practice/server-package*.json text eol=lf
 scripts/practice/build-server.cjs text eol=lf
+api/deploy/*.sh text eol=lf

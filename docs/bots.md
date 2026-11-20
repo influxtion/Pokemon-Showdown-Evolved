@@ -155,6 +155,15 @@ overflow; `npm test` runs the Python checks with `api/runtime`, a system Python,
 or an interpreter path supplied in `PRACTICE_TEST_PYTHON`. Deploy the updated worker to
 apply this protection on a hosted API; the audit did not deploy it.
 
+For the existing Linux systemd host, `api/deploy/deploy-audited-worker.sh` applies
+only the worker from audit merge `9f7f646`. Run it as the checkout owner. It finds
+the service directory, checks pinned file hashes, runs the queue tests and both
+format self-checks against the installed runtime, and refuses a busy API. It
+retains a backup and restores it if replacement/startup fails. An optional first
+argument supplies a non-default runtime directory. The script passed shell
+syntax and isolated mock tests for success, busy refusal, failed preflight,
+checksum mismatch and restart rollback; it has not been run on the hosted VM.
+
 ### 3.4 Network confinement
 
 The Foul Play worker never needs the network: it reads frames from stdin. A Python audit hook (`loopback_only`) still raises on any socket bind, connect, send or DNS lookup that is not IPv4 loopback (Windows asyncio uses a loopback socket pair internally). The simulator replaces outbound `Socket.connect` and `fetch` with functions that throw. The bridge in the launcher sends the simulator only the login, the challenge acceptance and moves that pass the choice grammar.
