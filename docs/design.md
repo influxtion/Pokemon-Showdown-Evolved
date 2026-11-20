@@ -175,8 +175,8 @@ Verification: daily state tests cover streaks, three attempts, ties, missed days
 ### Launcher shell and Home
 
 - **Icon bar:** an 84px cobalt bar on the left; each page (Home, Teambuilder, Stats, Replay notes, Practice, Settings) is an icon with its name underneath, and the account avatar and name sit at the foot.
-- **Page tabs:** the tab strip across the top of every page starts with small, label-width tabs for launcher pages, as in Showdown's own header. Home is always first and cannot be closed. Opening Stats, Replay notes, Practice or Settings from the icon bar adds its small tab after Home; it stays until closed or the app restarts, and closing the page being shown moves to the tab on its left. Teambuilder is the client's own room: its small tab is shown exactly while that room is open, and closing the tab leaves the room. **Community** (the client's main menu in its Community view, with its chat room list) also opens from the icon bar; its small tab appears whenever that view shows and stays until closed. Closing it while it shows switches the client back to its Battle view and opens Home; elsewhere it only drops the tab. **Info & Resources** is a launcher page (`resources.html`): the help, tier and clause explanations, chat commands, ranks and shortcuts are written into the page, so nothing is fetched. The client's own resources room (Community's Info & Resources button) is closed as soon as a session read sees it, and this page opens instead. **Practice battle** opens when a practice battle starts and exists while that session does; closing it ends practice, asking first in the same forfeit popup while the battle is on. A wider gap separates these from the room tabs. **Ctrl+Tab** opens the tab to the right of the open one and **Ctrl+Shift+Tab** the one to its left, through page tabs, rooms and conversations, wrapping at the ends. **Ctrl+1** to **Ctrl+8** open that tab counted from the left (Ctrl+1 is always Home) and **Ctrl+9** opens the last one. **Ctrl+W** closes the open tab and a **middle click** closes the tab under the pointer, both exactly as the tab's close button would, so a live battle of your own still asks before forfeiting; Home has no close button and ignores both. The main process catches the keys, so they also work while the focus is inside the Showdown client, a replay or a practice battle.
-- **Room tabs:** the normal-sized tabs that follow. One tab per open room (battles, chats, ladder) in the client's order with a close button, then conversations after a Messages label. There is no Battle tab: Home replaces the client's main menu. If the Showdown screen is left on that menu (for example after closing a room), it returns to Home once two session reads agree, unless a client popup is waiting. Tabs sit flat on a darker strip with a short hairline between neighbours; the open tab takes the page colour, close buttons are always visible, and the hairlines beside it or beside a hovered tab drop away. Tabs share one width (up to 150px), shrink together to a 104px minimum, and then the strip scrolls (the mouse wheel scrolls it sideways). Closing an own live battle asks **Forfeit this battle?** in a small popup under the tab's close button (Forfeit or Cancel, as Showdown does; it fits over the top bar, since a battle view covers the page below), then sends the client's own `/forfeit` and leaves the room in the background, so the battle is never brought back on screen just to confirm. Other rooms close through the client's own leave path.
+- **Page tabs:** the tab strip across the top of every page starts with small, label-width tabs for launcher pages, as in Showdown's own header. Home is always first and cannot be closed. Opening Stats, Replay notes, Practice or Settings from the icon bar adds its small tab after Home; it stays until closed or the app restarts, and closing the selected tab moves directly to the tab on its right, falling back to the left neighbor when it was the last tab. Closing a background tab keeps the selection. Teambuilder is the client's own room: its small tab is shown exactly while that room is open, and closing the tab leaves the room. **Community** (the client's main menu in its Community view, with its chat room list) also opens from the icon bar; its small tab appears whenever that view shows and stays until closed. Closing it uses the same neighboring-tab rule without switching through the client Battle menu. **Info & Resources** is a launcher page (`resources.html`): the help, tier and clause explanations, chat commands, ranks and shortcuts are written into the page, so nothing is fetched. The client's own resources room (Community's Info & Resources button) is closed as soon as a session read sees it, and this page opens instead. **Practice battle** opens when a practice battle starts and exists while that session does; closing it ends practice, asking first in the same forfeit popup while the battle is on. A wider gap separates these from the room tabs. **Ctrl+Tab** opens the tab to the right of the open one and **Ctrl+Shift+Tab** the one to its left, through page tabs, rooms and conversations, wrapping at the ends. **Ctrl+1** to **Ctrl+8** open that tab counted from the left (Ctrl+1 is always Home) and **Ctrl+9** opens the last one. **Ctrl+W** closes the open tab and a **middle click** closes the tab under the pointer, both exactly as the tab's close button would, so a live battle of your own still asks before forfeiting; Home has no close button and ignores both. The main process catches the keys, so they also work while the focus is inside the Showdown client, a replay or a practice battle.
+- **Room tabs:** the normal-sized tabs that follow. One tab per open room (battles, chats, ladder) in the client's order with a close button, then conversations after a Messages label. There is no Battle tab: Home replaces the client's main menu. If the Showdown screen is left on that menu (outside an explicit tab switch), it returns to Home once two session reads agree, unless a client popup is waiting. Tabs sit flat on a darker strip with a short hairline between neighbours; the open tab takes the page colour, close buttons are always visible, and the hairlines beside it or beside a hovered tab drop away. Tabs share one width (up to 150px), shrink together to a 104px minimum, and then the strip scrolls (the mouse wheel scrolls it sideways). Closing an own live battle asks **Forfeit this battle?** in a small popup under the tab's close button (Forfeit or Cancel, as Showdown does; it fits over the top bar, since a battle view covers the page below), then sends the client's own `/forfeit` and leaves the room in the background, so the battle is never brought back on screen just to confirm. Other rooms close through the client's own leave path.
 - **Persistence:** the client stays loaded across page changes, so navigating never loses a battle. A newly started battle switches to the Showdown view and takes priority. Home shows **Return to battle** while one runs. An ended battle shows a result bar: **Save replay note**, **Close battle**, **Battle again**.
 - **Home hero:** format and team pickers (with the team's sprites: Showdown's 2D gen 5 style sprites, drawn pixelated, rather than the Teambuilder's 3D Pokémon HOME renders), **Battle**, **Cancel** and **Challenge a user**. Search runs in the background with an animated state. Choices are remembered per format as a convenience only.
 - **Home hero record:** the selected format's rating, win rate, win–loss record and GXE, from the public profile endpoint (cached 2 minutes), with user and battle counts and **Edit teams** (opens the selected team).
@@ -523,3 +523,350 @@ The updater follows the configured public GitHub repository without embedding cr
 All packaging scripts use `--publish never`. The release-candidate workflow has only `contents: read` and uploads Actions artifacts for review. It builds pinned Showdex on Windows, then native Windows, Apple Silicon, Intel Mac, and Linux x64 packages. Generated Windows and Linux manifests (`latest.yml`, `latest-linux.yml`) and the Windows blockmap must accompany their corresponding binaries. Do not rename an update binary without regenerating metadata. Upload every binary first and metadata last, preferably to a draft release for future versions. Keep each future version increasing. The owner reports no current 0.2.0 users and requested a replacement candidate; replacing that tag/files requires explicit approval of the exact release text and file list. Never publish from a source push automatically.
 
 Tests cover automatic download without quit hooks, cancellation, duplicate requests, state changes during confirmation, practice/search/battle/draft blocking, retries, and manual builds. The Electron suite uses a loopback feed and the real updater to check a newer download, corrupt SHA-512 rejection, same/older versions, and actual launcher IPC/UI guards. Its payload is inert and is never executed. This does not claim a clean-machine installer upgrade or Mac signing test.
+
+## Home design exploration (November 19, 2026)
+
+The owner rejected the first TCG-inspired layout and copy. The current direction
+preserves the desktop app's arrangement and wording, adds warmer and more
+interesting colors and border choices, and gives Home more breathing room.
+The saved Home preference is Classic. Do not turn this into a mobile-style
+dashboard, add a promotional greeting, or replace familiar labels.
+
+On `feat/home-ui-rehaul`, `npm run preview:home` opens an isolated Electron
+appearance preview using the current `renderer/index.html` and `styles.css`.
+`mockups/home-themes.css` provides appearance and spacing overrides;
+`mockups/home-themes.js` provides palettes and clearly labeled sample data.
+`mockups/preview-home.cjs` owns the preview window and native comparison menus.
+The production renderer and saved settings are unchanged. The rejected mockup
+was removed; its historical source remains in commit `b9ef00d`.
+
+The desktop menus offer six palettes (Hearth, Garden, Seaside, Rosewood, Amber,
+Twilight), light/dark versions of each, four border finishes (fine, soft inset,
+double frame, stitched), three corner sizes, and Current/Relaxed/Airy spacing.
+Hearth with Relaxed spacing is the initial suggestion. Classic and the existing
+Revamped layout can both be inspected. The palette uses cream or deep colored
+surfaces, differently tinted panel headers, colored rail icons, warmer yellow
+actions, and optional subtle texture. These are intentional explorations beyond
+the older flat color and border rules.
+
+Relaxed spacing increases Home margins, column separation, panel padding,
+control heights, and list-row spacing while softening dividers. It retains
+the compact desktop rail, room tabs, daily strip, and Classic's battle/news/
+rooms/friends arrangement. Home scrolls vertically at smaller window sizes.
+The menus are design-review controls, not a proposed production navigation bar.
+
+The owner clarified that the additional space should be between boxes. The
+subsequent increase in outer margins, panel padding, and control spacing was
+reverted. Relaxed retains its earlier outer spacing, with 48 px
+between main columns, 40 px between panel rows, and 36 px between Chat rooms
+and Friends. Airy increases only those panel gaps further. Minimum-width
+layouts use 32 px between major columns and 28 px between the lower panels.
+Panel padding was then reduced at the owner's request: the battle panel uses
+18–20 px, news and room rows use 8–16 px, and Friends uses 12–16 px. These
+tighter interiors retain the wider gaps between boxes in both spacing modes.
+Only the gap below Daily Foul Play is tighter at 20 px in Relaxed and Airy;
+the other panel gaps retain their chosen spacing.
+The top inset above Daily Foul Play is also 20 px at both desktop widths.
+
+The preview has no launcher preload or account session and performs no
+matchmaking, bot startup, or external navigation. Artwork includes the
+existing local logo and keystone, plus optional Showdown wallpapers described
+below. The guest, daily state, news, and room list
+are sample content labeled in the preview chrome. Battle/search/cancel and
+the format picker demonstrate local states. Reopening resets the study.
+
+Verification includes script syntax, contrast checks for all twelve palette
+variants, captures of light/dark and multiple border treatments, desktop and
+minimum-size overflow checks, and format/search/cancel interactions. Generated
+pages and captures are in ignored `out/home-themes/`. This remains a design
+preview, not verification of a production Home implementation.
+
+Daily Foul Play was removed from the preview's sample news at the owner's
+request; the dedicated daily strip remains.
+
+### Showdown background feasibility (November 19, 2026)
+
+Image backgrounds are technically feasible for Home without changing its
+desktop layout. The existing image CSP permits local assets and the official
+Showdown origin. An isolated Electron experiment decoded all five backgrounds
+used by the classic client's random selection: Charizards (1500×891), Horizon
+(1280×853), Ocean (1500×1000), Shaymin (1280×800), and Pokemon Showdown Day
+(2000×967). The current picker explicitly offers the first four, Solid blue,
+Random, and a custom image; Showdown Day is part of the random pool.
+Sources: [background storage and attribution](https://github.com/smogon/pokemon-showdown-client/blob/1cf9b385a97ad5c77a25b91a1c799078827ec306/play.pokemonshowdown.com/src/oldclient/storage.js#L30-L118),
+[background picker](https://github.com/smogon/pokemon-showdown-client/blob/1cf9b385a97ad5c77a25b91a1c799078827ec306/play.pokemonshowdown.com/src/oldclient/client-topbar.js#L868-L934),
+and [hosted assets](https://play.pokemonshowdown.com/fx/).
+
+The experiment placed Ocean behind the Seaside Home panels with a light tint,
+preserving opaque content surfaces and the existing gaps. Desktop and minimum
+window sizes had no horizontal overflow. The capture was visually inspected;
+it is saved at ignored `out/home-themes/background-ocean-study.png`, with its
+temporary harness at `out/home-background-feasibility.cjs`. This was a hidden
+research window; the normal preview's background, production files and saved
+preferences were not changed. It does not establish startup performance or
+offline behavior for a shipped feature.
+
+Suggested implementation: a Home background choice independent of the color
+palette, starting with Plain color and a small allowlisted image catalog,
+with cover cropping, per-image positioning, a theme-aware tint, and a visible
+artist credit. Load artwork asynchronously and keep the palette color as the
+loading/offline fallback. A cached or bundled copy would make the desktop
+experience independent of a network fetch after first use. Upstream credits
+Vivian Zou (Horizon), Quanyails (Sunrise Ocean), Daniel Kong (Shaymin), Jessica
+Valencia (Charizards), and LifeisDANK (Showdown Day); this check did not establish
+an image-specific redistribution grant, so retain those credits and resolve
+asset distribution terms before bundling exact artwork.
+
+Home and the embedded Showdown client have separate storage. Matching an
+existing Showdown choice would require a narrow, sanitized background ID in
+the bridge; arbitrary CSS or custom data URLs should not be copied through it.
+The embedded client's art is currently suppressed by the explicit `body`
+background rule in `app/client-theme.css`. A Home-only background needs no
+change to that stylesheet or to battle rendering. Restoring client wallpaper
+or importing custom local images would be separate extensions.
+
+The owner subsequently requested backgrounds in the mockup. The native
+Background menu now offers Plain color, Ocean, Horizon, Shaymin, Charizards,
+and Showdown Day. Ocean starts selected with the existing Hearth palette.
+Artwork tint offers Natural, Soft, and Muted; Soft mixes in 12% of the palette
+background in light appearance and 24% in dark appearance. The artist credit
+appears in the top bar.
+
+The mockup loads only the five allowlisted images from Showdown's image host
+under the existing CSP. It displays the palette background while decoding,
+falls back to it on failure or a 12-second timeout, and ignores stale loads
+after another selection. No wallpaper files are bundled or added to the
+production app. Verification covered all five images, credits, both
+appearances, both layouts at minimum size, rapid switching, plain color, and
+a blocked-network fallback in an isolated Electron session. Captures are in
+ignored `out/home-themes/background-*.png`.
+
+To expose more of the wallpaper, Relaxed now uses 80 px between the main
+columns, 64 px between panel rows, and 56 px between Chat rooms and Friends.
+Airy uses 104/80/72 px respectively. The small-window horizontal gaps are
+48/40 px in Relaxed and 64/56 px in Airy. Shortcut tiles have 24 px gaps in
+Relaxed and 32 px in Airy. Outer padding and panel interiors stay unchanged;
+the gaps above and below Daily Foul Play remain 20 px, verified by rendered
+geometry.
+
+The owner clarified that wallpaper must fill the whole Home screen: the
+Show whole image default left unwanted bands. Background > Image framing now
+defaults to Fill window (`cover`), centered in the Home viewport with only
+the proportional crop required to cover it. Show whole image (`contain`)
+remains an optional comparison. The wallpaper is sized to the viewport rather than the
+scrolling content, so expanding news or scrolling does not enlarge it.
+Checked all five images, desktop and minimum widths in both layouts, image
+framing choices, and unchanged hero padding; no horizontal overflow.
+
+Home's panel fills now use 80% opacity (20% transparency) when artwork is loaded: Battle, News,
+Chat rooms, Friends, the daily strip, and shortcut tiles let a little of the
+wallpaper through. Text and controls stay fully opaque, as do panel headers.
+Secondary panel text mixes 80% toward the primary text color. The Battle
+gradient and dark panel fills are deepened, and light daily/tile text is
+slightly darkened, to preserve contrast at the increased transparency. Plain-color and loading
+fallbacks retain solid panels. There is no panel-level opacity or backdrop
+blur. Rendered color checks across all twelve palette variants, compositing
+the fills over both black and white, gave a minimum 4.61:1 for the checked
+primary, secondary, daily, tile, and Battle text. Ocean and the busier
+Charizards artwork were visually inspected in light/dark captures; desktop
+and minimum-size layout checks passed.
+
+The default Hearth colors were then rebalanced around soft blue News, seafoam
+Chat rooms, and apricot Friends headers, with a cooler ivory surface and
+bluer Battle panel. The matching dark colors use blue, deep seafoam, and
+warm brown. The other five palettes remain available for comparison.
+
+Classic's right-hand group now caps at 620 px instead of stretching across
+all remaining width. With the existing 56 px gap, Chat rooms and Friends
+are 282 px wide each at the desktop preview size. News uses a 280 px height
+and the lower pair 260 px, reducing unused space while preserving the wide
+panel gaps and Battle's dimensions. The group contracts with the available
+space at smaller widths; News gets 300 px height below 1180 px to accommodate
+wrapped text. Checked desktop/minimum layouts, news expand/collapse, and
+all twelve palette contrast combinations; the checked minimum remains 4.61:1.
+The three-box group is aligned to the right edge of its grid column at the
+owner's request, preserving its sizes and the existing outer inset.
+
+### Home appearance implementation (November 19, 2026)
+
+The approved study is now the real Home screen. The six palettes (Hearth,
+Garden, Seaside, Rosewood, Amber, Twilight), five Showdown wallpapers plus
+plain color, tint, framing, four border finishes, three corner sizes, three
+spacing choices, and plain-background texture are saved in launcher settings.
+Home's Customize Home link opens Settings at Home appearance; See Home returns
+to the working screen. Defaults are Twilight, Ocean, Soft tint, Fill Home,
+Soft inset borders, Soft corners, Relaxed spacing, and subtle plain texture.
+The background is a fixed saved choice, not random. Existing Home layout and
+app appearance preferences are preserved; palettes follow native light/dark
+appearance, including system changes.
+
+`renderer/home-appearance-options.js` supplies the same catalog/defaults and
+allowlists to the settings store, Home, Settings, and isolated preview.
+`renderer/home-appearance.js` applies tokens and bounded asynchronous artwork
+loading. `renderer/home-appearance.css` is loaded only on Home. The mockup uses
+these production files while retaining its separate sample data. Home's real
+Showdown snapshot/actions, daily challenge, news expansion, and navigation stay
+in their existing controllers. No new IPC or arbitrary artwork URL is exposed.
+
+The art remains hosted by Showdown, with a visible artist credit. A failed or
+12-second image load leaves solid palette panels and does not block Home;
+stale completion cannot replace a newer selection. Fill uses the Home viewport
+and proportional cropping, not the height of scrolling content. Artwork is
+not bundled, and this change makes no offline artwork availability guarantee.
+Loaded panels retain 20% transparency with solid controls and text. The compact
+daily gaps, reduced interiors, smaller right-aligned secondary panels, and
+larger inter-panel gaps match the approved study.
+
+Validation: syntax checks and 252 unit tests passed (one optional real-server
+test skipped), and all eleven isolated desktop suites passed. The Home desktop suite exercises real settings IPC, persistence,
+all palettes/background choices, native theme changes, both layouts at 1440x900
+and 1024x640, daily spacing, news expansion without duplicate summaries, client
+preservation, and offline fallback. Rendered checked text contrast across all
+twelve palette variants remained at least 4.61:1 against both extreme artwork
+colors. All five actual hosted images decoded in the optional live-art run;
+screenshots were inspected. The rest of the desktop regression suite uses
+blocked launcher artwork requests to remain isolated. No installer or release
+is part of this change.
+
+A separate fresh guest profile also loaded the production Home against live
+Showdown, with real formats, news, room counts, and the Ocean artwork. No search,
+challenge, or signed-in account was used; that review window was left open.
+
+The owner subsequently selected Twilight as the default palette. Existing
+saved palette choices are retained. Classic's Tournament/Ladder/Spectate
+shortcuts now sit 20 px below Battle in Relaxed and Airy, rather than 64/80 px.
+Daily's 20 px gaps and the wider gaps among the right-hand panels are unchanged.
+
+### App-wide appearance (November 19, 2026)
+
+The owner approved extending the Home design throughout the desktop app. Every
+launcher page now loads the shared palette and artwork controller, plus
+`renderer/app-appearance.css` for Settings, Bots, Stats, replay notes/review,
+resources and battle placeholders. Colors & style in Settings controls all six
+palettes, backgrounds, framing, tint, border finishes, corners and spacing.
+Twilight remains the default; existing saved choices and internal `home*`
+preference names are preserved. Settings previews saved changes immediately.
+
+The shared catalog now exports pure color tokens for both renderer and main.
+`app/appearance.js` generates validated user-origin CSS for explicitly registered
+Showdown, practice and replay views. Each document owns one replaceable sheet;
+palette changes do not reload it or interrupt a battle. Main-document navigation
+invalidates pending insertions; subframes and same-document navigation do not.
+OAuth windows receive no appearance controller. No IPC or remote privileges
+were added. Window/view fills also follow the selected palette.
+
+Teambuilder, Community, Ladder, chat-room and spectate lists receive the selected
+wallpaper with translucent cards. Reading headers, form controls and buttons
+stay solid; Friends uses a reading panel around its page. Plain color works
+without network access. The art stays proportional to the visible viewport and
+keeps its credit in the launcher bar. The existing Home arrangement, shortcuts,
+daily gaps and wording are retained, apart from the customization link now
+being named Colors & style.
+
+Chat, tournament chrome, online/practice battles, replay playback and Showdex
+use matching colors and softer corners. Battle and calculator reading surfaces
+remain solid. Battlefields, sprites, Pokémon types, HP/status colors and
+calculator game colors keep their existing treatment. The optional launcher
+battle stylesheet owns the new move/switch/card rounding, so the original
+Showdown battle-style choice still bypasses those rules. Practice/replay views
+make no new wallpaper requests; their native battlefield artwork remains intact.
+
+Validation includes syntax checks, 255 passing unit tests (one optional
+real-server test skipped), and twelve isolated desktop suites. The new app
+appearance suite checks seven real launcher pages in both themes at 1366×768
+and 1024×640, real Settings IPC, immediate palette/corner changes in the retained
+client, solid controls and horizontal fit. Friends fixtures now use the shared
+Twilight sheet. The Daily desktop harness waits for initial Home navigation
+before driving another load, fixing a test startup race.
+
+`npm run test:appearance:live` checks actual hosted artwork and the real guest
+Teambuilder, Community, Ladder, room browser, spectate list and chat at both
+sizes/themes, plus four native screens. Live Showdex, dock and public replay
+playback suites passed. The real loopback Foul Play/Showdex suite passed moves,
+switching, Tera, rematch, theme/size checks and lifecycle cleanup on rerun; its
+first run timed out waiting for a switch control, and now records state and a
+screenshot on that failure. Screenshots of native pages, remote pages and
+battle/calculator surfaces were inspected. Signed-in friends/account behavior,
+public account battles, installer packaging and public releases were not part
+of this appearance change.
+
+November 20 correction: Bots and Teambuilder always use the selected palette's
+plain color, with solid panels and
+no wallpaper, background texture or gradient. The shared artwork preference
+still applies elsewhere. Bots skips artwork loading entirely; the play shell
+follows the active room and hides the artwork credit on the plain tabs. These
+page policies do not overwrite the saved background choice. Community,
+including its room browser, uses the selected wallpaper again at the owner's
+request, with translucent cards and the artwork credit restored.
+Syntax checks, the Home and app appearance desktop suites, and the live guest
+appearance suite passed; the plain tabs were visually checked in the
+captured light/dark desktop layouts.
+
+Daily Foul Play now sits after the opponent groups on Bots. Its Home card and
+Bots header use the palette's rose/plum surface (Twilight), with a coral edge
+and a lightly tinted Bots body. Other palettes use their matching surface.
+The inactive flame is muted; the active streak flame keeps its lit color.
+Syntax checks and the existing Daily/Home appearance desktop suites passed;
+both Bots themes were inspected, and Home's twelve palette contrast checks
+remain at least 4.61:1.
+
+The owner rejected the remaining orange/gold accents on Daily Foul Play.
+Its updated treatment uses a cool periwinkle surface, violet action button and
+edge, and blue lit flame on both Home and Bots. Dedicated light/dark daily
+tokens replace the shared warm accents, including button shadows and the Home
+emblem. Its position below the bot choices is retained.
+Syntax, Daily desktop flow and Home appearance checks passed; the twelve
+palette contrast checks still meet 4.61:1. Light/dark screenshots were inspected.
+
+Foul Play Medium's Bots card now includes a violet Play daily shortcut beside
+its regular Play action. Both daily entry points share the same controller,
+availability, start lock and existing main-process attempt reservation. A
+running challenge shows Return to daily; a completed challenge shows a disabled
+Cleared today button. Rebuilding cards after format changes restores this state.
+Errors from the shortcut reveal the daily panel's error message. The footer
+wraps the connection status above the two actions at narrow card widths.
+Syntax and the Daily/app appearance desktop suites passed. Checks cover the
+Medium-only action, format changes, one attempt when both entry points are
+clicked, returning without another reservation, completed-state disabling and
+light/dark card fit. No live daily attempt was consumed during verification.
+
+The owner subsequently swapped the Bots sections: Daily Foul Play now sits in
+the former local-download position above the opponent groups, and Foul Play on
+this computer sits below those groups. Daily is shorter: its action shares the
+title/streak row, its description, attempts and record wrap along one line,
+and its existing expandable rules stay below. Home and the Medium card's daily
+shortcut keep their layouts and behavior.
+Syntax checks and the Daily/app appearance desktop suites passed; both desktop
+sizes and themes were visually checked with the compact strip above the cards.
+
+The Medium card footer now keeps its connection status and both actions on one
+row. The action buttons have narrower horizontal padding, smaller text and no
+fixed minimum width; their height is retained. Long connection messages can
+wrap within the status area without pushing the buttons onto another row.
+Syntax and the Daily desktop suite passed, with light/dark footer captures
+inspected, including the longer Cleared today label.
+
+Classic Home's battle panel uses a middle ground after the owner found the
+compact revision too short: 16px vertical padding, 14px section gaps, 36px
+selects, a 50px Battle button and team previews capped at 52px. This restores
+about 56px of height while remaining shorter than the original. The separate
+panels retain their spacing; shorter windows use normal Home scrolling.
+Syntax and the Home appearance desktop suite passed; light/dark captures
+were inspected with the restored spacing.
+
+Tab closing now shares one selection rule across launcher pages, Community,
+Teambuilder, client rooms, conversations and bot battles: select the tab to
+the right, or the left neighbor for the final tab. Background closes preserve
+the current selection. Close buttons, middle clicks and Ctrl+W use this path.
+Client closes and successor selection run in one validated bridge call so the
+client's fallback room does not paint. Reads begun before or during a close
+cannot render stale state or redirect a navigation already in progress; the
+cached strip is refreshed before crossing back to the client page. Failed or
+cancelled closes keep the tab, including failed practice stops.
+
+Verified with syntax checks, 262 passing unit tests (one optional real-server
+test skipped), all 12 isolated desktop suites, and the live guest shell suite.
+Regressions cover delayed reads, client-change events, right/left selection,
+native/client transitions, background closes and forfeit guards. Live frame
+sampling observed no intermediate main-menu frame during client tab closes.
+The live suite used only a disposable guest profile and spectated battles.

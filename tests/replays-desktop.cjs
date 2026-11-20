@@ -30,6 +30,8 @@ async function until(check, label, timeout = 12000) {
 }
 
 app.whenReady().then(async () => {
+  // Home artwork stays offline in this suite; loopback update fixtures remain available.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: /^https?:/.test(details.url) && new URL(details.url).hostname !== '127.0.0.1' }));
   session.fromPartition('persist:showdown').webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: /^https?:/.test(details.url) });
   });

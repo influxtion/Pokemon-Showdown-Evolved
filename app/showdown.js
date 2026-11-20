@@ -398,6 +398,16 @@ function leaveRoom(roomid, forfeit) {
   return app.leaveRoom(roomid) ? true : 'needs-client';
 }
 
+// Closing and selecting happen in one client task, so its fallback room never paints.
+function closeClientTab(kind, id, forfeit, next) {
+  const result = kind === 'room' ? leaveRoom(id, forfeit) : closePM(id);
+  if (result !== true || !next) return result;
+  if (next.room) focusRoom(next.room);
+  else if (next.user) openPM(next.user);
+  else showMenu(next.tab);
+  return true;
+}
+
 function openSounds() {
   app.addPopup(SoundsPopup);
   return true;
@@ -1680,6 +1690,12 @@ class ShowdownBridge {
   async act(action, args) {
     const contents = this.getContents();
     if (!contents || !args || typeof args !== 'object') return false;
+    // Optional successor for a close: one existing room, conversation, or Community.
+    const next = args.next;
+    if ((action === 'leave-room' || action === 'close-pm') && next !== undefined &&
+        (!next || typeof next !== 'object' || Object.keys(next).length !== 1 ||
+          !(typeof next.room === 'string' && ROOM_ID.test(next.room) ||
+            typeof next.user === 'string' && USER_ID.test(next.user) || next.tab === 'community'))) return false;
     let code;
     switch (action) {
       case 'search': {
@@ -1713,12 +1729,13 @@ class ShowdownBridge {
         break;
       case 'leave-room':
         if (!(typeof args.room === 'string' && ROOM_ID.test(args.room)) || args.room === 'rooms') return false;
-        code = call(leaveRoom, args.room, args.forfeit === true);
+        code = callWith([leaveRoom, closePM, pmWindow, openPM, focusRoom, showMenu], closeClientTab, 'room', args.room, args.forfeit === true, next);
         break;
       case 'open-pm':
       case 'close-pm':
         if (typeof args.user !== 'string' || !USER_ID.test(args.user)) return false;
-        code = callWith([pmWindow], action === 'open-pm' ? openPM : closePM, args.user);
+        code = action === 'open-pm' ? callWith([pmWindow], openPM, args.user)
+          : callWith([leaveRoom, closePM, pmWindow, openPM, focusRoom, showMenu], closeClientTab, 'pm', args.user, false, next);
         break;
       case 'answer-challenge': {
         const team = args.team === undefined ? null : args.team;

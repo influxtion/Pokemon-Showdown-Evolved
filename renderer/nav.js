@@ -15,6 +15,9 @@
   if (!list || !window.desktop) return;
   const onPlay = !!document.body && document.body.dataset.page === 'play';
   const desktop = window.desktop;
+  let closingTab = false;
+  let navigating = false;
+  let navigationVersion = 0;
 
   const svg = (d, extra = '') => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"${extra}>${d}</svg>`;
   const round = ' stroke-linejoin="round"';
@@ -65,7 +68,11 @@
   }
 
   function go(page) {
-    if (!(onPlay && page === 'play.html')) location.href = page;
+    if (!(onPlay && page === 'play.html')) {
+      navigating = true;
+      navigationVersion += 1;
+      location.href = page;
+    }
   }
 
   // focus-room and leave-room answer 'needs-client' when the client shows a popup (such as a
@@ -134,19 +141,17 @@
   }
 
   async function closeRoom(id) {
-    let result = await act('leave-room', { room: id });
-    if (result === 'needs-forfeit') {
-      if (!(await confirmForfeit(id))) return false;
-      result = await act('leave-room', { room: id, forfeit: true });
-    }
-    if (result === 'needs-client') {
-      go('play.html');
-    } else if (result === true) {
-      const session = await pollNow();
-      // With nothing left to show, or only the client's main menu, Home takes over.
-      if (onPlay && session && session.ready && (session.rooms.length === 0 || onMainMenu(session))) location.href = 'index.html';
-    }
-    return result;
+    return closeAndSelect(`${id === 'teambuilder' ? 'page' : 'room'}:${id}`, async (next) => {
+      const args = { room: id, ...(next ? { next } : {}) };
+      let result = await act('leave-room', args);
+      if (result === 'needs-forfeit') {
+        if (!(await confirmForfeit(id))) return false;
+        result = await act('leave-room', { ...args, forfeit: true });
+      }
+      if (result === 'needs-client') go('play.html');
+      if (result === true && id === 'teambuilder') removePage(id);
+      return result;
+    }, true);
   }
 
   // Fixed tabs and how to reach their view in the client. The client's main menu has no tab; Home
@@ -171,8 +176,7 @@
 
   // Closing goes through the client, which also declines a challenge still waiting there.
   async function closeConversation(user) {
-    await act('close-pm', { user });
-    pollNow();
+    return closeAndSelect(`pm:${user}`, (next) => act('close-pm', { user, ...(next ? { next } : {}) }), true);
   }
 
   function messageSub(m) {
@@ -295,53 +299,80 @@
     savePages();
   }
 
-  // Closing the page being shown moves to the tab on its left.
-  function closePage(file) {
-    const at = pages.indexOf(file);
-    if (at < 0) return;
-    pages.splice(at, 1);
-    savePages();
-    if (file === thisPage) {
-      // Community and Teambuilder are client rooms, not files: open them the way their tab does.
-      const left = pages[at - 1] || 'index.html';
-      if (PAGES[left].room) openTab(left).catch(() => { location.href = 'index.html'; });
-      else location.href = left;
-      return;
+  // Choose from the complete strip before removing anything. Background closes keep focus.
+  async function closeAndSelect(id, remove, clientClose = false) {
+    if (closingTab || navigating) return false;
+    const at = strip.findIndex((tab) => tab.id === id);
+    const next = at >= 0 && strip[at].current ? strip[at + 1] || strip[at - 1] : null;
+    closingTab = true;
+    navigationVersion += 1;
+    menuReads = 0;
+    try {
+      const result = await remove(next?.client);
+      if (result === true && lastSession) {
+        const cached = { ...lastSession,
+          rooms: lastSession.rooms.filter((room) => id !== `room:${room.id}` && id !== `page:${room.id}`),
+          messages: (lastSession.messages || []).filter((message) => id !== `pm:${message.userid}`),
+        };
+        try { sessionStorage.setItem(lastSessionKey, JSON.stringify(cached)); } catch {}
+      }
+      if (result === true && next) {
+        if (next.client) {
+          // Client closes already focused their successor in the same client task.
+          if (!clientClose) {
+            const target = next.client;
+            await act(target.room ? 'focus-room' : target.user ? 'open-pm' : 'show-menu', target);
+          }
+          // The next document must not first draw a cached selection from before the close.
+          await inflight;
+          try {
+            const session = await desktop.getSession();
+            if (session?.ready && Array.isArray(session.rooms)) sessionStorage.setItem(lastSessionKey, JSON.stringify(session));
+          } catch {}
+          go('play.html');
+        } else await next.open();
+      }
+      return result;
+    } finally {
+      // Discard reads started before/during the close, then render one settled state.
+      await inflight;
+      closingTab = false;
+      navigationVersion += 1;
+      menuReads = 0;
+      if (!navigating) await pollNow();
     }
-    lastKey = null;
-    if (lastSession) render(lastSession);
   }
 
-  // Closing Community while shown returns the client to its Battle view, so Home opens.
-  async function closeCommunity() {
-    const at = pages.indexOf('community');
-    if (at >= 0) {
-      pages.splice(at, 1);
-      savePages();
-    }
-    const shown = onPlay && lastSession && communityShown(lastSession);
-    if (shown) {
-      await act('show-menu', { tab: 'battle' });
-      location.href = 'index.html';
-      return true;
-    }
+  function removePage(file) {
+    const at = pages.indexOf(file);
+    if (at < 0) return false;
+    pages.splice(at, 1);
+    savePages();
     lastKey = null;
-    if (lastSession) render(lastSession);
     return true;
+  }
+
+  function closePage(file) {
+    return closeAndSelect(`page:${file}`, () => removePage(file));
+  }
+
+  function closeCommunity() {
+    return closePage('community');
   }
 
   async function closePracticeBattle() {
-    let result = null;
-    try {
-      result = await desktop.stopPractice();
-      if (result && result.needsConfirm) {
-        if (!(await confirmForfeit(BATTLE_PAGE))) return false;
-        result = await desktop.stopPractice(true);
-      }
-    } catch {}
-    if (result && result.cancelled) return false;
-    closePage(BATTLE_PAGE);
-    return true;
+    return closeAndSelect(`page:${BATTLE_PAGE}`, async () => {
+      let result = null;
+      try {
+        result = await desktop.stopPractice();
+        if (result && result.needsConfirm) {
+          if (!(await confirmForfeit(BATTLE_PAGE))) return false;
+          result = await desktop.stopPractice(true);
+        }
+      } catch {}
+      if (!result?.ok || result.cancelled) return false;
+      return removePage(BATTLE_PAGE);
+    });
   }
 
   // Elsewhere, drop the battle tab once its session has ended (stopped, or the app restarted).
@@ -376,7 +407,7 @@
     main.addEventListener('click', () => {
       if (current) return;
       if (room) openTab(file);
-      else location.href = file;
+      else go(file);
     });
     node.append(main);
     const shut = pageCloser(file);
@@ -556,13 +587,15 @@
     lastSession = session;
     strip = [
       ...pageRows.map(({ file, current: open }) => ({
-        current: open, open: () => (PAGES[file].room ? openTab(file) : void (location.href = file)),
+        id: `page:${file}`, client: file === 'community' ? { tab: 'community' } : PAGES[file].room ? { room: file } : null,
+        current: open, open: () => (PAGES[file].room ? openTab(file) : go(file)),
         close: pageCloser(file),
       })),
       ...rows.map((r) => ({
+        id: `room:${r.id}`, client: { room: r.id },
         current: r.current, open: () => (r.tab ? openTab(r.tab) : focusRoom(r.id)), close: rowCloser(r),
       })),
-      ...messages.map((m) => ({ current: m.current, open: () => openConversation(m.pm), close: rowCloser(m) })),
+      ...messages.map((m) => ({ id: `pm:${m.pm}`, client: { user: m.pm }, current: m.current, open: () => openConversation(m.pm), close: rowCloser(m) })),
     ];
     const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named]);
     renderChallenges(session);
@@ -676,6 +709,7 @@
   }
 
   async function update() {
+    const version = navigationVersion;
     let session;
     try {
       session = await desktop.getSession();
@@ -683,6 +717,7 @@
       session = null;
     }
     if (!session || !Array.isArray(session.rooms)) session = { ready: false, rooms: [] };
+    if (closingTab || navigating || version !== navigationVersion) return session;
     render(session);
     pruneBattleTab();
     if (session.ready) {
@@ -692,19 +727,19 @@
     if (session.ready && session.rooms.some((r) => r.id === RESOURCES_ROOM)) {
       await act('leave-room', { room: RESOURCES_ROOM });
       if (thisPage !== 'resources.html') {
-        location.href = 'resources.html';
+        go('resources.html');
         return session;
       }
     }
     if (session.ready && battleStarted(session) && !onPlay) {
-      location.href = 'play.html';
+      go('play.html');
       return session;
     }
     // The Showdown screen never shows the client's main menu; Home replaces it. Two reads must agree,
     // so a room still opening doesn't bounce to Home, and client popups stay on screen.
     menuReads = onPlay && onMainMenu(session) && !session.popups ? menuReads + 1 : 0;
     if (menuReads >= 2) {
-      location.href = 'index.html';
+      go('index.html');
       return session;
     }
     document.dispatchEvent(new CustomEvent('showdown-session', { detail: session }));
@@ -720,7 +755,7 @@
   // A step answers false when it changed nothing.
   function queued(step) {
     cycling = cycling.then(async () => {
-      if ((await step()) === false || !onPlay) return;
+      if ((await step()) === false || !onPlay || navigating) return;
       // A read that began before the change can still say the old tab is open.
       await inflight;
       await pollNow();

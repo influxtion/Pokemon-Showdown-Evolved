@@ -41,10 +41,11 @@ class PracticeView {
   // `battleCss()` returns the battle-room stylesheet while the launcher battle style is on, else ''.
   // `script()` returns JavaScript to run in each new document (the battle resize handle), and
   // `onConsole(text)` receives the page's console messages (how that handle reports a new size).
-  constructor({ window, root, css, battleCss = () => '', script = () => '', onConsole = () => {}, showdex = () => null, background, onFailure = () => {}, View = WebContentsView }) {
+  constructor({ window, root, css, battleCss = () => '', script = () => '', onConsole = () => {}, showdex = () => null, background, onFailure = () => {}, onContents = () => {}, View = WebContentsView }) {
     this.window = window;
     this.root = root;
     this.css = css;
+    this.onContents = onContents;
     this.battleCss = battleCss;
     this.script = script;
     this.onConsole = onConsole;
@@ -83,6 +84,7 @@ class PracticeView {
     view.setVisible(false);
     this.window.contentView.addChildView(view);
     const contents = view.webContents;
+    this.onContents(contents);
     contents.session.setPermissionCheckHandler(() => false);
     contents.session.setPermissionRequestHandler((_contents, _permission, respond) => respond(false));
     contents.session.on('will-download', event => event.preventDefault());

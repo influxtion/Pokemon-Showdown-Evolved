@@ -76,6 +76,8 @@ app.whenReady().then(async () => {
     resources: await shown('.mainmenu button[value="resources"]'), chat: await shown('.rightmenu button[value="rooms"]'),
   });
   assert.equal(await page("window.desktop.showdown('show-menu', { tab: 'community' })"), true);
+  await page('window.showdownNav.pollNow(); 0');
+  await until(() => page("!!document.querySelector('[data-tab-id=community]')"), 'Community tab retained');
   assert.equal((await session()).menuTab, 'community');
   assert.deepEqual(await menuView(), { form: false, ladder: false, watch: false, teambuilder: false, finduser: true, friends: true, resources: true, chat: true });
   assert.equal(await page("window.desktop.showdown('show-menu', { tab: 'battle' })"), true);
@@ -121,18 +123,33 @@ app.whenReady().then(async () => {
   await until(async () => (await session()).shell === true, 'shell restored');
   assert.equal(await headerShown(), false);
 
-  // Spectated and chat rooms close from the rail without any prompt; the last close goes Home.
-  for (const title of ['Battles', 'Lobby']) {
+  // Active closes choose the right neighbor without painting the client's fallback menu.
+  await js(`window.__sdCloseFrames = []; window.__sdWatchClose = true;
+    requestAnimationFrame(function watch() {
+      window.__sdCloseFrames.push(app.curRoom.id);
+      if (window.__sdWatchClose) requestAnimationFrame(watch);
+    }); 0`);
+  for (const [title, next] of [['Lobby', 'battles'], ['Battles', battleId]]) {
     assert.equal(await clickRow(title, '.nav-close'), true);
     await until(async () => !(await rail()).some((row) => row.title === title), `${title} closed`);
+    assert.equal(await js('app.curRoom.id'), next, 'right neighbor selected');
   }
+  await pause(1200);
+  const frames = await js('window.__sdWatchClose = false; window.__sdCloseFrames');
+  assert.ok(frames.length > 1);
+  assert.equal(frames.includes(''), false, 'client never paints the fallback main menu');
+  assert.match(renderer.getURL(), /play\.html$/, 'late polls do not navigate Home');
   // A live battle's displayed title can change while the preceding checks run.
   assert.equal(await page(`(() => {
     const buttons = document.querySelectorAll('[data-nav="rooms"] .nav-room .nav-close');
     if (buttons.length !== 1) return false;
     buttons[0].click(); return true;
   })()`), true);
-  await until(() => page("location.pathname.endsWith('index.html')"), 'Home after the last room closes');
+  await until(async () => (await session()).menuTab === 'community' && (await session()).current === '', 'last room selects Community on its left');
+  assert.match(renderer.getURL(), /play\.html$/);
+  await until(() => page("document.querySelector('[data-tab-id=community]')?.getAttribute('aria-current') === 'page'"), 'Community close transition settled');
+  await page("document.querySelector('[data-tab-id=community] .nav-close').click(); 0");
+  await until(() => page("location.pathname.endsWith('index.html')"), 'Home after the last closable tab closes');
   assert.deepEqual(await js("Object.keys(app.rooms).filter((id) => id && id !== 'rooms')"), []);
   assert.equal(await js('app.popups.length'), 0);
 

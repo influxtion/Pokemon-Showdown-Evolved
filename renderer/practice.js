@@ -266,7 +266,17 @@
     play.type = 'button';
     play.setAttribute('aria-label', `Play against ${bot.name}`);
     play.addEventListener('click', () => begin(bot.id));
-    foot.append(play);
+    if (bot.id === 'foulplay-medium') {
+      const daily = element('button', 'btn btn-primary bot-daily', 'Play daily');
+      daily.type = 'button';
+      daily.disabled = true;
+      daily.setAttribute('data-daily-start', '');
+      daily.setAttribute('aria-describedby', 'daily-status');
+      const actions = element('div', 'bot-card-actions');
+      actions.append(daily, play);
+      foot.classList.add('bot-card-foot--daily');
+      foot.append(actions);
+    } else foot.append(play);
     article.append(body, foot);
     return article;
   }
@@ -307,6 +317,7 @@
       sections.push(section);
     }
     groups.replaceChildren(...sections);
+    document.dispatchEvent(new Event('practice-cards-updated'));
   }
 
   let last = null;

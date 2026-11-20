@@ -104,7 +104,7 @@ app.whenReady().then(async () => {
       assert.ok(part, `${module} ${name} present`);
       assert.equal(part.background, state.expected[name === 'settingsOverlay' ? 'subtle' : 'panel'], `${module} ${name} background`);
       assert.equal(part.shadow, 'none', `${module} ${name} flat`);
-      if (name !== 'settingsOverlay') assert.equal(part.radius, '4px', `${module} ${name} radius`);
+      if (name !== 'settingsOverlay') assert.equal(part.radius, '10px', `${module} ${name} follows saved corners`);
       assert.equal(part.filter, 'none', `${module} ${name} no blur`);
     }
     return state;

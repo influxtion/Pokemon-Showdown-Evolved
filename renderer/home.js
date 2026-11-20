@@ -687,8 +687,7 @@ welcome.addEventListener('click', async (event) => {
 async function loadLayout() {
   let settings = null;
   try {
-    const result = await window.desktop.getSettings();
-    if (result && result.ok) settings = result.settings;
+    settings = await window.HomeAppearance.loaded;
   } catch {}
   const chosen = settings && LAYOUTS.has(settings.homeLayout) ? settings.homeLayout : null;
   applyLayout(chosen || 'modern');

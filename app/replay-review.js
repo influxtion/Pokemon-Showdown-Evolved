@@ -52,9 +52,10 @@ function fitBounds(value, content) {
 }
 
 class ReplayReview {
-  constructor({ window, css, background, View = WebContentsView }) {
+  constructor({ window, css, background, onContents = () => {}, View = WebContentsView }) {
     this.window = window;
     this.css = css;
+    this.onContents = onContents;
     this.background = background;
     this.View = View;
     this.view = null;
@@ -152,6 +153,7 @@ class ReplayReview {
     view.setBackgroundColor(this.background);
 
     const contents = view.webContents;
+    this.onContents(contents);
     secureSession(contents.session);
     const current = () => this.view === view && this.state !== 'failed';
     const fail = (error = LOAD_ERROR) => {

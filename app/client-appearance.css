@@ -1,0 +1,95 @@
+/* Palette and soft chrome only. Battlefield art, type colors and sprite backgrounds stay native. */
+:root body { background: var(--sd-app) !important; }
+:root .ps-popup { border-radius: var(--sd-radius) !important; box-shadow: var(--sd-card-shadow) !important; }
+:root :is(.button, .textbox, input[type="text"], input[type="search"], input[type="password"], textarea) {
+  border-radius: var(--sd-control-radius) !important;
+}
+html.sd-launcher-shell:root :is(#room-ladder, #room-rooms, #room-battles, [id^="room-view-friends"]),
+html.sd-launcher-shell.sd-menu-community:root #room- {
+  background-color: var(--sd-app) !important;
+  background-image: linear-gradient(var(--sd-wallpaper-tint), var(--sd-wallpaper-tint)), var(--sd-wallpaper) !important;
+  background-size: 100% 100%, var(--sd-wallpaper-fit) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+/* Teambuilder always uses plain palette colors, regardless of the saved artwork choice. */
+html.sd-launcher-shell:root #room-teambuilder {
+  background: var(--sd-app) !important;
+  --sd-card: var(--sd-panel) !important;
+}
+html.sd-launcher-shell:root #room-teambuilder :is(.teamlist .team, .sd-tb-banner),
+html.sd-launcher-shell:root #room-ladder :is(.ladder > h3 + ul, .ladder table),
+html.sd-launcher-shell:root :is(#room-rooms, #room-battles) .blocklink,
+html.sd-launcher-shell:root [id^="room-view-friends"] :is(.infobox, .blocklink),
+html.sd-launcher-shell.sd-menu-community:root :is(.pm-window, .rightmenu .menugroup, .mainmenu button[name="finduser"], .mainmenu button[value="/friends"], .mainmenu button[value="resources"]) {
+  border-radius: var(--sd-radius) !important;
+  border-style: var(--sd-edge) !important;
+  box-shadow: var(--sd-card-shadow) !important;
+  outline: var(--sd-card-outline) !important;
+  outline-offset: -4px !important;
+  background-color: var(--sd-card) !important;
+  background-image: none !important;
+}
+html.sd-launcher-shell:root #room-teambuilder .teamlist .team:hover,
+html.sd-launcher-shell:root :is(#room-rooms, #room-battles, [id^="room-view-friends"]) .blocklink:hover { background: var(--sd-hover) !important; }
+html.sd-launcher-shell:root #room-teambuilder .sd-tb-grid { gap: var(--sd-gap) !important; }
+html.sd-launcher-shell:root #room-teambuilder .sd-tb-new-btn {
+  background: var(--sd-card) !important; border-radius: var(--sd-radius) !important; color: var(--sd-text) !important;
+}
+html.sd-launcher-shell:root #room-teambuilder .sd-tb-group h3 {
+  width: fit-content !important; padding: 6px 10px !important; background: var(--sd-subtle) !important;
+  border-radius: var(--sd-control-radius) !important;
+}
+html.sd-launcher-shell:root #room-teambuilder .sd-tb-group h3::after { display: none !important; }
+html.sd-launcher-shell:root #room-teambuilder .setchart { background-color: var(--sd-panel) !important; border-radius: var(--sd-radius) !important; }
+html.sd-launcher-shell:root #room-teambuilder :is(.sd-tb-head, .folderpane) { background: var(--sd-subtle) !important; }
+html.sd-launcher-shell:root #room-ladder .ladder > h3 {
+  background: var(--sd-news) !important; border-radius: var(--sd-radius) var(--sd-radius) 0 0 !important;
+  margin-top: var(--sd-gap) !important;
+}
+html.sd-launcher-shell:root #room-ladder .ladder > h3 + ul { border-radius: 0 0 var(--sd-radius) var(--sd-radius) !important; }
+html.sd-launcher-shell:root #room-ladder .ladder > h3:nth-of-type(3n + 2) { background: var(--sd-rooms) !important; }
+html.sd-launcher-shell:root #room-ladder .ladder > h3:nth-of-type(3n) { background: var(--sd-friends) !important; }
+/* Solid reading headers protect text over busy artwork. */
+html.sd-launcher-shell:root #room-ladder .ladder > p,
+html.sd-launcher-shell:root :is(#room-rooms, #room-battles, [id^="room-view-friends"]) > .pad > :is(h2, h3, p),
+html.sd-launcher-shell.sd-menu-community:root .mainmenu::before {
+  background: var(--sd-subtle) !important; color: var(--sd-text) !important; border-radius: var(--sd-control-radius) !important;
+}
+html.sd-launcher-shell.sd-menu-community:root .mainmenu::before {
+  width: fit-content !important; padding: 8px 14px !important;
+}
+html.sd-launcher-shell:root #room-ladder .ladder > p {
+  width: fit-content !important; padding: 6px 10px !important;
+}
+html.sd-launcher-shell:root #room-ladder .ladder:has(> ul)::before,
+html.sd-launcher-shell:root #room-ladder .ladder:has(> ul)::after,
+html.sd-launcher-shell:root :is(#room-rooms, #room-battles) > .pad::before,
+html.sd-launcher-shell:root #room-rooms .roomlist > h2,
+html.sd-launcher-shell:root #room-battles .list > p {
+  width: fit-content !important; box-sizing: border-box !important; max-width: 100% !important;
+  padding: 6px 10px !important; background: var(--sd-subtle) !important; color: var(--sd-text) !important;
+  border-radius: var(--sd-control-radius) !important;
+}
+html.sd-launcher-shell:root #room-rooms .roomlist,
+html.sd-launcher-shell:root #room-battles .list { gap: var(--sd-gap) !important; }
+html.sd-launcher-shell:root #room-rooms .subrooms,
+html.sd-launcher-shell:root #room-battles .roomlist > :is(p, label) {
+  background: var(--sd-subtle) !important; border-radius: var(--sd-control-radius) !important; padding: 4px 8px !important;
+}
+html.sd-launcher-shell:root [id^="room-view-friends"] > .pad {
+  background: var(--sd-card) !important; border: 1px var(--sd-edge) var(--sd-border) !important;
+  border-radius: var(--sd-radius) !important; margin: 24px auto !important; width: calc(100% - 48px) !important;
+  box-shadow: var(--sd-card-shadow) !important;
+}
+html.sd-launcher-shell.sd-menu-community:root .mainmenuwrapper { gap: var(--sd-gap) !important; }
+html.sd-launcher-shell.sd-menu-community:root .mainmenu { gap: var(--sd-gap) !important; }
+html.sd-launcher-shell.sd-menu-community:root .pm-window { overflow: hidden !important; }
+html.sd-launcher-shell.sd-menu-community:root .pm-window h3 { background: var(--sd-news) !important; }
+html.sd-launcher-shell.sd-menu-community:root .rightmenu .menugroup { background-color: var(--sd-rooms) !important; }
+html.sd-launcher-shell:root .ps-room :is(.chat-log, .pm-log, .tournament-wrapper) { border-radius: var(--sd-control-radius) !important; }
+html.sd-launcher-shell:root .ps-room :is(.tournament-title, .pm-window h3) { background-color: var(--sd-news) !important; }
+:root .sd-calcdex-docked { border-radius: var(--sd-radius) !important; }
+:root .section { border-radius: var(--sd-radius) !important; box-shadow: var(--sd-card-shadow) !important; }
+:root .replay-controls { border-radius: var(--sd-control-radius) !important; }

@@ -18,6 +18,7 @@ app.setPath('userData', profile);
 const captures = path.join(__dirname, '..', 'out', 'desktop-smoke');
 const css = ['client-theme.css', 'client-shell.css', 'client-friends.css']
   .map((file) => fs.readFileSync(path.join(__dirname, '..', 'app', file), 'utf8'));
+css.push(require('../app/appearance').appearanceCss({ homeBackground: 'none' }, true));
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PAGES = ['all', 'spectate', 'sent', 'received', 'help', 'settings'];
@@ -88,7 +89,7 @@ app.whenReady().then(async () => {
   }
   const rect = (selector) => run(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; })()`);
   const style = (selector, prop) => run(`getComputedStyle(document.querySelector(${JSON.stringify(selector)}))[${JSON.stringify(prop)}]`);
-  const accent = { light: 'rgb(36, 89, 184)', dark: 'rgb(125, 178, 255)' };
+  const accent = { light: 'rgb(67, 110, 159)', dark: 'rgb(168, 203, 239)' };
 
   for (const theme of ['light', 'dark']) {
     nativeTheme.themeSource = theme;

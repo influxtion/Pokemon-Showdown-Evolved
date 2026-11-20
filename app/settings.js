@@ -17,14 +17,17 @@ const HOME_LAYOUTS = new Set(['classic', 'modern']);
 const BATTLE_STYLES = new Set(['launcher', 'showdown']);
 // How wide the battle column is, set by dragging the handle beside the log.
 const { validWidth } = require('./battle-resize');
+const homeAppearance = require('../renderer/home-appearance-options');
 const DEFAULTS = Object.freeze({
   theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, showdexPrompted: false, notifyMessages: true, homeLayout: null,
   battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640,
+  ...homeAppearance.defaults,
 });
 const KEYS = new Set(Object.keys(DEFAULTS));
 
 // Values a saved file may hold. A renderer can only set a real choice (see set()).
 function valid(key, value) {
+  if (Object.hasOwn(homeAppearance.defaults, key)) return homeAppearance.valid(key, value);
   if (key === 'theme') return THEMES.has(value);
   if (key === 'startPage') return START_PAGES.has(value);
   if (key === 'homeLayout') return value === null || HOME_LAYOUTS.has(value);

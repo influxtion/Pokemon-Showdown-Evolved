@@ -11,6 +11,38 @@ const controls = {
 const status = document.getElementById('settings-status');
 let saved = null;
 
+// Populate from the same allowlists the main process validates. No custom URLs or CSS.
+const homeOptions = window.HomeAppearanceOptions;
+const homeLabels = {
+  homePalette: ['Palette', Object.values(homeOptions.palettes).map(p => p.name)],
+  homeBackground: ['Background', ['Plain color', ...Object.values(homeOptions.backgrounds).map(b => b.title)]],
+  homeBackgroundTone: ['Artwork tint', ['Natural', 'Soft', 'Muted']],
+  homeBackgroundFit: ['Image framing', ['Fill screen', 'Show whole image']],
+  homeBorders: ['Borders', ['Fine outline', 'Soft inset', 'Double frame', 'Stitched edge']],
+  homeRadius: ['Corners', ['Slight', 'Soft', 'Round']],
+  homeSpacing: ['Spacing', ['Compact', 'Relaxed', 'Airy']],
+  homeTexture: ['Plain background texture', ['Subtle', 'None']],
+};
+for (const [key, [label, labels]] of Object.entries(homeLabels)) {
+  const row = document.createElement('div');
+  row.className = 'setting-row';
+  const text = document.createElement('label');
+  text.className = 'setting-text';
+  text.htmlFor = key;
+  text.textContent = label;
+  const holder = document.createElement('div');
+  holder.className = 'setting-control';
+  const select = document.createElement('select');
+  select.className = 'select';
+  select.id = key;
+  homeOptions.choices[key].forEach((value, i) => select.add(new Option(labels[i], String(value))));
+  controls[key] = select;
+  select.addEventListener('change', () => save(key, homeOptions.choices[key][select.selectedIndex]));
+  holder.append(select);
+  row.append(text, holder);
+  document.getElementById('home-appearance-controls').append(row);
+}
+
 function message(text) {
   status.textContent = text;
   status.hidden = !text;
@@ -18,12 +50,14 @@ function message(text) {
 
 function show(values) {
   saved = values;
+  window.HomeAppearance.apply(values);
   controls.theme.value = values.theme;
   controls.homeLayout.value = values.homeLayout || '';
   controls.battleStyle.value = values.battleStyle;
   controls.startPage.value = values.startPage;
   controls.confirmOnClose.checked = values.confirmOnClose;
   controls.notifyMessages.checked = values.notifyMessages;
+  for (const key of Object.keys(homeLabels)) controls[key].value = String(values[key]);
 }
 
 function disableSettings(disabled) {

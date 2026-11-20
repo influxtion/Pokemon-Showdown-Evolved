@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
+const { DEFAULTS } = require('../app/settings');
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'showdown-settings-desktop-'));
 const rendererDir = path.join(__dirname, '..', 'renderer');
@@ -35,6 +36,8 @@ async function until(check, label, timeout = 12000) {
 }
 
 app.whenReady().then(async () => {
+  // Home artwork stays offline in this suite; loopback update fixtures remain available.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: /^https?:/.test(details.url) && new URL(details.url).hostname !== '127.0.0.1' }));
   const clientSession = session.fromPartition('persist:showdown');
   clientSession.protocol.handle('https', (request) => {
     if (new URL(request.url).hostname === 'play.pokemonshowdown.com') {
@@ -168,7 +171,7 @@ app.whenReady().then(async () => {
   assert.equal((await result('resetLauncher()')).ok, true);
   assert.equal(await noteCount(), 0);
   assert.equal(fs.existsSync(replayFile), false);
-  assert.deepEqual(readSettings(), { theme: 'system', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640, showdexPrompted: true });
+  assert.deepEqual(readSettings(), { ...DEFAULTS, showdexPrompted: true });
   assert.equal(await run("localStorage.getItem('launcher-marker')"), null);
   assert.equal(await client().executeJavaScript("localStorage.getItem('session-marker')"), 'keep-after-reset');
 

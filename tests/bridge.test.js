@@ -366,28 +366,66 @@ test('rooms are focused and left through the client, keeping its forfeit confirm
     ['popup', 'sounds'], ['popup', 'options']]);
 });
 
+test('a close focuses its validated successor within the same client execution', async () => {
+  const calls = [];
+  const chain = { length: 1, removeClass() { return this; }, addClass() { return this; }, show() { return this; },
+    data() { return false; }, find() { return this; }, scrollTop() {}, height() { return 0; } };
+  const document = fakeDocument();
+  const app = {
+    rooms: { '': { $pmBox: { find: () => chain }, closePM: id => calls.push(['close-pm', id]) }, lobby: {}, help: {}, blocked: {} },
+    focusRoom: id => calls.push(['focus', id]),
+    leaveRoom: id => { calls.push(['leave', id]); return id !== 'blocked'; },
+  };
+  const contents = fakeContents(code => vm.runInNewContext(code, { app, document, window: { app } }));
+  const bridge = new ShowdownBridge(() => contents);
+  for (const [action, args, expected] of [
+    ['leave-room', { room: 'lobby', next: { room: 'help' } }, [['leave', 'lobby'], ['focus', 'help']]],
+    ['leave-room', { room: 'lobby', next: { tab: 'community' } }, [['leave', 'lobby'], ['focus', '']]],
+    ['close-pm', { user: 'misty', next: { user: 'ash' } }, [['close-pm', 'misty'], ['focus', '']]],
+    ['close-pm', { user: 'misty', next: { room: 'help' } }, [['close-pm', 'misty'], ['focus', 'help']]],
+  ]) {
+    calls.length = 0;
+    const before = contents.codes.length;
+    assert.equal(await bridge.act(action, args), true);
+    assert.deepEqual(calls, expected);
+    assert.equal(contents.codes.length, before + 1, 'no separate focus request or paint between close and selection');
+  }
+  calls.length = 0;
+  assert.equal(await bridge.act('leave-room', { room: 'blocked', next: { room: 'help' } }), 'needs-client');
+  assert.deepEqual(calls, [['leave', 'blocked']], 'a refused close does not switch tabs');
+  const before = contents.codes.length;
+  for (const next of [null, {}, [], 'help', { room: '' }, { room: 'bad/id' }, { user: 'Bad Name' },
+    { tab: 'battle' }, { room: 'help', user: 'ash' }, { action: 'send' }]) {
+    assert.equal(await bridge.act('leave-room', { room: 'lobby', next }), false);
+    assert.equal(await bridge.act('close-pm', { user: 'misty', next }), false);
+  }
+  assert.equal(contents.codes.length, before, 'invalid successors never reach the client');
+});
+
 test('a live battle asks in the launcher, then forfeits and leaves without showing the client', async () => {
   const sent = [];
   const removed = [];
   const live = { battle: {}, side: 'p1', send: (text) => sent.push(text) };
   const app = {
-    rooms: { '': {}, 'battle-gen9ou-2': live, 'battle-gen9ou-3': { battle: {}, side: 'p1', battleEnded: true }, 'battle-gen9ou-4': { battle: {} } },
+    rooms: { '': {}, lobby: {}, 'battle-gen9ou-2': live, 'battle-gen9ou-3': { battle: {}, side: 'p1', battleEnded: true }, 'battle-gen9ou-4': { battle: {} } },
     popups: [],
     leaveRoom: (id) => { removed.push(['leave', id]); return true; },
     removeRoom: (id) => removed.push(['remove', id]),
+    focusRoom: (id) => removed.push(['focus', id]),
     addPopup: () => { throw new Error('the client popup must not open'); },
   };
-  const contents = fakeContents((code) => vm.runInNewContext(code, { app }));
+  const contents = fakeContents((code) => vm.runInNewContext(code, { app, window: { app } }));
   const bridge = new ShowdownBridge(() => contents);
-  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2' }), 'needs-forfeit');
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2', next: { room: 'lobby' } }), 'needs-forfeit');
   assert.deepEqual(sent, [], 'asking does not forfeit');
-  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2', forfeit: true }), true);
+  assert.deepEqual(removed, [], 'asking does not switch tabs');
+  assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-2', forfeit: true, next: { room: 'lobby' } }), true);
   assert.deepEqual(sent, ['/forfeit']);
   assert.equal(live.battle.forfeitPending, true);
   // Finished battles and battles the user only watches close normally.
   assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-3' }), true);
   assert.equal(await bridge.act('leave-room', { room: 'battle-gen9ou-4' }), true);
-  assert.deepEqual(removed, [['remove', 'battle-gen9ou-2'], ['leave', 'battle-gen9ou-3'], ['leave', 'battle-gen9ou-4']]);
+  assert.deepEqual(removed, [['remove', 'battle-gen9ou-2'], ['focus', 'lobby'], ['leave', 'battle-gen9ou-3'], ['leave', 'battle-gen9ou-4']]);
 });
 
 test('right-side tools focus visibly in the shell and retain upstream behavior after fail-safe', async () => {
