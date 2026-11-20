@@ -557,10 +557,13 @@ The menus are design-review controls, not a proposed production navigation bar.
 
 The owner clarified that the additional space should be between boxes. The
 subsequent increase in outer margins, panel padding, and control spacing was
-reverted. Relaxed retains its earlier outer and internal spacing, with 48 px
+reverted. Relaxed retains its earlier outer spacing, with 48 px
 between main columns, 40 px between panel rows, and 36 px between Chat rooms
 and Friends. Airy increases only those panel gaps further. Minimum-width
 layouts use 32 px between major columns and 28 px between the lower panels.
+Panel padding was then reduced at the owner's request: the battle panel uses
+18–20 px, news and room rows use 8–16 px, and Friends uses 12–16 px. These
+tighter interiors retain the wider gaps between boxes in both spacing modes.
 
 The preview has no launcher preload or account session and performs no
 matchmaking, bot startup, or external navigation. Its only artwork is the

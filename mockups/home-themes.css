@@ -126,21 +126,21 @@ html[data-home-theme] .preview-status { color: var(--text-2); font-size: 11px; }
 html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 36px 40px; }
 html[data-spacing="relaxed"] .hub-grid, html[data-spacing="airy"] .hub-grid { column-gap: 48px; row-gap: 40px; }
 html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 400px minmax(0, 1fr); }
-html[data-spacing="relaxed"] .hero--menu, html[data-spacing="airy"] .hero--menu { padding: 28px 24px 24px; gap: 20px; }
+html[data-spacing="relaxed"] .hero--menu, html[data-spacing="airy"] .hero--menu { padding: 20px 18px 18px; gap: 20px; }
 html[data-spacing="relaxed"] .hero--menu .hero-pickers, html[data-spacing="airy"] .hero--menu .hero-pickers { gap: 16px; }
 html[data-spacing="relaxed"] .hero .select, html[data-spacing="airy"] .hero .select { height: 38px; }
 html[data-spacing="relaxed"] .hero--menu .hero-actions, html[data-spacing="airy"] .hero--menu .hero-actions { gap: 12px; }
 html[data-spacing="relaxed"] .hero--menu .btn-battle, html[data-spacing="airy"] .hero--menu .btn-battle { height: 56px; }
 html[data-spacing="relaxed"] .hero-stats:empty, html[data-spacing="airy"] .hero-stats:empty { display: none; }
-html[data-spacing="relaxed"] .daily-compact, html[data-spacing="airy"] .daily-compact { padding: 13px 16px; gap: 16px; }
-html[data-spacing="relaxed"] .window-head, html[data-spacing="airy"] .window-head { min-height: 43px; padding-left: 20px; padding-right: 16px; }
-html[data-spacing="relaxed"] .post-toggle, html[data-spacing="airy"] .post-toggle { padding: 17px 42px 17px 20px; gap: 5px; }
+html[data-spacing="relaxed"] .daily-compact, html[data-spacing="airy"] .daily-compact { padding: 9px 12px; gap: 16px; }
+html[data-spacing="relaxed"] .window-head, html[data-spacing="airy"] .window-head { min-height: 36px; padding-left: 16px; padding-right: 12px; }
+html[data-spacing="relaxed"] .post-toggle, html[data-spacing="airy"] .post-toggle { padding: 12px 36px 12px 16px; gap: 5px; }
 html[data-spacing="relaxed"] .post, html[data-spacing="airy"] .post { border-top-color: color-mix(in srgb, var(--border) 40%, transparent); }
-html[data-spacing="relaxed"] .room-row, html[data-spacing="airy"] .room-row { padding: 12px 20px; border-bottom-color: transparent; border-top-color: transparent; }
-html[data-spacing="relaxed"] .friends-note, html[data-spacing="airy"] .friends-note { padding: 20px; line-height: 1.7; }
+html[data-spacing="relaxed"] .room-row, html[data-spacing="airy"] .room-row { padding: 8px 16px; border-bottom-color: transparent; border-top-color: transparent; }
+html[data-spacing="relaxed"] .friends-note, html[data-spacing="airy"] .friends-note { padding: 12px 16px; line-height: 1.7; }
 html[data-spacing="relaxed"] .hub--classic .hub-side, html[data-spacing="airy"] .hub--classic .hub-side { gap: 40px; }
 html[data-spacing="relaxed"] .hub--classic .hub-lower, html[data-spacing="airy"] .hub--classic .hub-lower { gap: 36px; }
-html[data-spacing="relaxed"] .hub-tile, html[data-spacing="airy"] .hub-tile { min-height: 66px; gap: 8px; }
+html[data-spacing="relaxed"] .hub-tile, html[data-spacing="airy"] .hub-tile { min-height: 56px; gap: 8px; }
 html[data-spacing="relaxed"] .hub-tiles, html[data-spacing="airy"] .hub-tiles { gap: 16px; }
 html[data-spacing="relaxed"] .hub--modern .hub-side, html[data-spacing="airy"] .hub--modern .hub-side { gap: 40px; }
 /* Airy increases only the separation between boxes. */
