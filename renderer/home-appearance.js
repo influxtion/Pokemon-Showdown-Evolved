@@ -8,11 +8,11 @@ let backgroundKey;
 let backgroundRevision = 0;
 let homeBackgroundReady = Promise.resolve();
 function applyHomeBackground() {
-  const key = Object.hasOwn(HOME_BACKGROUNDS, appearance.background) ? appearance.background : 'none';
+  const root = document.documentElement;
+  const key = root.dataset.backgroundPolicy !== 'plain' && Object.hasOwn(HOME_BACKGROUNDS, appearance.background) ? appearance.background : 'none';
   if (backgroundKey === key) return;
   backgroundKey = key;
   const revision = ++backgroundRevision;
-  const root = document.documentElement;
   let credit = document.getElementById('background-credit');
   if (!credit) {
     credit = document.createElement('span');
@@ -79,6 +79,10 @@ function apply(settings = {}, mode) {
 // The home* preference names are retained so existing choices carry across the app.
 window.HomeAppearance = {
   apply,
+  setPlainBackground(force) {
+    document.documentElement.dataset.backgroundPolicy = force ? 'plain' : 'selected';
+    applyHomeBackground();
+  },
   get ready() { return homeBackgroundReady; },
 };
 media.addEventListener('change', () => {

@@ -57,6 +57,7 @@ app.whenReady().then(async () => {
   await change('homeRadius', 14);
   await until(() => client.executeJavaScript('getComputedStyle(document.querySelector(".team")).borderRadius === "14px"'), 'client corners live');
   await change('homeRadius', 10);
+  assert.equal(await client.executeJavaScript('getComputedStyle(document.getElementById("room-teambuilder")).backgroundImage'), 'none', 'Teambuilder ignores the saved wallpaper');
   assert.equal(win.contentView.children[0].webContents.id, clientId);
   await run('window.desktop.saveReplayNote({title:"A close game",url:"https://replay.pokemonshowdown.com/gen9ou-123456789",format:"gen9ou",notes:"Keep the late-game plan in mind."})');
   win.showInactive();
@@ -79,6 +80,11 @@ app.whenReady().then(async () => {
         assert.equal(geometry.scheme,theme,page);
         assert.deepEqual(geometry.overflow,[],page+' fits '+width);
         assert.equal(geometry.controls,true,page+' controls remain solid');
+        if(page==='practice') {
+          assert.equal(await run('document.documentElement.dataset.backgroundState'),'plain','Bots always plain');
+          assert.equal(await run('getComputedStyle(document.querySelector(".content")).backgroundImage'),'none','Bots has no artwork or texture');
+          assert.equal(await run('document.getElementById("background-credit").hidden'),true,'no artwork credit on Bots');
+        }
         fs.writeFileSync(path.join(output,page+'-'+width+'-'+theme+'.png'),(await renderer.capturePage()).toPNG());
       }
     }

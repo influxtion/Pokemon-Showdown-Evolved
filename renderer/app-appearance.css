@@ -28,6 +28,7 @@ html[data-background-state="ready"][data-background-fit="fit"] .content:not(:has
 html[data-texture="true"]:not([data-background-state="ready"]) .content:not(:has(.hub)) {
   background-image: repeating-linear-gradient(0deg, transparent 0 3px, color-mix(in srgb, var(--text) 2%, transparent) 3px 4px);
 }
+html[data-home-theme][data-background-policy="plain"] .content:not(:has(.hub)) { background: var(--bg-app); }
 html[data-home-theme] .topbar > .home-background-credit { margin-left: auto; }
 html[data-home-theme] .topbar-actions .home-background-credit { flex: 0 1 auto; min-width: 0; }
 html[data-home-theme] :is(.panel, .settings-section, .bot-card, .bots-local, .team-slot, .split-list, .split-detail, .review-player, .res-section, .res-intro, .res-toc, .battle-empty) {

@@ -789,3 +789,13 @@ screenshot on that failure. Screenshots of native pages, remote pages and
 battle/calculator surfaces were inspected. Signed-in friends/account behavior,
 public account battles, installer packaging and public releases were not part
 of this appearance change.
+
+November 20 correction: Bots, Teambuilder and Community (including its room
+browser) always use the selected palette's plain color, with solid panels and
+no wallpaper, background texture or gradient. The shared artwork preference
+still applies elsewhere. Bots skips artwork loading entirely; the play shell
+follows the active room and hides the artwork credit on the plain tabs. These
+page policies do not overwrite the saved background choice.
+Syntax checks, the Home and app appearance desktop suites, and the live guest
+appearance suite passed; the three plain tabs were visually checked in the
+captured light/dark desktop layouts.
