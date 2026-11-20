@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-const { palettes: HOME_PALETTES, backgrounds: HOME_BACKGROUNDS, defaults, valid } = window.HomeAppearanceOptions;
+const { backgrounds: HOME_BACKGROUNDS, defaults, valid, tokens: paletteTokens } = window.HomeAppearanceOptions;
 const media = matchMedia('(prefers-color-scheme: dark)');
 const appearance = {};
 let backgroundKey;
@@ -13,7 +13,15 @@ function applyHomeBackground() {
   backgroundKey = key;
   const revision = ++backgroundRevision;
   const root = document.documentElement;
-  const credit = document.getElementById('background-credit');
+  let credit = document.getElementById('background-credit');
+  if (!credit) {
+    credit = document.createElement('span');
+    credit.id = 'background-credit';
+    credit.className = 'home-background-credit';
+    credit.setAttribute('role', 'status');
+    const bar = document.querySelector('.topbar-actions') || document.querySelector('.topbar');
+    bar?.append(credit);
+  }
   root.dataset.backgroundState = key === 'none' ? 'plain' : 'loading';
   root.style.removeProperty('--home-background-image');
   credit.hidden = key === 'none';
@@ -49,25 +57,9 @@ function apply(settings = {}, mode) {
     appearance[property] = valid(key, settings[key]) ? settings[key] : fallback;
   }
   appearance.appearance = mode || (media.matches ? 'dark' : 'light');
-  const p = HOME_PALETTES[appearance.palette] || HOME_PALETTES[defaults.homePalette];
   const dark = appearance.appearance === 'dark';
-  const [bg,paper,subtle,ink,muted,line,rail,hero,heroEnd,accent,yellow,daily,news,rooms,friends,coral] = p[dark ? 'dark' : 'light'];
-  const tokens = {
-    'bg-app':bg, 'bg-panel':paper, 'bg-raised':paper, 'bg-hover':subtle, 'bg-input':paper, 'bg-selected':news, 'bg-subtle':subtle, 'client-bg':bg,
-    'text':ink, 'text-2':muted, 'text-3':muted, 'border':line, 'border-strong':line, 'border-hover':accent, 'accent':accent, 'on-accent':paper,
-    'primary':yellow, 'primary-hover':`color-mix(in srgb, ${yellow} 82%, white)`, 'primary-active':yellow, 'on-primary':'#3c3c2d',
-    'rail-bg':rail, 'rail-border':rail, 'rail-selected':`color-mix(in srgb, ${rail} 85%, #172937)`, 'rail-hover':hero,
-    'rail-text':'#dfebe0', 'rail-text-strong':'#fff9ec', 'rail-muted':'#b6c8c4', 'rail-indicator':yellow,
-    'strip-bg':rail, 'tab-hover':hero, 'tab-border':hero, 'topbar-bg':paper, 'topbar-border':line,
-    'hero-bg':hero, 'hero-border':`color-mix(in srgb, ${hero} 65%, ${yellow})`, 'hero-text':'#fff8e9', 'hero-muted':'#fff8e9',
-    'hero-input':`color-mix(in srgb, ${heroEnd} 90%, #243641)`, 'hero-input-border':`color-mix(in srgb, ${hero} 60%, #f5edcf)`, 'hero-team-bg':`color-mix(in srgb, ${hero} 82%, #e6d9ac)`,
-    'home-hero-end':heroEnd, 'home-daily':daily, 'home-news':news, 'home-rooms':rooms, 'home-friends':friends, 'home-coral':coral,
-    'home-highlight':dark ? '#fff6dc1c' : '#ffffff9c', 'home-shadow':dark ? '#081e2928' : '#6b573a18',
-    'home-readable-muted':`color-mix(in srgb, ${muted} 20%, ${ink})`,
-    'home-surface-strength':dark ? '76%' : '100%',
-    'home-surface-text':dark ? ink : `color-mix(in srgb, ${ink} 92%, #000)`,
-    'ok':dark ? '#a9d6ab' : '#3e7956', 'ok-bg':rooms,
-  };
+  const tokens = paletteTokens(settings, dark);
+  const bg = tokens['bg-app'];
   for (const [key,value] of Object.entries(tokens)) document.documentElement.style.setProperty(`--${key}`, value);
   document.documentElement.style.colorScheme = appearance.appearance;
   document.documentElement.style.setProperty('--home-radius', `${appearance.radius}px`);
@@ -84,6 +76,7 @@ function apply(settings = {}, mode) {
 }
 
 
+// The home* preference names are retained so existing choices carry across the app.
 window.HomeAppearance = {
   apply,
   get ready() { return homeBackgroundReady; },
@@ -93,4 +86,11 @@ media.addEventListener('change', () => {
   for (const key of Object.keys(defaults)) settings[key] = appearance[key.slice(4, 5).toLowerCase() + key.slice(5)];
   apply(settings);
 });
+if (window.desktop?.getSettings) {
+  window.HomeAppearance.loaded = window.desktop.getSettings().then(result => {
+    const settings = result?.ok ? result.settings : null;
+    apply(settings || {});
+    return settings;
+  }, () => { apply({}); return null; });
+}
 })();

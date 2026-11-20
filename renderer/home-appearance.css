@@ -1,4 +1,4 @@
-/* Home appearance. Loaded only by Home; battles and other pages keep their own styles. */
+/* Shared shell colors and Home's approved arrangement. Other launcher panels use app-appearance.css. */
 html[data-home-theme] {
   --radius: 6px;
   --home-radius: 10px;

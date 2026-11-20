@@ -111,7 +111,7 @@
 [data-showdex-module] [data-showdex-layout="card"]::before {
   background: none !important;
   backdrop-filter: none !important;
-  border-radius: 4px !important;
+  border-radius: var(--sd-radius, 4px) !important;
 }
 
 /* Panels, including settings opened over an in-battle calculator. */
@@ -126,7 +126,7 @@
   background: var(--sd-panel) !important;
   color: var(--sd-text) !important;
   border: 1px solid var(--sd-border) !important;
-  border-radius: 4px !important;
+  border-radius: var(--sd-radius, 4px) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
@@ -370,7 +370,7 @@
   background: var(--sd-panel) !important;
   color: var(--sd-text) !important;
   border: 1px solid var(--sd-border-strong) !important;
-  border-radius: 4px !important;
+  border-radius: var(--sd-radius, 4px) !important;
   box-shadow: none !important;
   font-family: "Segoe UI", system-ui, sans-serif !important;
 }

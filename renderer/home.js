@@ -687,12 +687,9 @@ welcome.addEventListener('click', async (event) => {
 async function loadLayout() {
   let settings = null;
   try {
-    const result = await window.desktop.getSettings();
-    if (result && result.ok) settings = result.settings;
+    settings = await window.HomeAppearance.loaded;
   } catch {}
   const chosen = settings && LAYOUTS.has(settings.homeLayout) ? settings.homeLayout : null;
-  // Paint immediately; artwork loads independently and never delays Home or onboarding.
-  window.HomeAppearance.apply(settings || {});
   applyLayout(chosen || 'modern');
   // Unreadable settings could not keep the answer, so only ask when they loaded.
   if (settings && !chosen && !welcome.open) welcome.showModal();

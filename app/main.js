@@ -9,6 +9,8 @@ require('./profile').configureProfile(app);
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 const { Settings } = require('./settings');
+const { AppearanceStyles } = require('./appearance');
+const appearanceOptions = require('../renderer/home-appearance-options');
 const { ShowdownBridge } = require('./showdown');
 const { Replays } = require('./replays');
 const { ReplayImports } = require('./replay-imports');
@@ -48,7 +50,6 @@ const launcherBattles = () => settings.get('battleStyle') !== 'showdown';
 const REPLAY_CSS = ['client-theme.css', 'replay-theme.css']
   .map((file) => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
 // Window and view fills shown before pages paint; match --bg-app in each theme.
-const BACKGROUND = { light: '#e6ecf5', dark: '#24304a' };
 const CLIENT_URL = 'https://play.pokemonshowdown.com/';
 // Persistent partition keeps the Showdown login across launches, isolated from the launcher.
 const CLIENT_PARTITION = 'persist:showdown';
@@ -64,6 +65,7 @@ app.on('second-instance', () => {
 });
 let client = null;
 let settings = null;
+const appearanceStyles = new AppearanceStyles(() => settings?.snapshot() || {});
 let replays = null;
 let replayImports = null;
 let replayReview = null;
@@ -123,7 +125,7 @@ const shownAlerts = new Set();
 if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId('com.influxtion.showdowndesktop');
 
 function background() {
-  return nativeTheme.shouldUseDarkColors ? BACKGROUND.dark : BACKGROUND.light;
+  return appearanceOptions.tokens(settings?.snapshot() || {}, nativeTheme.shouldUseDarkColors)['bg-app'];
 }
 
 function parseUrl(url) {
@@ -211,6 +213,7 @@ function ensureClient() {
   client.setBackgroundColor(background());
 
   const contents = client.webContents;
+  appearanceStyles.watch(contents, { wallpaper: true });
   // The launcher sends its own challenge and message notifications (see announce); the client's
   // would duplicate them and can't raise the window.
   denyPermissions(contents.session);
@@ -313,7 +316,7 @@ function createWindow() {
   const currentWindow = win;
   win.on('focus', () => { if (!currentWindow.isDestroyed()) currentWindow.flashFrame(false); });
   if (process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1') win.setIgnoreMouseEvents(true);
-  replayReview = new ReplayReview({ window: win, css: REPLAY_CSS, background: background() });
+  replayReview = new ReplayReview({ window: win, css: REPLAY_CSS, background: background(), onContents: contents => appearanceStyles.watch(contents) });
   const practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
     : path.join(__dirname, '..', 'vendor', 'practice', 'dist');
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
@@ -324,6 +327,7 @@ function createWindow() {
   dailyChallenge = new DailyChallenge(dailyStore, practice);
   practiceTeams = new PracticeTeams({ root: practiceRoot });
   practiceView = new PracticeView({ window: win, root: path.join(practiceRoot, 'client'), css: CLIENT_CSS,
+    onContents: contents => appearanceStyles.watch(contents),
     showdex: () => showdexBundle.installed && settings.get('showdexEnabled') ? { distDir: showdex.distDir } : null,
     battleCss: () => (launcherBattles() ? BATTLE_CSS : ''),
     script: () => battleResizeScript(settings.get('battleWidth')),
@@ -906,6 +910,7 @@ ipcMain.handle('settings:set', (event, key, value) => {
   try {
     if (!settings.set(key, value)) return { ok: false, error: 'Invalid setting.' };
     nativeTheme.themeSource = settings.get('theme');
+    if (Object.hasOwn(appearanceOptions.defaults, key)) { appearanceStyles.refresh(); refreshBackgrounds(); }
     if (key === 'battleStyle') applyBattleStyle();
     return { ok: true, settings: settings.snapshot() };
   } catch {
@@ -980,6 +985,8 @@ ipcMain.handle('settings:reset', async (event) => {
     if (response !== 1) return { ok: true, cancelled: true };
     // Remove only the launcher's two data files, never the Showdown partition.
     settings.reset();
+    appearanceStyles.refresh();
+    refreshBackgrounds();
     fs.rmSync(path.join(app.getPath('userData'), 'replays.json'), { force: true });
     replayImports.reset();
     fs.rmSync(path.join(app.getPath('userData'), 'window-state.json'), { force: true });
@@ -1009,7 +1016,7 @@ ipcMain.handle('settings:set-theme', (event, value) => {
   return true;
 });
 
-nativeTheme.on('updated', () => {
+function refreshBackgrounds() {
   if (win) win.setBackgroundColor(background());
   if (client) client.setBackgroundColor(background());
   replayReview?.backgroundChanged(background());
@@ -1017,7 +1024,8 @@ nativeTheme.on('updated', () => {
     practiceView.background = background();
     practiceView.view?.setBackgroundColor(background());
   }
-});
+}
+nativeTheme.on('updated', refreshBackgrounds);
 
 app.whenReady().then(async () => {
   if (!primaryInstance) return;

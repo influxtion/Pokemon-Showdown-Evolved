@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; connect-src 'none'; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; connect-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https://play.pokemonshowdown.com">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings · Pokemon Showdown Evolved</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="home-appearance.css">
+  <link rel="stylesheet" href="app-appearance.css">
 </head>
 <body>
 <div class="app">
@@ -189,8 +191,8 @@
         </section>
 
         <section class="settings-section" id="home-appearance" aria-labelledby="home-appearance-title">
-          <h2 id="home-appearance-title">Home appearance</h2>
-          <p class="setting-desc">Make Home your own. Your choices are saved and follow the app’s light or dark appearance.</p>
+          <h2 id="home-appearance-title">Colors &amp; style</h2>
+          <p class="setting-desc">Make the app your own. Your choices apply across pages and follow the app’s light or dark appearance.</p>
           <div class="panel" id="home-appearance-controls"></div>
           <p class="setting-desc">Showdown artwork loads online. A warm plain background appears while it loads or when you’re offline.</p>
           <a class="btn" href="index.html">See Home</a>
@@ -253,8 +255,9 @@
     </main>
   </div>
 </div>
-<script src="nav.js"></script>
 <script src="home-appearance-options.js"></script>
+<script src="home-appearance.js"></script>
+<script src="nav.js"></script>
 <script src="settings.js"></script>
 <script src="integrations.js"></script>
 </body>

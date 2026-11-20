@@ -277,7 +277,16 @@ async function smoke() {
     if (!button || !active) return null;
     button.click();
     return { active, turn: room.battle.turn };
-  `), 'clicked an enabled upstream switch button');
+  `), 'clicked an enabled upstream switch button').catch(async error => {
+    console.error('Practice switch state', await battleEval(player, `return {
+      turn:room.battle.turn, ended:room.battle.ended, request:room.request.requestType,
+      trapped:room.request.active?.[0]?.trapped, choice:room.choice,
+      buttons:[...room.el.querySelectorAll('button[name="chooseSwitch"]')].map(n=>({
+        label:n.textContent, disabled:n.disabled, visible:!!n.getClientRects().length}))
+    };`));
+    await capture(player, 'switch-timeout');
+    throw error;
+  });
   await until(() => battleEval(player, `
     const active = room.request.side?.pokemon?.find(mon => mon.active)?.ident;
     return Boolean(active && active !== ${JSON.stringify(firstSwitch.active)});

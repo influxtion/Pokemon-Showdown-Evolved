@@ -736,3 +736,56 @@ The owner subsequently selected Twilight as the default palette. Existing
 saved palette choices are retained. Classic's Tournament/Ladder/Spectate
 shortcuts now sit 20 px below Battle in Relaxed and Airy, rather than 64/80 px.
 Daily's 20 px gaps and the wider gaps among the right-hand panels are unchanged.
+
+### App-wide appearance (November 19, 2026)
+
+The owner approved extending the Home design throughout the desktop app. Every
+launcher page now loads the shared palette and artwork controller, plus
+`renderer/app-appearance.css` for Settings, Bots, Stats, replay notes/review,
+resources and battle placeholders. Colors & style in Settings controls all six
+palettes, backgrounds, framing, tint, border finishes, corners and spacing.
+Twilight remains the default; existing saved choices and internal `home*`
+preference names are preserved. Settings previews saved changes immediately.
+
+The shared catalog now exports pure color tokens for both renderer and main.
+`app/appearance.js` generates validated user-origin CSS for explicitly registered
+Showdown, practice and replay views. Each document owns one replaceable sheet;
+palette changes do not reload it or interrupt a battle. Main-document navigation
+invalidates pending insertions; subframes and same-document navigation do not.
+OAuth windows receive no appearance controller. No IPC or remote privileges
+were added. Window/view fills also follow the selected palette.
+
+Teambuilder, Community, Ladder, chat-room and spectate lists receive the selected
+wallpaper with translucent cards. Reading headers, form controls and buttons
+stay solid; Friends uses a reading panel around its page. Plain color works
+without network access. The art stays proportional to the visible viewport and
+keeps its credit in the launcher bar. The existing Home arrangement, shortcuts,
+daily gaps and wording are retained, apart from the customization link now
+being named Colors & style.
+
+Chat, tournament chrome, online/practice battles, replay playback and Showdex
+use matching colors and softer corners. Battle and calculator reading surfaces
+remain solid. Battlefields, sprites, Pokémon types, HP/status colors and
+calculator game colors keep their existing treatment. The optional launcher
+battle stylesheet owns the new move/switch/card rounding, so the original
+Showdown battle-style choice still bypasses those rules. Practice/replay views
+make no new wallpaper requests; their native battlefield artwork remains intact.
+
+Validation includes syntax checks, 255 passing unit tests (one optional
+real-server test skipped), and twelve isolated desktop suites. The new app
+appearance suite checks seven real launcher pages in both themes at 1366×768
+and 1024×640, real Settings IPC, immediate palette/corner changes in the retained
+client, solid controls and horizontal fit. Friends fixtures now use the shared
+Twilight sheet. The Daily desktop harness waits for initial Home navigation
+before driving another load, fixing a test startup race.
+
+`npm run test:appearance:live` checks actual hosted artwork and the real guest
+Teambuilder, Community, Ladder, room browser, spectate list and chat at both
+sizes/themes, plus four native screens. Live Showdex, dock and public replay
+playback suites passed. The real loopback Foul Play/Showdex suite passed moves,
+switching, Tera, rematch, theme/size checks and lifecycle cleanup on rerun; its
+first run timed out waiting for a switch control, and now records state and a
+screenshot on that failure. Screenshots of native pages, remote pages and
+battle/calculator surfaces were inspected. Signed-in friends/account behavior,
+public account battles, installer packaging and public releases were not part
+of this appearance change.

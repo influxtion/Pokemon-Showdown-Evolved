@@ -6,12 +6,13 @@ const env = { ...process.env };
 env.SHOWDOWN_DESKTOP_BACKGROUND = '1';
 delete env.ELECTRON_RUN_AS_NODE;
 const liveFile = process.argv.includes('--startup-live') ? 'startup-live.cjs'
+  : process.argv.includes('--appearance-live') ? 'app-appearance-live.cjs'
   : process.argv.includes('--showdex-live') ? 'showdex-live.cjs'
   : process.argv.includes('--showdex-dock-live') ? 'showdex-dock-live.cjs'
   : process.argv.includes('--replay-review-live') ? 'replay-review-live.cjs'
     : process.argv.includes('--shell-live') ? 'shell-live.cjs'
       : process.argv.includes('--practice') ? 'practice-desktop.cjs' : null;
-for (const file of liveFile ? [liveFile] : ['home-appearance-desktop.cjs', 'updates-desktop.cjs', 'showdex-onboarding-desktop.cjs', 'daily-challenge-desktop.cjs', 'desktop.cjs', 'replays-desktop.cjs', 'replay-import-desktop.cjs', 'replay-review-desktop.cjs', 'settings-desktop.cjs', 'security-desktop.cjs', 'friends-desktop.cjs']) {
+for (const file of liveFile ? [liveFile] : ['home-appearance-desktop.cjs', 'app-appearance-desktop.cjs', 'updates-desktop.cjs', 'showdex-onboarding-desktop.cjs', 'daily-challenge-desktop.cjs', 'desktop.cjs', 'replays-desktop.cjs', 'replay-import-desktop.cjs', 'replay-review-desktop.cjs', 'settings-desktop.cjs', 'security-desktop.cjs', 'friends-desktop.cjs']) {
   const result = spawnSync(require('electron'), [path.join(__dirname, '..', 'tests', file), ...(process.argv.includes('--showdex') ? ['--showdex'] : [])], {
     stdio: 'inherit', env, timeout: liveFile === 'practice-desktop.cjs' ? 300000 : liveFile ? 180000 : 90000,
   });

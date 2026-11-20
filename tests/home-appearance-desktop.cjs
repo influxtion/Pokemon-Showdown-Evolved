@@ -73,7 +73,7 @@ app.whenReady().then(async () => {
   // Exercise the actual Settings controls and persistence, then return to the real Home page.
   await run("document.querySelector('a[href=\"settings.html#home-appearance\"]').click(); 0");
   await until(() => run("!!document.getElementById('homePalette') && !document.getElementById('homePalette').disabled"), 'customization settings');
-  assert.equal(await run('document.documentElement.dataset.homeTheme'), undefined, 'other pages retain their styles');
+  assert.equal(await run('document.documentElement.dataset.homeTheme'), 'twilight', 'Settings shares the selected palette');
   assert.deepEqual(await run("[...document.getElementById('homePalette').options].map(o=>o.text)"), Object.values(options.palettes).map(p => p.name));
   const chosen = { homePalette: 'seaside', homeBackground: 'shaymin', homeBackgroundTone: 'natural', homeBackgroundFit: 'fit', homeBorders: 'stitched', homeRadius: 14, homeSpacing: 'airy', homeTexture: false };
   for (const [key, value] of Object.entries(chosen)) {

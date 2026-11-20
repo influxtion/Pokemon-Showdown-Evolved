@@ -30,6 +30,7 @@ app.whenReady().then(async () => {
   require('../app/main');
   await until(() => BrowserWindow.getAllWindows().length, 'window');
   const win = BrowserWindow.getAllWindows()[0];
+  await until(() => !win.webContents.isLoading() && win.webContents.getURL().endsWith('/index.html'), 'initial Home load');
   const run = code => win.webContents.executeJavaScript(code);
   const home = async () => { await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html')); await until(() => run("document.getElementById('daily-start').disabled === false"), 'daily ready'); };
   await home();

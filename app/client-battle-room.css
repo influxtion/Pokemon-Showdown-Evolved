@@ -235,7 +235,7 @@
   .movebutton {
     appearance: none !important;
     border: 1px solid var(--sd-border) !important;
-    border-radius: 0 !important;
+    border-radius: var(--sd-control-radius, 6px) !important;
     background: var(--sd-panel) !important;
     box-shadow: none !important;
     color: var(--sd-text) !important;
@@ -304,7 +304,7 @@
   :is(.switchmenu, .allyparty) button {
     appearance: none !important;
     border: 1px solid var(--sd-border) !important;
-    border-radius: 0 !important;
+    border-radius: var(--sd-control-radius, 6px) !important;
     background: var(--sd-panel) !important;
     box-shadow: none !important;
     color: var(--sd-text) !important;
@@ -540,7 +540,8 @@
       box-sizing: border-box !important;
       padding: 16px !important;
       border: 1px solid var(--sd-border) !important;
-      border-radius: 0 !important;
+      border-radius: var(--sd-radius, 10px) !important;
+      box-shadow: var(--sd-card-shadow, none) !important;
     }
 
     .battle-log {
@@ -550,7 +551,7 @@
       bottom: 81px !important;
       border: 1px solid var(--sd-border) !important;
       border-bottom: 0 !important;
-      border-radius: 0 !important;
+      border-radius: var(--sd-radius, 10px) var(--sd-radius, 10px) 0 0 !important;
     }
     .battle-log-add {
       left: var(--sd-log-left) !important;
@@ -560,7 +561,7 @@
       box-sizing: border-box !important;
       padding: 12px 16px !important;
       border: 1px solid var(--sd-border) !important;
-      border-radius: 0 !important;
+      border-radius: 0 0 var(--sd-radius, 10px) var(--sd-radius, 10px) !important;
     }
     .battle-userlist {
       top: 25px !important;
@@ -606,7 +607,7 @@
   html[data-practice-state] .ps-room:not(.small-layout):not(.tiny-layout) .battle-log {
     bottom: 24px !important;
     border-bottom: 1px solid var(--sd-border) !important;
-    border-radius: 0 !important;
+    border-radius: var(--sd-radius, 10px) !important;
   }
 
   /* Controls: header row, then tile grids. */

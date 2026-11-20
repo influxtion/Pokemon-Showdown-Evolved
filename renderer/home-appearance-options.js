@@ -1,6 +1,6 @@
 'use strict';
 
-// Shared by the settings validator, Home renderer, and isolated design preview.
+// Shared by settings, launcher pages, embedded client styles, and the isolated design preview.
 (() => {
 // Ordered tokens: background, paper, subtle, ink, muted, line, rail, hero,
 // hero end, accent, yellow, daily, news, rooms, friends, coral.
@@ -39,7 +39,29 @@ const CHOICES = Object.freeze({
 function valid(key, value) {
   return Object.hasOwn(CHOICES, key) && CHOICES[key].includes(value);
 }
-const options = { palettes: HOME_PALETTES, backgrounds: HOME_BACKGROUNDS, defaults: DEFAULTS, choices: CHOICES, valid };
+function tokens(settings = {}, dark = false) {
+  const p = HOME_PALETTES[valid('homePalette', settings.homePalette) ? settings.homePalette : DEFAULTS.homePalette];
+  const [bg,paper,subtle,ink,muted,line,rail,hero,heroEnd,accent,yellow,daily,news,rooms,friends,coral] = p[dark ? 'dark' : 'light'];
+  const tokens = {
+    'bg-app':bg, 'bg-panel':paper, 'bg-raised':paper, 'bg-hover':subtle, 'bg-input':paper, 'bg-selected':news, 'bg-subtle':subtle, 'client-bg':bg,
+    'text':ink, 'text-2':muted, 'text-3':muted, 'border':line, 'border-strong':line, 'border-hover':accent, 'accent':accent, 'on-accent':dark ? bg : paper,
+    'primary':yellow, 'primary-hover':`color-mix(in srgb, ${yellow} 82%, white)`, 'primary-active':yellow, 'on-primary':'#3c3c2d',
+    'rail-bg':rail, 'rail-border':rail, 'rail-selected':`color-mix(in srgb, ${rail} 85%, #172937)`, 'rail-hover':hero,
+    'rail-text':'#dfebe0', 'rail-text-strong':'#fff9ec', 'rail-muted':'#b6c8c4', 'rail-indicator':yellow,
+    'strip-bg':rail, 'tab-hover':hero, 'tab-border':hero, 'topbar-bg':paper, 'topbar-border':line,
+    'hero-bg':hero, 'hero-border':`color-mix(in srgb, ${hero} 65%, ${yellow})`, 'hero-text':'#fff8e9', 'hero-muted':'#fff8e9',
+    'hero-input':`color-mix(in srgb, ${heroEnd} 90%, #243641)`, 'hero-input-border':`color-mix(in srgb, ${hero} 60%, #f5edcf)`, 'hero-team-bg':`color-mix(in srgb, ${hero} 82%, #e6d9ac)`,
+    'home-hero-end':heroEnd, 'home-daily':daily, 'home-news':news, 'home-rooms':rooms, 'home-friends':friends, 'home-coral':coral,
+    'home-highlight':dark ? '#fff6dc1c' : '#ffffff9c', 'home-shadow':dark ? '#081e2928' : '#6b573a18',
+    'home-readable-muted':`color-mix(in srgb, ${muted} 20%, ${ink})`,
+    'home-surface-strength':dark ? '76%' : '100%',
+    'home-surface-text':dark ? ink : `color-mix(in srgb, ${ink} 92%, #000)`,
+    'ok':dark ? '#a9d6ab' : '#3e7956', 'ok-bg':rooms,
+  };
+  return tokens;
+}
+
+const options = { tokens, palettes: HOME_PALETTES, backgrounds: HOME_BACKGROUNDS, defaults: DEFAULTS, choices: CHOICES, valid };
 if (typeof module !== 'undefined' && module.exports) module.exports = options;
 else window.HomeAppearanceOptions = options;
 })();

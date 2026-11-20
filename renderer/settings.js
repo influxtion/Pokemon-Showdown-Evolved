@@ -17,7 +17,7 @@ const homeLabels = {
   homePalette: ['Palette', Object.values(homeOptions.palettes).map(p => p.name)],
   homeBackground: ['Background', ['Plain color', ...Object.values(homeOptions.backgrounds).map(b => b.title)]],
   homeBackgroundTone: ['Artwork tint', ['Natural', 'Soft', 'Muted']],
-  homeBackgroundFit: ['Image framing', ['Fill Home', 'Show whole image']],
+  homeBackgroundFit: ['Image framing', ['Fill screen', 'Show whole image']],
   homeBorders: ['Borders', ['Fine outline', 'Soft inset', 'Double frame', 'Stitched edge']],
   homeRadius: ['Corners', ['Slight', 'Soft', 'Round']],
   homeSpacing: ['Spacing', ['Compact', 'Relaxed', 'Airy']],
@@ -50,6 +50,7 @@ function message(text) {
 
 function show(values) {
   saved = values;
+  window.HomeAppearance.apply(values);
   controls.theme.value = values.theme;
   controls.homeLayout.value = values.homeLayout || '';
   controls.battleStyle.value = values.battleStyle;
