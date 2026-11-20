@@ -159,7 +159,7 @@ html[data-home-theme] .hub--classic .hub-news { flex: 0 1 280px; }
 html[data-home-theme] .hub--classic .hub-lower { flex: 0 1 260px; }
 html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 40px 36px; }
 html[data-spacing="relaxed"] .hub-grid, html[data-spacing="airy"] .hub-grid { column-gap: 80px; row-gap: 64px; }
-html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 400px minmax(0, 1fr); }
+html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 400px minmax(0, 1fr); row-gap: 20px; }
 html[data-spacing="relaxed"] .hero--menu, html[data-spacing="airy"] .hero--menu { padding: 20px 18px 18px; gap: 20px; }
 html[data-spacing="relaxed"] .hero--menu .hero-pickers, html[data-spacing="airy"] .hero--menu .hero-pickers { gap: 16px; }
 html[data-spacing="relaxed"] .hero .select, html[data-spacing="airy"] .hero .select { height: 38px; }
@@ -183,9 +183,9 @@ html[data-spacing="airy"] .hub--classic .hub-side { gap: 80px; }
 html[data-spacing="airy"] .hub--classic .hub-lower { gap: 72px; }
 html[data-spacing="airy"] .hub--modern .hub-side { gap: 80px; }
 html[data-spacing="airy"] .hub-tiles { gap: 32px; }
-/* Keep 20px below the daily strip without changing the grid's other gaps. */
-html[data-spacing="relaxed"] .daily-compact { margin-bottom: -44px; }
-html[data-spacing="airy"] .daily-compact { margin-bottom: -60px; }
+/* Classic keeps Daily and the shortcuts close to Battle. Modern retains its wider panel gaps. */
+html[data-spacing="relaxed"] .hub--modern .daily-compact { margin-bottom: -44px; }
+html[data-spacing="airy"] .hub--modern .daily-compact { margin-bottom: -60px; }
 @media (max-width: 1180px) {
   html[data-home-theme] .hub--classic .hub-news { flex-basis: 300px; }
   html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 28px 28px; }

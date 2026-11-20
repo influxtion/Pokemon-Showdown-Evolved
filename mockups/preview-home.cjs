@@ -17,7 +17,7 @@ let html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8')
   .replace('</body>', `<script src="${pathToFileURL(path.join(root, 'renderer', 'home-appearance-options.js'))}"></script><script src="${pathToFileURL(path.join(root, 'renderer', 'home-appearance.js'))}"></script><script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
 fs.writeFileSync(path.join(output, 'index.html'), html);
 let win;
-let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };
+let selection = { palette: require('../renderer/home-appearance-options').defaults.homePalette, appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };
 async function change(next) {
   Object.assign(selection, next);
   await win.webContents.executeJavaScript(`applyHomeStudy(${JSON.stringify(selection)})`);

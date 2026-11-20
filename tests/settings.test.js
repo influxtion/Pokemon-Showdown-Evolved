@@ -89,7 +89,7 @@ test('Home choices migrate, persist, reset, and reject arbitrary artwork or styl
   const dir = fixture(t);
   fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ theme: 'dark', homeLayout: 'modern' }));
   const settings = new Settings(dir);
-  assert.equal(settings.get('homePalette'), 'hearth');
+  assert.equal(settings.get('homePalette'), 'twilight');
   assert.equal(settings.get('homeBackground'), 'ocean');
   assert.equal(settings.get('homeLayout'), 'modern', 'upgrade keeps the existing layout');
   for (const [key, choices] of Object.entries(homeAppearance.choices)) {

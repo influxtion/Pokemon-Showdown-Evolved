@@ -23,7 +23,7 @@ const HOME_BACKGROUNDS = {
 };
 
 const DEFAULTS = Object.freeze({
-  homePalette: 'hearth', homeBorders: 'inset', homeRadius: 10, homeTexture: true,
+  homePalette: 'twilight', homeBorders: 'inset', homeRadius: 10, homeTexture: true,
   homeSpacing: 'relaxed', homeBackground: 'ocean', homeBackgroundTone: 'soft', homeBackgroundFit: 'fill',
 });
 const CHOICES = Object.freeze({

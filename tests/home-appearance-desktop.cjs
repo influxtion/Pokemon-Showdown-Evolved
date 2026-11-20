@@ -67,6 +67,7 @@ app.whenReady().then(async () => {
   const save = async (key, value) => assert.equal((await run('window.desktop.setSetting(' + JSON.stringify(key) + ',' + JSON.stringify(value) + ')')).ok, true);
   await home();
   assert.equal(await run('document.documentElement.dataset.backgroundState'), 'ready');
+  assert.equal(await run('document.documentElement.dataset.homeTheme'), 'twilight', 'new profiles default to Twilight');
   assert.match(await run("document.getElementById('background-credit').textContent"), /Quanyails/);
 
   // Exercise the actual Settings controls and persistence, then return to the real Home page.

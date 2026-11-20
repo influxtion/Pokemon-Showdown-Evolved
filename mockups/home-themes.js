@@ -1,6 +1,6 @@
 'use strict';
 const HOME_PALETTES = window.HomeAppearanceOptions.palettes;
-const homeStudy = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };
+const homeStudy = { palette: window.HomeAppearanceOptions.defaults.homePalette, appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };
 let homeBackgroundReady = Promise.resolve();
 function applyHomeStudy(next = {}) {
   Object.assign(homeStudy, next);

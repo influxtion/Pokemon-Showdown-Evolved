@@ -49,7 +49,7 @@ function apply(settings = {}, mode) {
     appearance[property] = valid(key, settings[key]) ? settings[key] : fallback;
   }
   appearance.appearance = mode || (media.matches ? 'dark' : 'light');
-  const p = HOME_PALETTES[appearance.palette] || HOME_PALETTES.hearth;
+  const p = HOME_PALETTES[appearance.palette] || HOME_PALETTES[defaults.homePalette];
   const dark = appearance.appearance === 'dark';
   const [bg,paper,subtle,ink,muted,line,rail,hero,heroEnd,accent,yellow,daily,news,rooms,friends,coral] = p[dark ? 'dark' : 'light'];
   const tokens = {

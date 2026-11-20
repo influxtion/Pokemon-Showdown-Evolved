@@ -694,7 +694,7 @@ Garden, Seaside, Rosewood, Amber, Twilight), five Showdown wallpapers plus
 plain color, tint, framing, four border finishes, three corner sizes, three
 spacing choices, and plain-background texture are saved in launcher settings.
 Home's Customize Home link opens Settings at Home appearance; See Home returns
-to the working screen. Defaults are Hearth, Ocean, Soft tint, Fill Home,
+to the working screen. Defaults are Twilight, Ocean, Soft tint, Fill Home,
 Soft inset borders, Soft corners, Relaxed spacing, and subtle plain texture.
 The background is a fixed saved choice, not random. Existing Home layout and
 app appearance preferences are preserved; palettes follow native light/dark
@@ -731,3 +731,8 @@ is part of this change.
 A separate fresh guest profile also loaded the production Home against live
 Showdown, with real formats, news, room counts, and the Ocean artwork. No search,
 challenge, or signed-in account was used; that review window was left open.
+
+The owner subsequently selected Twilight as the default palette. Existing
+saved palette choices are retained. Classic's Tournament/Ladder/Spectate
+shortcuts now sit 20 px below Battle in Relaxed and Airy, rather than 64/80 px.
+Daily's 20 px gaps and the wider gaps among the right-hand panels are unchanged.
