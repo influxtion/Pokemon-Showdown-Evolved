@@ -90,9 +90,9 @@ html[data-home-theme] .hub-tile:nth-child(1) { background: var(--home-daily); bo
 html[data-home-theme] .hub-tile:nth-child(2) { background: var(--home-rooms); border-color: color-mix(in srgb, var(--home-rooms) 55%, var(--border-strong)); }
 html[data-home-theme] .hub-tile:nth-child(3) { background: var(--home-news); border-color: color-mix(in srgb, var(--home-news) 55%, var(--border-strong)); }
 html[data-home-theme] .daily-compact {
-  background: var(--home-daily);
+  background: var(--home-friends);
   color: var(--text);
-  border-color: color-mix(in srgb, var(--home-daily) 55%, var(--border-strong));
+  border-color: color-mix(in srgb, var(--home-friends) 55%, var(--border-strong));
   border-left-color: var(--home-coral);
   border-radius: var(--home-radius);
   box-shadow: inset 0 1px var(--home-highlight), 0 3px 0 var(--home-shadow);
@@ -116,7 +116,7 @@ html[data-background-state="ready"] .hero {
 }
 html[data-background-state="ready"] .daily-compact,
 html[data-background-state="ready"] .hub-tile { --text: var(--home-surface-text); }
-html[data-background-state="ready"] .daily-compact,
+html[data-background-state="ready"] .daily-compact { background: color-mix(in srgb, color-mix(in srgb, var(--home-friends) var(--home-surface-strength), #000) 80%, transparent); }
 html[data-background-state="ready"] .hub-tile:nth-child(1) { background: color-mix(in srgb, color-mix(in srgb, var(--home-daily) var(--home-surface-strength), #000) 80%, transparent); }
 html[data-background-state="ready"] .hub-tile:nth-child(2) { background: color-mix(in srgb, color-mix(in srgb, var(--home-rooms) var(--home-surface-strength), #000) 80%, transparent); }
 html[data-background-state="ready"] .hub-tile:nth-child(3) { background: color-mix(in srgb, color-mix(in srgb, var(--home-news) var(--home-surface-strength), #000) 80%, transparent); }

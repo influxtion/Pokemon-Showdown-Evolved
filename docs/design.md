@@ -799,3 +799,11 @@ page policies do not overwrite the saved background choice.
 Syntax checks, the Home and app appearance desktop suites, and the live guest
 appearance suite passed; the three plain tabs were visually checked in the
 captured light/dark desktop layouts.
+
+Daily Foul Play now sits after the opponent groups on Bots. Its Home card and
+Bots header use the palette's rose/plum surface (Twilight), with a coral edge
+and a lightly tinted Bots body. Other palettes use their matching surface.
+The inactive flame is muted; the active streak flame keeps its lit color.
+Syntax checks and the existing Daily/Home appearance desktop suites passed;
+both Bots themes were inspected, and Home's twelve palette contrast checks
+remain at least 4.61:1.

@@ -77,6 +77,7 @@ app.whenReady().then(async () => {
   for (const theme of ['light', 'dark']) {
     await run(`window.desktop.setTheme('${theme}'); 0`);
     await pause(200);
+    await run("document.getElementById('daily-challenge').scrollIntoView({block:'nearest'}); 0");
     assert.equal(await run("document.documentElement.scrollWidth <= innerWidth"), true, 'Bots no horizontal overflow');
     fs.writeFileSync(path.join(dir, `bots-1024-${theme}.png`), (await win.webContents.capturePage()).toPNG());
   }
