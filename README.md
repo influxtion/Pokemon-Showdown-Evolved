@@ -12,7 +12,7 @@ This is an early preview. Windows is unsigned, and Mac builds are not Apple-nota
 
 ## Home preview
 
-[![Pokemon Showdown Evolved Home in light mode, with Daily Foul Play, battle setup, news, and chat rooms](assets/readme/home-light.png)](assets/readme/home-light.png)
+[![Pokemon Showdown Evolved Home in light mode, with Daily Bot Gauntlet Challenge, battle setup, news, and chat rooms](assets/readme/home-light.png)](assets/readme/home-light.png)
 
 The modern Home layout in light mode, captured from the running app in an isolated guest profile. Click the image to view it at full resolution. [See a Foul Play battle with Showdex](assets/readme/battle.png).
 
@@ -21,7 +21,7 @@ The modern Home layout in light mode, captured from the running app in an isolat
 - **Online play:** The official Showdown client modernized with a clean, restyled look and collected all together
 - **Bot practice:** Practice against the best bots in competitive Pokemon with just a click, like how Chess and other competitive games do it. Test teams and your skill
 - **Showdex:** Optional damage calculations integrated. Install it on first launch or from Settings
-- **Daily Foul Play:** three attempts each day against Medium difficulty, with local streaks and clear history. Keep sharp and work towards winning
+- **Daily Bot Gauntlet Challenge:** three attempts each day against Medium difficulty, with local streaks and clear history. Keep sharp and work towards winning
 - **Replay notes:** Bookmark replay links, write notes, watch replays alongside them, and import or export backups with conflict review.
 - **Your workspace:** Light and dark themes, two Home layouts, adjustable battle width, and keyboard shortcuts for tabs and notes.
 

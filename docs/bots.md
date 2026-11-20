@@ -283,7 +283,7 @@ All of these use disposable profiles and private servers, never the player's acc
 - The Docker image build (`api/deploy/`), and the in-app install on Windows and macOS. The systemd and Caddy setup is verified on the hosted Google Cloud VM. The installer was exercised on Linux x64 only; Windows uses the self-contained `x86_64-pc-windows-gnu` Rust toolchain for the build.
 - Server sizing: search is time-limited, so fewer CPUs give similar decision times but shallower search; that is one reason the API caps threads (`MAX_THREADS`). A decision is about 200 ms of search per thread budget, so CPU load is roughly `MAX_SESSIONS × MAX_THREADS` cores while battles think. Measure before inviting players.
 
-## Daily Foul Play
+## Daily Bot Gauntlet Challenge
 
 The Home challenge pins `foulplay-medium`, `gen9randombattle`, and the `full` computation preset. It respects the player's existing cloud/local engine choice. No teams are authored: the simulator generates both sides. Daily attempts use separate sessions; same-session rematches are blocked in both the IPC handler and the bot challenge-accept path.
 

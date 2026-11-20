@@ -46,7 +46,7 @@
       daily = Boolean(value.dailyChallenge);
       NAME = value.opponents?.find(bot => bot.id === value.opponent)?.name || 'the bot';
       subtitle.textContent = `vs. ${NAME} · ${({ gen9ou: 'Gen 9 OU' })[value.format] || 'Gen 9 Random Battle'}`;
-      if (daily) subtitle.textContent = `Daily Foul Play · Medium · Gen 9 Random Battle`;
+      if (daily) subtitle.textContent = `Daily Bot Gauntlet Challenge · Medium · Gen 9 Random Battle`;
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
       const finished = Boolean(running && value.battle?.finished);

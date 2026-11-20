@@ -162,9 +162,9 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ## 4. Feature details
 
-### Daily Foul Play
+### Daily Bot Gauntlet Challenge
 
-Home includes a compact cobalt Daily Foul Play strip in both layouts, with a yellow flame tile, highlighted active streak, remaining attempts, a Play daily action, and a Details link to Bots. The fuller challenge panel on Bots holds rules, best streak and total clears, and can also start or resume a daily attempt. Win one Gen 9 Random Battle against Foul Play Medium in at most three attempts per UTC calendar day. A clear adds exactly one day to the streak and locks further daily play until 00:00 UTC. Missing a day or finishing all three attempts without a win resets the current streak; personal best and total daily clears remain. Ordinary practice does not count and remains available.
+Home includes a compact cobalt Daily Bot Gauntlet Challenge strip in both layouts, with a yellow flame tile, highlighted active streak, remaining attempts, a Play daily action, and a Details link to Bots. The fuller challenge panel on Bots holds rules, best streak and total clears, and can also start or resume a daily attempt. Win one Gen 9 Random Battle against Foul Play Medium in at most three attempts per UTC calendar day. A clear adds exactly one day to the streak and locks further daily play until 00:00 UTC. Missing a day or finishing all three attempts without a win resets the current streak; personal best and total daily clears remain. Ordinary practice does not count and remains available.
 
 The card offers Start challenge or Return to challenge, remaining attempts, current/best streak, lifetime clears, and the rules. Daily battles use the existing battle tab, with a guarded daily retry after a loss. Each retry starts a fresh session and random teams. Finish before midnight UTC: a late result cannot clear either the expired challenge or the next day's challenge. Ties and deliberate exits from active battles consume an attempt; cancelling setup or a detected runtime/engine failure refunds it. The app cannot resume a simulator after restart: an interrupted active attempt counts, while interrupted setup is refunded.
 
@@ -564,9 +564,9 @@ layouts use 32 px between major columns and 28 px between the lower panels.
 Panel padding was then reduced at the owner's request: the battle panel uses
 18–20 px, news and room rows use 8–16 px, and Friends uses 12–16 px. These
 tighter interiors retain the wider gaps between boxes in both spacing modes.
-Only the gap below Daily Foul Play is tighter at 20 px in Relaxed and Airy;
+Only the gap below Daily Bot Gauntlet Challenge is tighter at 20 px in Relaxed and Airy;
 the other panel gaps retain their chosen spacing.
-The top inset above Daily Foul Play is also 20 px at both desktop widths.
+The top inset above Daily Bot Gauntlet Challenge is also 20 px at both desktop widths.
 
 The preview has no launcher preload or account session and performs no
 matchmaking, bot startup, or external navigation. Artwork includes the
@@ -581,7 +581,7 @@ minimum-size overflow checks, and format/search/cancel interactions. Generated
 pages and captures are in ignored `out/home-themes/`. This remains a design
 preview, not verification of a production Home implementation.
 
-Daily Foul Play was removed from the preview's sample news at the owner's
+Daily Bot Gauntlet Challenge was removed from the preview's sample news at the owner's
 request; the dedicated daily strip remains.
 
 ### Showdown background feasibility (November 19, 2026)
@@ -646,7 +646,7 @@ columns, 64 px between panel rows, and 56 px between Chat rooms and Friends.
 Airy uses 104/80/72 px respectively. The small-window horizontal gaps are
 48/40 px in Relaxed and 64/56 px in Airy. Shortcut tiles have 24 px gaps in
 Relaxed and 32 px in Airy. Outer padding and panel interiors stay unchanged;
-the gaps above and below Daily Foul Play remain 20 px, verified by rendered
+the gaps above and below Daily Bot Gauntlet Challenge remain 20 px, verified by rendered
 geometry.
 
 The owner clarified that wallpaper must fill the whole Home screen: the
@@ -802,7 +802,7 @@ Syntax checks, the Home and app appearance desktop suites, and the live guest
 appearance suite passed; the plain tabs were visually checked in the
 captured light/dark desktop layouts.
 
-Daily Foul Play now sits after the opponent groups on Bots. Its Home card and
+Daily Bot Gauntlet Challenge now sits after the opponent groups on Bots. Its Home card and
 Bots header use the palette's rose/plum surface (Twilight), with a coral edge
 and a lightly tinted Bots body. Other palettes use their matching surface.
 The inactive flame is muted; the active streak flame keeps its lit color.
@@ -810,7 +810,7 @@ Syntax checks and the existing Daily/Home appearance desktop suites passed;
 both Bots themes were inspected, and Home's twelve palette contrast checks
 remain at least 4.61:1.
 
-The owner rejected the remaining orange/gold accents on Daily Foul Play.
+The owner rejected the remaining orange/gold accents on Daily Bot Gauntlet Challenge.
 Its updated treatment uses a cool periwinkle surface, violet action button and
 edge, and blue lit flame on both Home and Bots. Dedicated light/dark daily
 tokens replace the shared warm accents, including button shadows and the Home
@@ -830,7 +830,7 @@ Medium-only action, format changes, one attempt when both entry points are
 clicked, returning without another reservation, completed-state disabling and
 light/dark card fit. No live daily attempt was consumed during verification.
 
-The owner subsequently swapped the Bots sections: Daily Foul Play now sits in
+The owner subsequently swapped the Bots sections: Daily Bot Gauntlet Challenge now sits in
 the former local-download position above the opponent groups, and Foul Play on
 this computer sits below those groups. Daily is shorter: its action shares the
 title/streak row, its description, attempts and record wrap along one line,
