@@ -103,6 +103,23 @@ html[data-home-theme] .daily-details, html[data-home-theme] .daily-compact .dail
 html[data-home-theme] .daily-emblem { background: var(--study-coral); color: #fff7ec; border-radius: 7px; box-shadow: inset 0 1px #ffffff40; }
 html[data-home-theme] .window, html[data-home-theme] .daily-compact { position: relative; }
 
+/* Only the fills let artwork through; text, controls, and header bars stay solid. */
+html[data-background-state="ready"] .window {
+  background: color-mix(in srgb, var(--bg-panel) 90%, transparent);
+  --text-2: var(--study-readable-muted);
+  --text-3: var(--study-readable-muted);
+}
+html[data-background-state="ready"] .hero {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, color-mix(in srgb, var(--hero-bg) 85%, #000) 90%, transparent),
+    color-mix(in srgb, color-mix(in srgb, var(--study-hero-end) 85%, #000) 90%, transparent));
+}
+html[data-background-state="ready"] .daily-compact,
+html[data-background-state="ready"] .hub-tile:nth-child(1) { background: color-mix(in srgb, var(--study-daily) 90%, transparent); }
+html[data-background-state="ready"] .hub-tile:nth-child(2) { background: color-mix(in srgb, var(--study-rooms) 90%, transparent); }
+html[data-background-state="ready"] .hub-tile:nth-child(3) { background: color-mix(in srgb, var(--study-news) 90%, transparent); }
+html[data-background-state="ready"] .room-row:nth-child(even) { background: color-mix(in srgb, var(--study-rooms) 18%, transparent); }
+
 /* Border variants overlay their finish, preserving the app's geometry. */
 html[data-borders="fine"] .window,
 html[data-borders="fine"] .hero,

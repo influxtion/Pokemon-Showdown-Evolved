@@ -75,6 +75,7 @@ function applyHomeStudy(next = {}) {
     'hero-input':`color-mix(in srgb, ${heroEnd} 90%, #243641)`, 'hero-input-border':`color-mix(in srgb, ${hero} 60%, #f5edcf)`, 'hero-team-bg':`color-mix(in srgb, ${hero} 82%, #e6d9ac)`,
     'study-hero-end':heroEnd, 'study-daily':daily, 'study-news':news, 'study-rooms':rooms, 'study-friends':friends, 'study-coral':coral,
     'study-highlight':dark ? '#fff6dc1c' : '#ffffff9c', 'study-shadow':dark ? '#081e2928' : '#6b573a18',
+    'study-readable-muted':`color-mix(in srgb, ${muted} 60%, ${ink})`,
     'ok':dark ? '#a9d6ab' : '#3e7956', 'ok-bg':rooms,
   };
   for (const [key,value] of Object.entries(tokens)) document.documentElement.style.setProperty(`--${key}`, value);

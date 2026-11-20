@@ -629,8 +629,8 @@ The owner subsequently requested backgrounds in the mockup. The native
 Background menu now offers Plain color, Ocean, Horizon, Shaymin, Charizards,
 and Showdown Day. Ocean starts selected with the existing Hearth palette.
 Artwork tint offers Natural, Soft, and Muted; Soft mixes in 12% of the palette
-background in light appearance and 24% in dark appearance. Opaque panels and
-all existing spacing remain. The artist credit appears in the top bar.
+background in light appearance and 24% in dark appearance. The artist credit
+appears in the top bar.
 
 The mockup loads only the five allowlisted images from Showdown's image host
 under the existing CSP. It displays the palette background while decoding,
@@ -657,3 +657,15 @@ remains an optional comparison. The wallpaper is sized to the viewport rather th
 scrolling content, so expanding news or scrolling does not enlarge it.
 Checked all five images, desktop and minimum widths in both layouts, image
 framing choices, and unchanged hero padding; no horizontal overflow.
+
+Home's panel fills now use 90% opacity when artwork is loaded: Battle, News,
+Chat rooms, Friends, the daily strip, and shortcut tiles let a little of the
+wallpaper through. Text and controls stay fully opaque, as do panel headers.
+Secondary panel text mixes 40% toward the primary text color, and the Battle
+gradient is slightly deepened to preserve contrast. Plain-color and loading
+fallbacks retain solid panels. There is no panel-level opacity or backdrop
+blur. Rendered color checks across all twelve palette variants, compositing
+the fills over both black and white, gave a minimum 4.56:1 for the checked
+primary, secondary, daily, tile, and Battle text. Ocean and the busier
+Charizards artwork were visually inspected in light/dark captures; desktop
+and minimum-size layout checks passed.
