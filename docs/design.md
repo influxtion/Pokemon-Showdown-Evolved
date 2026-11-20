@@ -670,3 +670,17 @@ the fills over both black and white, gave a minimum 4.61:1 for the checked
 primary, secondary, daily, tile, and Battle text. Ocean and the busier
 Charizards artwork were visually inspected in light/dark captures; desktop
 and minimum-size layout checks passed.
+
+The default Hearth colors were then rebalanced around soft blue News, seafoam
+Chat rooms, and apricot Friends headers, with a cooler ivory surface and
+bluer Battle panel. The matching dark colors use blue, deep seafoam, and
+warm brown. The other five palettes remain available for comparison.
+
+Classic's right-hand group now caps at 620 px instead of stretching across
+all remaining width. With the existing 56 px gap, Chat rooms and Friends
+are 282 px wide each at the desktop preview size. News uses a 280 px height
+and the lower pair 260 px, reducing unused space while preserving the wide
+panel gaps and Battle's dimensions. The group contracts with the available
+space at smaller widths; News gets 300 px height below 1180 px to accommodate
+wrapped text. Checked desktop/minimum layouts, news expand/collapse, and
+all twelve palette contrast combinations; the checked minimum remains 4.61:1.
