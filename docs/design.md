@@ -658,14 +658,15 @@ scrolling content, so expanding news or scrolling does not enlarge it.
 Checked all five images, desktop and minimum widths in both layouts, image
 framing choices, and unchanged hero padding; no horizontal overflow.
 
-Home's panel fills now use 90% opacity when artwork is loaded: Battle, News,
+Home's panel fills now use 80% opacity (20% transparency) when artwork is loaded: Battle, News,
 Chat rooms, Friends, the daily strip, and shortcut tiles let a little of the
 wallpaper through. Text and controls stay fully opaque, as do panel headers.
-Secondary panel text mixes 40% toward the primary text color, and the Battle
-gradient is slightly deepened to preserve contrast. Plain-color and loading
+Secondary panel text mixes 80% toward the primary text color. The Battle
+gradient and dark panel fills are deepened, and light daily/tile text is
+slightly darkened, to preserve contrast at the increased transparency. Plain-color and loading
 fallbacks retain solid panels. There is no panel-level opacity or backdrop
 blur. Rendered color checks across all twelve palette variants, compositing
-the fills over both black and white, gave a minimum 4.56:1 for the checked
+the fills over both black and white, gave a minimum 4.61:1 for the checked
 primary, secondary, daily, tile, and Battle text. Ocean and the busier
 Charizards artwork were visually inspected in light/dark captures; desktop
 and minimum-size layout checks passed.
