@@ -101,13 +101,15 @@ html[data-home-theme] .daily-summary h2 span,
 html[data-home-theme] .daily-summary p { color: var(--text); }
 html[data-home-theme] .daily-details, html[data-home-theme] .daily-compact .daily-streak { color: var(--text); }
 html[data-home-theme] .daily-emblem { background: var(--daily-accent); color: var(--daily-on-accent); border-radius: 7px; box-shadow: inset 0 1px #ffffff40; }
-html[data-home-theme] .daily-challenge .btn-primary {
+html[data-home-theme] .daily-challenge .btn-primary,
+html[data-home-theme] .bot-daily.btn-primary {
   background: var(--daily-accent);
   color: var(--daily-on-accent);
   border-color: color-mix(in srgb, var(--daily-accent) 75%, #28294b);
   box-shadow: inset 0 1px #ffffff30, 0 2px 0 color-mix(in srgb, var(--daily-accent) 65%, #28294b);
 }
-html[data-home-theme] .daily-challenge .btn-primary:hover { background: color-mix(in srgb, var(--daily-accent) 90%, #28294b); }
+html[data-home-theme] .daily-challenge .btn-primary:hover,
+html[data-home-theme] .bot-daily.btn-primary:hover { background: color-mix(in srgb, var(--daily-accent) 90%, #28294b); }
 html[data-home-theme] .daily-challenge .daily-streak.is-lit svg { color: var(--daily-flame); }
 html[data-home-theme] .window, html[data-home-theme] .daily-compact { position: relative; }
 

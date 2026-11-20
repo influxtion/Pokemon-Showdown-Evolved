@@ -817,3 +817,15 @@ tokens replace the shared warm accents, including button shadows and the Home
 emblem. Its position below the bot choices is retained.
 Syntax, Daily desktop flow and Home appearance checks passed; the twelve
 palette contrast checks still meet 4.61:1. Light/dark screenshots were inspected.
+
+Foul Play Medium's Bots card now includes a violet Play daily shortcut beside
+its regular Play action. Both daily entry points share the same controller,
+availability, start lock and existing main-process attempt reservation. A
+running challenge shows Return to daily; a completed challenge shows a disabled
+Cleared today button. Rebuilding cards after format changes restores this state.
+Errors from the shortcut reveal the daily panel's error message. The footer
+wraps the connection status above the two actions at narrow card widths.
+Syntax and the Daily/app appearance desktop suites passed. Checks cover the
+Medium-only action, format changes, one attempt when both entry points are
+clicked, returning without another reservation, completed-state disabling and
+light/dark card fit. No live daily attempt was consumed during verification.
