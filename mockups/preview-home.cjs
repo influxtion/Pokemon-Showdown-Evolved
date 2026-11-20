@@ -17,7 +17,7 @@ let html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8')
   .replace('</body>', `<script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
 fs.writeFileSync(path.join(output, 'index.html'), html);
 let win;
-let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fit' };
+let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };
 async function change(next) {
   Object.assign(selection, next);
   await win.webContents.executeJavaScript(`applyHomeStudy(${JSON.stringify(selection)})`);
@@ -32,7 +32,7 @@ function setMenu() {
       ...radios('background', [['Plain color','none'],['Ocean','ocean'],['Horizon','horizon'],['Shaymin','shaymin'],['Charizards','charizards'],['Showdown Day','psday']]),
       {type:'separator'},
       {label:'Artwork tint',submenu:radios('backgroundTone', [['Natural','natural'],['Soft','soft'],['Muted','muted']])},
-      {label:'Image framing',submenu:radios('backgroundFit', [['Show whole image','fit'],['Fill window','fill']])},
+      {label:'Image framing',submenu:radios('backgroundFit', [['Fill window','fill'],['Show whole image','fit']])},
     ] },
     { label: 'Borders', submenu: radios('borders', [['Fine outline','fine'],['Soft inset','inset'],['Double frame','double'],['Stitched edge','stitched']]) },
     { label: 'Appearance', submenu: [...radios('appearance', [['Light','light'],['Dark','dark']]), {type:'separator'}, {label:'Subtle surface texture',type:'checkbox',checked:selection.texture,click:()=>change({texture:!selection.texture})}] },

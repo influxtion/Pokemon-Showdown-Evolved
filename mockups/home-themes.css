@@ -21,12 +21,12 @@ html[data-texture="true"] .hub {
 /* Anchor the wallpaper to the Home viewport while panels scroll over it. */
 html[data-background-state="ready"] .hub {
   background-image: linear-gradient(var(--study-background-tint), var(--study-background-tint)), var(--study-background-image);
-  background-size: 100% 100%, contain;
+  background-size: 100% 100%, cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: scroll;
 }
-html[data-background-state="ready"][data-background-fit="fill"] .hub { background-size: 100% 100%, cover; }
+html[data-background-state="ready"][data-background-fit="fit"] .hub { background-size: 100% 100%, contain; }
 html[data-home-theme] .rail {
   background: linear-gradient(155deg, var(--rail-bg), var(--rail-selected));
   border-right-color: color-mix(in srgb, var(--primary) 25%, var(--rail-border));

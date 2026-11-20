@@ -649,10 +649,11 @@ Relaxed and 32 px in Airy. Outer padding and panel interiors stay unchanged;
 the gaps above and below Daily Foul Play remain 20 px, verified by rendered
 geometry.
 
-Background > Image framing defaults to Show whole image (`contain`), centered
-in the Home viewport, preserving aspect ratio without cropping. Remaining
-space uses the palette background. Fill window (`cover`) remains available
-for comparison. The wallpaper is sized to the viewport rather than the
+The owner clarified that wallpaper must fill the whole Home screen: the
+Show whole image default left unwanted bands. Background > Image framing now
+defaults to Fill window (`cover`), centered in the Home viewport with only
+the proportional crop required to cover it. Show whole image (`contain`)
+remains an optional comparison. The wallpaper is sized to the viewport rather than the
 scrolling content, so expanding news or scrolling does not enlarge it.
 Checked all five images, desktop and minimum widths in both layouts, image
 framing choices, and unchanged hero padding; no horizontal overflow.
