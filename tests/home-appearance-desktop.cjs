@@ -43,17 +43,20 @@ app.whenReady().then(async () => {
   ipcMain.removeHandler('showdown:session');
   ipcMain.handle('showdown:session', () => current);
   ipcMain.removeHandler('showdown:snapshot');
-  ipcMain.handle('showdown:snapshot', () => ({
+  let snapshotReady = true;
+  const snapshot = {
     ready: true, connected: true, user: { name: 'Guest123', userid: 'guest123', registered: false },
     counts: { users: 100, battles: 20 }, currentFormat: 'gen9randombattle',
-    formats: [{ id: 'gen9randombattle', name: '[Gen 9] Random Battle', section: 'Singles', presetTeam: true }],
+    formats: [{ id: 'gen9randombattle', name: '[Gen 9] Random Battle', section: 'Singles', presetTeam: true },
+      { id: 'gen9ou', name: '[Gen 9] OU', section: 'Singles', presetTeam: false }],
     teams: [], ratings: {}, friends: { available: false, items: [] },
     news: [
       { id: '123', title: 'Community tournament', text: 'Join this week’s tournament.', author: 'Staff', body: [[{ text: 'Join this week’s tournament.' }], [{ text: 'Registration is open through Friday.' }]] },
       { id: '124', title: 'Metagame update', text: 'Read the latest discussion from the community.', author: 'Staff' },
     ],
     rooms: ['Lobby', 'OverUsed', 'Random Battles', 'Tournaments', 'Help'].map(title => ({ title, desc: '', users: 50 })),
-  }));
+  };
+  ipcMain.handle('showdown:snapshot', () => snapshotReady ? snapshot : { ready: false });
   const run = code => renderer.executeJavaScript(code);
   const load = async file => {
     await win.loadFile(path.join(__dirname, '..', 'renderer', file));
@@ -195,8 +198,73 @@ return { minimum, worst }; })()`);
   await home();
   assert.equal(requests.length, before, 'plain color makes no artwork requests');
   assert.equal(await run('document.documentElement.dataset.backgroundState'), 'plain');
+
+  // Cold Home keeps its controls in place while the session, formats and ratings arrive separately.
+  await save('homePalette', 'twilight');
+  const geometry = () => run(`Object.fromEntries(['.hero','#hero-format','#format','#team','#team-grid','.hero-actions','#hero-stats','.hub-tiles','.hero-links','.hub-news','.hub-rooms','.hub-friends'].map(s => {
+    const r=document.querySelector(s).getBoundingClientRect();return [s,[r.x,r.y,r.width,r.height]];
+  }))`);
+  const sameLayout = (before, after, label) => {
+    for (const selector of Object.keys(before)) for (let i=0;i<4;i++) {
+      assert.ok(Math.abs(before[selector][i]-after[selector][i]) < 1, `${label}: ${selector} moved (${before[selector]} -> ${after[selector]})`);
+    }
+  };
+  for (const layout of ['classic', 'modern']) for (const [width,height] of [[1366,768],[1024,640]]) for (const theme of ['light','dark']) {
+    await save('homeLayout', layout);
+    await run(`window.desktop.setTheme('${theme}');localStorage.removeItem('hub.format'); 0`);
+    win.setSize(width,height);
+    snapshotReady = false;
+    current.ready = current.connected = false;
+    snapshot.user.registered = false;
+    snapshot.stats = {};
+    snapshot.currentFormat = 'gen9ou';
+    await load('index.html');
+    await run('window.HomeAppearance.loaded.then(() => true)');
+    await until(() => run(`document.getElementById('hub').classList.contains('hub--${layout}')`), 'initial layout');
+    assert.equal(await run('document.getElementById("format").value'), 'gen9randombattle');
+    assert.equal(await run('document.getElementById("hero-format").textContent'), '[Gen 9] Random Battle');
+    assert.equal(await run('document.querySelectorAll("#team-grid .hero-team-slot").length'), 6);
+    assert.equal(await run('document.getElementById("team").selectedOptions[0].textContent'), 'Team is provided');
+    const before = await geometry();
+    if (width === 1366) fs.writeFileSync(path.join(output, `startup-${layout}-${theme}-connecting.png`), (await renderer.capturePage()).toPNG());
+    await run('refresh()');
+    sameLayout(before, await geometry(), 'still connecting');
+    // A connected session alone must not enable the placeholder format.
+    current.ready = current.connected = true;
+    await run('window.showdownNav.pollNow()');
+    assert.equal(await run('document.getElementById("battle").disabled'), true);
+    assert.equal(await run('document.getElementById("format").disabled'), true);
+    snapshotReady = true;
+    await run('refresh()');
+    assert.equal(await run('document.getElementById("format").value'), 'gen9randombattle', 'default does not follow the client OU menu');
+    assert.equal(await run('document.getElementById("battle").disabled'), false);
+    sameLayout(before, await geometry(), `${layout} ${width} ${theme} guest connected`);
+    snapshot.user.registered = true;
+    await run('refresh()');
+    sameLayout(before, await geometry(), 'signed in without ratings');
+    snapshot.stats = { gen9randombattle: { elo: 1500, wins: 12, losses: 8, gxe: 65 } };
+    await run('refresh()');
+    assert.equal(await run('document.getElementById("hero-record").hidden'), false);
+    sameLayout(before, await geometry(), 'ratings arrived');
+    if (width === 1366) fs.writeFileSync(path.join(output, `startup-${layout}-${theme}-connected.png`), (await renderer.capturePage()).toPNG());
+  }
+  // Real selections and team choices survive a disconnect and a later return to Home.
+  snapshot.teams = [{ index: 2, name: 'My OU team', format: 'gen9ou', sprites: [] }];
+  await run('refresh()');
+  await run("document.getElementById('format').value='gen9ou';document.getElementById('format').dispatchEvent(new Event('change')); 0");
+  assert.equal(await run('document.getElementById("team").disabled'), false);
+  current.connected = false;
+  await run('window.showdownNav.pollNow()');
+  assert.equal(await run('document.getElementById("team").disabled'), true);
+  assert.equal(await run('document.getElementById("format").disabled'), true);
+  current.connected = true;
+  await run('window.showdownNav.pollNow()');
+  assert.equal(await run('document.getElementById("team").disabled'), false);
+  assert.equal(await run('document.getElementById("team").value'), '2');
+  await home();
+  assert.equal(await run('document.getElementById("format").value'), 'gen9ou', 'saved choice still restored');
   assert.deepEqual(errors, []);
-  console.log('PASS Home appearance: real settings persistence, six palettes, five backgrounds, both themes/layouts/sizes, news, client preservation and offline fallback.' + (liveArt ? ' Live artwork decoded.' : ' All network isolated.'));
+  console.log('PASS Home appearance: real settings persistence, six palettes, five backgrounds, both themes/layouts/sizes, news, client preservation, offline fallback, stable connecting/guest/rated layout and reconnect selections.' + (liveArt ? ' Live artwork decoded.' : ' All network isolated.'));
   win.destroy();
   app.exit(0);
 }).catch(error => { console.error(error); app.exit(1); });

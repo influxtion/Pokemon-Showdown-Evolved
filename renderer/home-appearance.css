@@ -206,6 +206,15 @@ html[data-home-theme] .hub--classic .hero-team-grid img,
 html[data-home-theme] .hub--classic .hero-team-slot { max-height: 52px; }
 html[data-home-theme] .hub--classic .hero-actions { gap: 8px; }
 html[data-home-theme] .hub--classic .btn-battle { height: 50px; }
+/* Account text and ratings share a stable slot while the connection settles. */
+html[data-home-theme] .hero-profile { display: grid; margin-top: 4px; min-height: 2lh; }
+html[data-home-theme] .hero-profile > * { grid-area: 1 / 1; margin: 0; align-self: center; }
+html[data-home-theme] .hero-sub.is-record-shown { visibility: hidden; }
+html[data-home-theme] .hero-team-name a[aria-disabled="true"] { opacity: .55; cursor: default; }
+html[data-home-theme] .hub--classic .hero-profile { min-height: calc(2lh + 12px); }
+html[data-home-theme] .hub--modern .hero-links { order: 0; }
+html[data-home-theme] .hub--modern .hero-record { order: 1; }
+html[data-home-theme] .hub--modern .hero-stats { order: 2; }
 @media (max-width: 1180px) {
   html[data-home-theme] .hub--classic .hub-news { flex-basis: 300px; }
   html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 28px 28px; }

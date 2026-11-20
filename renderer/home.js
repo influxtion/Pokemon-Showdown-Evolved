@@ -37,6 +37,8 @@ let searchClickedAt = 0;
 // When the current search began, for the elapsed timer on the button.
 let searchSince = 0;
 let friendsKey = '';
+const DEFAULT_FORMAT = 'gen9randombattle';
+let formatsLoaded = false;
 
 function tickSearch() {
   if (!searchSince) return;
@@ -71,6 +73,7 @@ function el(tag, className, text) {
 
 const openFriends = el('button', 'btn', 'Open list');
 openFriends.type = 'button';
+openFriends.hidden = openFriends.disabled = true;
 openFriends.addEventListener('click', () => {
   if (sessionReady && sessionConnected) act('friends');
 });
@@ -93,7 +96,7 @@ async function act(action, args, { show = true } = {}) {
 }
 
 function currentFormat() {
-  return state.formats.find((f) => f.id === els.format.value) || null;
+  return (state.ready && state.formats?.find((f) => f.id === els.format.value)) || null;
 }
 
 function teamsFor(formatId) {
@@ -105,7 +108,8 @@ function renderFormats() {
   if (key === formatsKey) return;
   formatsKey = key;
 
-  const wanted = els.format.value || prefs.get('hub.format') || state.currentFormat;
+  const wanted = formatsLoaded ? els.format.value : prefs.get('hub.format') || DEFAULT_FORMAT;
+  formatsLoaded = true;
   els.format.replaceChildren();
   const groups = new Map();
   for (const f of state.formats) {
@@ -163,7 +167,7 @@ function renderTeams() {
 
 function selectedTeam() {
   const format = currentFormat();
-  if (!format || format.presetTeam || els.team.disabled) return null;
+  if (!format || format.presetTeam) return null;
   return state.teams.find((t) => String(t.index) === els.team.value) || null;
 }
 
@@ -174,7 +178,8 @@ function renderHero() {
   const rating = format && state.ratings && state.ratings[format.id];
   const record = format && state.stats && state.stats[format.id];
   els.heroRecord.hidden = !(state.user.registered && record);
-  els.heroSub.hidden = !els.heroRecord.hidden;
+  // Modern keeps this space beside its record; Classic shares one profile slot.
+  els.heroSub.classList.toggle('is-record-shown', !els.heroRecord.hidden);
   if (!els.heroRecord.hidden) {
     const games = record.wins + record.losses;
     els.heroRecord.replaceChildren(...[
@@ -228,12 +233,15 @@ function renderHero() {
   els.battle.classList.toggle('is-searching', searching);
   els.battle.querySelector('.battle-label').textContent = searching ? 'Searching' : 'Battle!';
   els.battle.setAttribute('aria-label', searching ? 'Searching for an opponent' : 'Battle!');
-  $('hero-kicker').textContent = searching ? 'Searching for an opponent' : 'Ready to battle';
+  $('hero-kicker').textContent = searching ? 'Searching for an opponent'
+    : !sessionReady ? 'Connecting to Showdown…' : !sessionConnected ? 'Reconnecting to Showdown…' : 'Ready to battle';
   els.battle.closest('.hero').classList.toggle('is-searching', searching);
   tickSearch();
   els.battle.title = needsTeam ? 'Build or import a team for this format first' : '';
   $('cancel-search').hidden = !searching;
-  els.format.disabled = searching || !state.formats.length;
+  els.format.disabled = searching || !state.formats.length || !sessionReady || !sessionConnected;
+  els.team.disabled = searching || !format || format.presetTeam || !state.teams.length || !sessionReady || !sessionConnected;
+  $('edit-team').setAttribute('aria-disabled', String(!sessionReady || !sessionConnected));
   if (searching) els.challengeForm.hidden = true;
   els.challengeToggle.hidden = searching || !els.challengeForm.hidden;
   els.challengeToggle.disabled = !format || !sessionReady || !sessionConnected;
@@ -527,7 +535,7 @@ els.friends.addEventListener('click', (event) => {
 });
 
 function render() {
-  if (!state.ready) return;
+  if (!state.ready || !state.formats.length) return;
   renderAccount();
   renderFormats();
   renderTeams();
@@ -538,14 +546,16 @@ function render() {
 }
 
 async function refresh() {
+  let received = false;
   try {
-    state = await window.desktop.getShowdown();
+    const snapshot = await window.desktop.getShowdown();
+    if (snapshot.ready && snapshot.formats.length) { state = snapshot; received = true; }
   } catch {
-    state = { ready: false };
+    // Keep the last usable layout while the client recovers.
   }
   render();
   // Ratings or friends still loading in the background: look again shortly.
-  setTimeout(refresh, !state.ready ? 2000 : state.pending ? 1000 : 10000);
+  setTimeout(refresh, !received ? 2000 : state.pending ? 1000 : 10000);
 }
 
 els.format.addEventListener('change', () => {
@@ -602,6 +612,7 @@ els.challengeForm.addEventListener('submit', (event) => {
 
 $('edit-team').addEventListener('click', (event) => {
   event.preventDefault();
+  if (!state.ready || !sessionReady || !sessionConnected) return;
   const team = selectedTeam();
   act('edit-team', team ? { team: team.index, name: team.name, format: team.format } : { team: null });
 });
@@ -666,6 +677,8 @@ function applyLayout(layout) {
   const hub = $('hub');
   hub.classList.toggle('hub--classic', layout === 'classic');
   hub.classList.toggle('hub--modern', layout !== 'classic');
+  const parent = layout === 'classic' ? $('hero-profile') : document.querySelector('.hero-aside');
+  parent.prepend(els.heroRecord);
 }
 
 // Older Chromium may still let Escape close the dialog; there is nothing to fall back to.
