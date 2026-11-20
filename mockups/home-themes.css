@@ -149,6 +149,9 @@ html[data-spacing="airy"] .hub--classic .hub-side { gap: 52px; }
 html[data-spacing="airy"] .hub--classic .hub-lower { gap: 48px; }
 html[data-spacing="airy"] .hub--modern .hub-side { gap: 52px; }
 html[data-spacing="airy"] .hub-tiles { gap: 24px; }
+/* Keep 20px below the daily strip without changing the grid's other gaps. */
+html[data-spacing="relaxed"] .daily-compact { margin-bottom: -20px; }
+html[data-spacing="airy"] .daily-compact { margin-bottom: -32px; }
 @media (max-width: 1180px) {
   html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 28px; }
   html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 32px; }
