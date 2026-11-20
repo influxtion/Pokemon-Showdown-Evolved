@@ -526,37 +526,43 @@ Tests cover automatic download without quit hooks, cancellation, duplicate reque
 
 ## Home design exploration (November 19, 2026)
 
-The owner requested a new UI direction with more color, personality, and slightly
-rounded edges, inspired by the Pokémon TCG apps. Branch `feat/home-ui-rehaul`
-contains the reviewable Home concept in `mockups/home-rehaul.html`. This is an
-interactive design fragment, separate from the running launcher. It does not
-change other pages, settings, accounts, matchmaking, or packaged assets.
+The owner rejected the first TCG-inspired layout and copy. The current direction
+preserves the desktop app's arrangement and wording, adds warmer and more
+interesting colors and border choices, and gives Home more breathing room.
+The saved Home preference is Classic. Do not turn this into a mobile-style
+dashboard, add a promotional greeting, or replace familiar labels.
 
-The concept takes the light, tactile direction of
-[Pokémon TCG Pocket](https://tcgpocket.pokemon.com/en-us/): pearl surfaces, aqua
-battle controls, a warm yellow Battle button, a peach Daily Foul Play panel, and
-Pokémon artwork. Rounded corners and subtle depth are intentional explorations
-beyond the previous flat design rules. The existing navigation and Home tasks
-remain recognizable. Dark mode uses deep blue with aqua and warm accents.
+On `feat/home-ui-rehaul`, `npm run preview:home` opens an isolated Electron
+appearance preview using the current `renderer/index.html` and `styles.css`.
+`mockups/home-themes.css` provides appearance and spacing overrides;
+`mockups/home-themes.js` provides palettes and clearly labeled sample data.
+`mockups/preview-home.cjs` owns the preview window and native comparison menus.
+The production renderer and saved settings are unchanged. The rejected mockup
+was removed; its historical source remains in commit `b9ef00d`.
 
-The format selector demonstrates OU with a clearly labeled sample team and
-Random Battle with six unknown Pokémon. Battle/Cancel demonstrate a local
-search state; other actions explain their destination without connecting to
-Showdown. Appearance can be toggled in the preview. The inline design controls
-also expose accent color, panel radius, and artwork visibility. No ratings,
-online counts, or progress are fabricated as live data.
+The desktop menus offer six palettes (Hearth, Garden, Seaside, Rosewood, Amber,
+Twilight), light/dark versions of each, four border finishes (fine, soft inset,
+double frame, stitched), three corner sizes, and Current/Relaxed/Airy spacing.
+Hearth with Relaxed spacing is the initial suggestion. Classic and the existing
+Revamped layout can both be inspected. The palette uses cream or deep colored
+surfaces, differently tinted panel headers, colored rail icons, warmer yellow
+actions, and optional subtle texture. These are intentional explorations beyond
+the older flat color and border rules.
 
-The owner logo is referenced from this repository at `c961530`. Pokémon artwork
-is referenced from the [PokeAPI sprite archive](https://github.com/PokeAPI/sprites)
-through jsDelivr, under `sprites/pokemon/other/official-artwork/`. Pokémon artwork
-belongs to its respective owners. These references are preview assets, not a
-new shipping asset dependency. The visualization host supplies Lucide icons.
+Relaxed spacing increases Home margins, column separation, panel padding,
+control heights, and list-row spacing while softening dividers. It retains
+the compact desktop rail, room tabs, daily strip, and Classic's battle/news/
+rooms/friends arrangement. Home scrolls vertically at smaller window sizes.
+The menus are design-review controls, not a proposed production navigation bar.
 
-Review evidence: `npm run check` passed, the inline script parsed, and Electron
-rendered all nine images and 24 icons. Light/dark desktop and compact/mobile
-captures were inspected. Layout checks found no horizontal overflow or
-offscreen controls at desktop, minimum-window, and narrow preview widths.
-Format changes, search/cancel, and appearance switching passed interaction
-checks. The smaller window scrolls vertically. Generated standalone preview
-and captures are under ignored `out/mockups/`. This is design review, not
-verification of a production Home implementation.
+The preview has no launcher preload or account session and performs no
+matchmaking, bot startup, or external navigation. Its only artwork is the
+existing local logo and keystone. The guest, daily state, news, and room list
+are sample content labeled in the preview chrome. Battle/search/cancel and
+the format picker demonstrate local states. Reopening resets the study.
+
+Verification includes script syntax, contrast checks for all twelve palette
+variants, captures of light/dark and multiple border treatments, desktop and
+minimum-size overflow checks, and format/search/cancel interactions. Generated
+pages and captures are in ignored `out/home-themes/`. This remains a design
+preview, not verification of a production Home implementation.

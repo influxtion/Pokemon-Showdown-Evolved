@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "preview:home": "node mockups/launch-home-preview.cjs",
     "build:showdex": "node scripts/build-showdex.js",
     "build:practice": "node scripts/build-practice.js",
     "api:setup": "node api/install.js",
