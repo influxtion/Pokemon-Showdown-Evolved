@@ -640,3 +640,19 @@ production app. Verification covered all five images, credits, both
 appearances, both layouts at minimum size, rapid switching, plain color, and
 a blocked-network fallback in an isolated Electron session. Captures are in
 ignored `out/home-themes/background-*.png`.
+
+To expose more of the wallpaper, Relaxed now uses 80 px between the main
+columns, 64 px between panel rows, and 56 px between Chat rooms and Friends.
+Airy uses 104/80/72 px respectively. The small-window horizontal gaps are
+48/40 px in Relaxed and 64/56 px in Airy. Shortcut tiles have 24 px gaps in
+Relaxed and 32 px in Airy. Outer padding and panel interiors stay unchanged;
+the gaps above and below Daily Foul Play remain 20 px, verified by rendered
+geometry.
+
+Background > Image framing defaults to Show whole image (`contain`), centered
+in the Home viewport, preserving aspect ratio without cropping. Remaining
+space uses the palette background. Fill window (`cover`) remains available
+for comparison. The wallpaper is sized to the viewport rather than the
+scrolling content, so expanding news or scrolling does not enlarge it.
+Checked all five images, desktop and minimum widths in both layouts, image
+framing choices, and unchanged hero padding; no horizontal overflow.

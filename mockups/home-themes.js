@@ -19,7 +19,7 @@ const HOME_BACKGROUNDS = {
   charizards: { title: 'Charizards', artist: 'Jessica Valencia' },
   psday: { title: 'Showdown Day', artist: 'LifeisDANK' },
 };
-const homeStudy = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft' };
+const homeStudy = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fit' };
 let backgroundKey;
 let backgroundRevision = 0;
 let homeBackgroundReady = Promise.resolve();
@@ -85,6 +85,7 @@ function applyHomeStudy(next = {}) {
   document.documentElement.dataset.borders = homeStudy.borders;
   document.documentElement.dataset.texture = String(homeStudy.texture);
   document.documentElement.dataset.spacing = homeStudy.spacing;
+  document.documentElement.dataset.backgroundFit = homeStudy.backgroundFit === 'fill' ? 'fill' : 'fit';
   const tint = { natural: 0, soft: 12, muted: 32 }[homeStudy.backgroundTone] ?? 12;
   document.documentElement.style.setProperty('--study-background-tint', `color-mix(in srgb, ${bg} ${tint && dark ? tint + 12 : tint}%, transparent)`);
   document.querySelector('#hub').className = `hub hub--${homeStudy.layout}`;
