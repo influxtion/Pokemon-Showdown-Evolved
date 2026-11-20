@@ -12,9 +12,9 @@ This is an early preview. Windows is unsigned, and Mac builds are not Apple-nota
 
 ## Home preview
 
-[![Pokemon Showdown Evolved Home in light mode, with Daily Bot Gauntlet Challenge, battle setup, news, and chat rooms](assets/readme/home-light.png)](assets/readme/home-light.png)
+[![Pokemon Showdown Evolved classic Home in light mode, with Daily Bot Gauntlet Challenge, battle setup, news, and chat rooms](assets/readme/home-light.png)](assets/readme/home-light.png)
 
-The updated Home layout in light mode, with the Evolved sidebar, Sunrise Ocean background, and Daily Bot Gauntlet Challenge. Captured from the running app in an isolated guest profile on November 20, 2026. Click the image to view it at full resolution. [See a Foul Play battle with Showdex](assets/readme/battle.png).
+The classic Home layout in light mode, with the Evolved sidebar, Sunrise Ocean background, and Daily Bot Gauntlet Challenge. Captured from the running app in an isolated guest profile on November 20, 2026. Click the image to view it at full resolution. [See a Foul Play battle with Showdex](assets/readme/battle.png).
 
 ## Features
 
