@@ -141,13 +141,45 @@ html[data-spacing="relaxed"] .friends-note, html[data-spacing="airy"] .friends-n
 html[data-spacing="relaxed"] .hub--classic .hub-side, html[data-spacing="airy"] .hub--classic .hub-side { gap: 26px; }
 html[data-spacing="relaxed"] .hub--classic .hub-lower, html[data-spacing="airy"] .hub--classic .hub-lower { gap: 24px; }
 html[data-spacing="relaxed"] .hub-tile, html[data-spacing="airy"] .hub-tile { min-height: 66px; gap: 8px; }
-html[data-spacing="airy"] .hub { padding: 44px 48px; }
-html[data-spacing="airy"] .hero--menu { padding: 32px 28px 28px; gap: 24px; }
-html[data-spacing="airy"] .hub-grid { column-gap: 38px; row-gap: 28px; }
-html[data-spacing="airy"] .post-toggle { padding-top: 22px; padding-bottom: 22px; }
-html[data-spacing="airy"] .room-row { padding-top: 16px; padding-bottom: 16px; }
+html[data-spacing="airy"] .hub { padding: 52px 64px; }
+html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 420px minmax(0, 1fr); }
+html[data-spacing="airy"] .hero--menu { padding: 36px 32px 32px; gap: 28px; }
+html[data-spacing="airy"] .hub-grid { column-gap: 48px; row-gap: 36px; }
+html[data-spacing="airy"] .hero--menu .hero-pickers { gap: 24px; }
+html[data-spacing="airy"] .hero .field { gap: 9px; }
+html[data-spacing="airy"] .hero .select { height: 42px; }
+html[data-spacing="airy"] .hero-sub { margin-top: 10px; }
+html[data-spacing="airy"] .hero-team { display: flex; flex-direction: column; gap: 14px; }
+html[data-spacing="airy"] .hero-team-grid { gap: 10px; }
+html[data-spacing="airy"] .hero--menu .hero-actions { gap: 18px; }
+html[data-spacing="airy"] .hero--menu .hero-actions > .btn:not(.btn-battle) { min-height: 34px; }
+html[data-spacing="airy"] .daily-compact { padding: 18px 24px; gap: 20px; }
+html[data-spacing="airy"] .daily-summary h2 { margin-bottom: 7px; }
+html[data-spacing="airy"] .hub--classic .hub-side { gap: 36px; }
+html[data-spacing="airy"] .hub--classic .hub-lower { gap: 32px; }
+html[data-spacing="airy"] .window-head { min-height: 52px; padding-left: 24px; padding-right: 24px; }
+html[data-spacing="airy"] .post-toggle { padding: 24px 48px 24px 24px; gap: 9px; }
+html[data-spacing="airy"] .post-toggle::after { right: 24px; top: 31px; }
+html[data-spacing="airy"] .room-list { padding: 12px; }
+html[data-spacing="airy"] .room-row { padding: 16px 12px; margin: 6px 0; border-radius: 6px; }
+html[data-spacing="airy"] .room-row-head { gap: 12px; }
+html[data-spacing="airy"] .friends-note { padding: 28px 24px; }
+html[data-spacing="airy"] .friends-note p { margin-bottom: 22px; }
+html[data-spacing="airy"] .window-foot { padding: 14px 24px; }
+html[data-spacing="airy"] .hub-tiles { gap: 18px; }
+html[data-spacing="airy"] .hub-tile { min-height: 78px; gap: 12px; }
+html[data-spacing="airy"] .hub--modern .hero--menu { padding: 36px; gap: 40px; }
+html[data-spacing="airy"] .hub--modern .hero-main { gap: 28px; }
+html[data-spacing="airy"] .hero-links { gap: 16px; }
+html[data-spacing="airy"] .hero-link { min-height: 52px; }
 @media (max-width: 1180px) {
-  html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 28px; }
-  html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 24px; }
-  html[data-spacing="relaxed"] .hub--classic .hub-lower, html[data-spacing="airy"] .hub--classic .hub-lower { gap: 16px; }
+  html[data-spacing="relaxed"] .hub { padding: 28px; }
+  html[data-spacing="relaxed"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 24px; }
+  html[data-spacing="relaxed"] .hub--classic .hub-lower { gap: 16px; }
+  html[data-spacing="airy"] .hub { padding: 36px; }
+  html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 32px; }
+  html[data-spacing="airy"] .hub--classic .hub-lower { gap: 24px; }
+  html[data-spacing="airy"] .hero--menu { padding-left: 24px; padding-right: 24px; }
+  html[data-spacing="airy"] .window-head { padding-left: 18px; padding-right: 18px; }
+  html[data-spacing="airy"] .friends-note { padding-left: 18px; padding-right: 18px; }
 }
