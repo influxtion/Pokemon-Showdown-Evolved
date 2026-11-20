@@ -579,3 +579,47 @@ variants, captures of light/dark and multiple border treatments, desktop and
 minimum-size overflow checks, and format/search/cancel interactions. Generated
 pages and captures are in ignored `out/home-themes/`. This remains a design
 preview, not verification of a production Home implementation.
+
+Daily Foul Play was removed from the preview's sample news at the owner's
+request; the dedicated daily strip remains.
+
+### Showdown background feasibility (November 19, 2026)
+
+Image backgrounds are technically feasible for Home without changing its
+desktop layout. The existing image CSP permits local assets and the official
+Showdown origin. An isolated Electron experiment decoded all five backgrounds
+used by the classic client's random selection: Charizards (1500×891), Horizon
+(1280×853), Ocean (1500×1000), Shaymin (1280×800), and Pokemon Showdown Day
+(2000×967). The current picker explicitly offers the first four, Solid blue,
+Random, and a custom image; Showdown Day is part of the random pool.
+Sources: [background storage and attribution](https://github.com/smogon/pokemon-showdown-client/blob/1cf9b385a97ad5c77a25b91a1c799078827ec306/play.pokemonshowdown.com/src/oldclient/storage.js#L30-L118),
+[background picker](https://github.com/smogon/pokemon-showdown-client/blob/1cf9b385a97ad5c77a25b91a1c799078827ec306/play.pokemonshowdown.com/src/oldclient/client-topbar.js#L868-L934),
+and [hosted assets](https://play.pokemonshowdown.com/fx/).
+
+The experiment placed Ocean behind the Seaside Home panels with a light tint,
+preserving opaque content surfaces and the existing gaps. Desktop and minimum
+window sizes had no horizontal overflow. The capture was visually inspected;
+it is saved at ignored `out/home-themes/background-ocean-study.png`, with its
+temporary harness at `out/home-background-feasibility.cjs`. This was a hidden
+research window; the normal preview's background, production files and saved
+preferences were not changed. It does not establish startup performance or
+offline behavior for a shipped feature.
+
+Suggested implementation: a Home background choice independent of the color
+palette, starting with Plain color and a small allowlisted image catalog,
+with cover cropping, per-image positioning, a theme-aware tint, and a visible
+artist credit. Load artwork asynchronously and keep the palette color as the
+loading/offline fallback. A cached or bundled copy would make the desktop
+experience independent of a network fetch after first use. Upstream credits
+Vivian Zou (Horizon), Quanyails (Sunrise Ocean), Daniel Kong (Shaymin), Jessica
+Valencia (Charizards), and LifeisDANK (Showdown Day); this check did not establish
+an image-specific redistribution grant, so retain those credits and resolve
+asset distribution terms before bundling exact artwork.
+
+Home and the embedded Showdown client have separate storage. Matching an
+existing Showdown choice would require a narrow, sanitized background ID in
+the bridge; arbitrary CSS or custom data URLs should not be copied through it.
+The embedded client's art is currently suppressed by the explicit `body`
+background rule in `app/client-theme.css`. A Home-only background needs no
+change to that stylesheet or to battle rendering. Restoring client wallpaper
+or importing custom local images would be separate extensions.

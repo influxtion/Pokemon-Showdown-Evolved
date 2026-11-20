@@ -64,7 +64,6 @@ function setupHomePreview() {
   document.querySelector('[data-nav="rooms"]').innerHTML = '<div class="nav-item nav-page" aria-current="page"><button class="nav-room-main" type="button">Home</button></div><div class="nav-item nav-tab"><button class="nav-room-main" type="button">Main menu</button></div><div class="nav-item nav-tab"><button class="nav-room-main" type="button">Lobby</button></div>';
   // Sample content is clearly identified in the chrome, with existing component markup.
   const posts = [
-    ['Daily Foul Play','Medium · Gen 9 Random','Three attempts per UTC day against Foul Play. Win once to clear the daily challenge.'],
     ['Showdex in practice','Showdex','Damage calculations and matchup information alongside your practice battles.'],
     ['Replay notes','Pokemon Showdown Evolved','Save useful notes from your battles and open the replay to review them.'],
   ];
