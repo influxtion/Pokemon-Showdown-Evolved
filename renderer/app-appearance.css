@@ -70,7 +70,15 @@ html[data-home-theme] .daily-full {
   background: color-mix(in srgb, var(--daily-surface) 28%, var(--bg-panel));
   border-color: color-mix(in srgb, var(--daily-accent) 35%, var(--border-strong));
 }
-html[data-home-theme] .daily-full .window-head { background: var(--daily-surface); color: var(--text); border-top-color: var(--daily-accent); }
+html[data-home-theme] .daily-full .window-head {
+  min-height: 36px; padding: 2px 14px; gap: 10px;
+  background: var(--daily-surface); color: var(--text); border-top-color: var(--daily-accent);
+}
+html[data-home-theme] .daily-full .window-head .btn { height: 28px; padding: 0 12px; }
+html[data-home-theme] .daily-full .daily-body { padding: 6px 14px; }
+html[data-home-theme] .daily-full .daily-body > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px; }
+html[data-home-theme] .daily-full .daily-body p { margin: 0; }
+html[data-home-theme] .daily-full .daily-rules { padding: 0 14px 8px; }
 html[data-home-theme] .daily-full .daily-streak { color: var(--text); }
 html[data-home-theme] .daily-full .daily-streak svg { color: var(--text-2); }
 html[data-home-theme] .daily-full .daily-streak.is-lit svg { color: var(--daily-flame); }

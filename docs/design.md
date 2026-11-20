@@ -829,3 +829,12 @@ Syntax and the Daily/app appearance desktop suites passed. Checks cover the
 Medium-only action, format changes, one attempt when both entry points are
 clicked, returning without another reservation, completed-state disabling and
 light/dark card fit. No live daily attempt was consumed during verification.
+
+The owner subsequently swapped the Bots sections: Daily Foul Play now sits in
+the former local-download position above the opponent groups, and Foul Play on
+this computer sits below those groups. Daily is shorter: its action shares the
+title/streak row, its description, attempts and record wrap along one line,
+and its existing expandable rules stay below. Home and the Medium card's daily
+shortcut keep their layouts and behavior.
+Syntax checks and the Daily/app appearance desktop suites passed; both desktop
+sizes and themes were visually checked with the compact strip above the cards.
