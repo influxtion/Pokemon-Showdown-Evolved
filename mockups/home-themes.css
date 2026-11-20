@@ -152,7 +152,7 @@ html[data-home-theme] .preview-status { color: var(--text-2); font-size: 11px; }
 html[data-home-theme] .preview-credit { color: var(--text-2); font-size: 11px; margin-right: 16px; }
 
 /* Desktop spacing options keep Classic's arrangement and let Home scroll naturally. */
-html[data-home-theme] .hub--classic .hub-side { width: 100%; max-width: 620px; justify-self: start; }
+html[data-home-theme] .hub--classic .hub-side { width: 100%; max-width: 620px; justify-self: end; }
 html[data-home-theme] .hub--classic .hub-news { flex: 0 1 280px; }
 html[data-home-theme] .hub--classic .hub-lower { flex: 0 1 260px; }
 html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 40px 36px; }

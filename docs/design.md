@@ -684,3 +684,5 @@ panel gaps and Battle's dimensions. The group contracts with the available
 space at smaller widths; News gets 300 px height below 1180 px to accommodate
 wrapped text. Checked desktop/minimum layouts, news expand/collapse, and
 all twelve palette contrast combinations; the checked minimum remains 4.61:1.
+The three-box group is aligned to the right edge of its grid column at the
+owner's request, preserving its sizes and the existing outer inset.
