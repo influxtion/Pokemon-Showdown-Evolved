@@ -809,3 +809,11 @@ The inactive flame is muted; the active streak flame keeps its lit color.
 Syntax checks and the existing Daily/Home appearance desktop suites passed;
 both Bots themes were inspected, and Home's twelve palette contrast checks
 remain at least 4.61:1.
+
+The owner rejected the remaining orange/gold accents on Daily Foul Play.
+Its updated treatment uses a cool periwinkle surface, violet action button and
+edge, and blue lit flame on both Home and Bots. Dedicated light/dark daily
+tokens replace the shared warm accents, including button shadows and the Home
+emblem. Its position below the bot choices is retained.
+Syntax, Daily desktop flow and Home appearance checks passed; the twelve
+palette contrast checks still meet 4.61:1. Light/dark screenshots were inspected.

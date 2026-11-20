@@ -52,6 +52,8 @@ function tokens(settings = {}, dark = false) {
     'hero-bg':hero, 'hero-border':`color-mix(in srgb, ${hero} 65%, ${yellow})`, 'hero-text':'#fff8e9', 'hero-muted':'#fff8e9',
     'hero-input':`color-mix(in srgb, ${heroEnd} 90%, #243641)`, 'hero-input-border':`color-mix(in srgb, ${hero} 60%, #f5edcf)`, 'hero-team-bg':`color-mix(in srgb, ${hero} 82%, #e6d9ac)`,
     'home-hero-end':heroEnd, 'home-daily':daily, 'home-news':news, 'home-rooms':rooms, 'home-friends':friends, 'home-coral':coral,
+    'daily-surface':dark ? '#36466c' : '#e7ebff', 'daily-accent':dark ? '#b9b1ff' : '#5b50ad',
+    'daily-on-accent':dark ? '#252343' : '#ffffff', 'daily-flame':dark ? '#a9daff' : '#3c4ba3',
     'home-highlight':dark ? '#fff6dc1c' : '#ffffff9c', 'home-shadow':dark ? '#081e2928' : '#6b573a18',
     'home-readable-muted':`color-mix(in srgb, ${muted} 20%, ${ink})`,
     'home-surface-strength':dark ? '76%' : '100%',
