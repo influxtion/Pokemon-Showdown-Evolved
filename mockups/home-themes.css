@@ -123,7 +123,7 @@ html[data-borders="stitched"] .window-head { border-bottom-style: dashed; }
 html[data-home-theme] .preview-status { color: var(--text-2); font-size: 11px; }
 
 /* Desktop spacing options keep Classic's arrangement and let Home scroll naturally. */
-html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 36px 40px; }
+html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 40px 36px; }
 html[data-spacing="relaxed"] .hub-grid, html[data-spacing="airy"] .hub-grid { column-gap: 48px; row-gap: 40px; }
 html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 400px minmax(0, 1fr); }
 html[data-spacing="relaxed"] .hero--menu, html[data-spacing="airy"] .hero--menu { padding: 20px 18px 18px; gap: 20px; }
@@ -153,7 +153,7 @@ html[data-spacing="airy"] .hub-tiles { gap: 24px; }
 html[data-spacing="relaxed"] .daily-compact { margin-bottom: -20px; }
 html[data-spacing="airy"] .daily-compact { margin-bottom: -32px; }
 @media (max-width: 1180px) {
-  html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 28px; }
+  html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 28px 28px; }
   html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 32px; }
   html[data-spacing="relaxed"] .hub--classic .hub-lower, html[data-spacing="airy"] .hub--classic .hub-lower { gap: 28px; }
   html[data-spacing="airy"] .hub--classic .hub-grid { column-gap: 40px; }

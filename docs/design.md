@@ -566,6 +566,7 @@ Panel padding was then reduced at the owner's request: the battle panel uses
 tighter interiors retain the wider gaps between boxes in both spacing modes.
 Only the gap below Daily Foul Play is tighter at 20 px in Relaxed and Airy;
 the other panel gaps retain their chosen spacing.
+The top inset above Daily Foul Play is also 20 px at both desktop widths.
 
 The preview has no launcher preload or account session and performs no
 matchmaking, bot startup, or external navigation. Its only artwork is the
