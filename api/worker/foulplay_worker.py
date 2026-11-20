@@ -27,7 +27,7 @@ would download (set data, usage stats) is installed beforehand by install.js.
 """
 import argparse
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from contextlib import redirect_stdout
 from importlib.metadata import version
 import json
@@ -45,6 +45,7 @@ FORMATS = ("gen9randombattle", "gen9ou")
 BOT = "FoulPlay"
 ENGINE_VERSION = "0.0.48"
 MAX_LINE = 1 << 20
+MAX_QUEUED_FRAMES = 16
 MAX_TEAM = 8192
 CHOICE = re.compile(r"/choose move [a-z0-9]{1,40}(?: terastallize)?|/switch [1-6]|/team [1-6]{1,6}")
 GUEST = re.compile(r"[A-Za-z][A-Za-z0-9]{2,17}")
@@ -260,6 +261,18 @@ class Link:
 
 
 def read_stdin(loop, frames, stdin):
+    def put(value):
+        pending = frames.put(value)
+        try:
+            # Block this reader when the engine falls behind, so the API's pipe limit applies.
+            asyncio.run_coroutine_threadsafe(pending, loop).result()
+            return True
+        except RuntimeError:
+            pending.close()
+            return False
+        except CancelledError:
+            return False
+
     while True:
         try:
             line = stdin.readline(MAX_LINE + 2)
@@ -274,8 +287,9 @@ def read_stdin(loop, frames, stdin):
         if not isinstance(message, dict) or message.get("type") == "stop":
             break
         if message.get("type") == "frame" and isinstance(message.get("data"), str):
-            loop.call_soon_threadsafe(frames.put_nowait, message["data"])
-    loop.call_soon_threadsafe(frames.put_nowait, None)
+            if not put(message["data"]):
+                return
+    put(None)
 
 
 def first_team(stdin):
@@ -293,7 +307,7 @@ async def serve(args, emit, team):
     load(args)
     from fp.run_battle import pokemon_battle
 
-    frames = asyncio.Queue()
+    frames = asyncio.Queue(maxsize=MAX_QUEUED_FRAMES)
     stdin = sys.stdin.buffer
     threading.Thread(target=read_stdin, args=(asyncio.get_running_loop(), frames, stdin), daemon=True).start()
     emit("ready", protocol=PROTOCOL, bot="foulplay", level=args.level, format=args.format, threads=args.threads,

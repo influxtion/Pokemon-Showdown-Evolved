@@ -157,9 +157,10 @@ class PracticeSession extends EventEmitter {
     this.timer.unref?.();
     const current = () => generation === this.generation;
     try {
-      this.verification = this.verify(this.root);
-      const verified = await this.verification.promise.catch(() => ({ ok: false }));
-      this.verification = null;
+      const verification = this.verify(this.root);
+      this.verification = verification;
+      const verified = await verification.promise.catch(() => ({ ok: false }));
+      if (this.verification === verification) this.verification = null;
       if (!current()) return { ok: false, cancelled: true };
       if (!verified.ok) return this.fail('integrity', generation);
       // Start the simulator and the engine together; both take a moment.
@@ -223,6 +224,11 @@ class PracticeSession extends EventEmitter {
     // Only the cloud queues; the copy on this computer always has room for its one player.
     let session = await api.createSession({ bot: this.bot.id, preset: this.preset, format: this.format,
       ...(this.teams ? { team: this.teams.botExport } : {}), queue: engine === 'cloud' });
+    // A cancelled request can still reserve capacity. Release it before touching a newer session.
+    if (generation !== this.generation) {
+      if (session.queued) api.leaveQueue(session.ticket); else api.deleteSession(session.id);
+      return;
+    }
     if (session.queued) {
       session = await this.waitInQueue(api, session, generation, engine);
       if (!session) return;

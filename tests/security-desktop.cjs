@@ -58,6 +58,20 @@ app.whenReady().then(async () => {
   }
   assert.equal(await run('Notification.requestPermission()'), 'denied');
   assert.equal((await win.webContents.executeJavaScript('window.desktop.getSettings()')).ok, true);
+  const settings = () => win.webContents.executeJavaScript('window.desktop.getSettings()');
+  const initialWidth = (await settings()).settings.battleWidth;
+  await run(`(() => {
+    const frame = document.createElement('iframe');
+    frame.src = 'https://attacker.invalid/resize-frame';
+    document.body.append(frame);
+  })()`);
+  await until(() => client.mainFrame.frames.some(frame => frame.url === 'https://attacker.invalid/resize-frame'), 'untrusted subframe');
+  const subframe = client.mainFrame.frames.find(frame => frame.url === 'https://attacker.invalid/resize-frame');
+  await subframe.executeJavaScript("console.info('sd-battle-width:1000')");
+  await pause(100);
+  assert.equal((await settings()).settings.battleWidth, initialWidth, 'subframes cannot write launcher settings through the console');
+  await run("console.info('sd-battle-width:900')");
+  assert.equal((await settings()).settings.battleWidth, 900, 'the main battle frame can still persist its width');
   assert.equal(await win.webContents.executeJavaScript(`fetch('https://attacker.invalid/csp-test').then(()=>false,()=>true)`), true);
 
   // A different webContents with the actual preload cannot invoke privileged handlers.

@@ -256,6 +256,21 @@ test('closes the session when a client floods frames', async t => {
   assert.equal(error.code, 'rate-limited');
 });
 
+test('a worker that stops reading cannot grow the API pipe indefinitely', { timeout: 5000 }, async t => {
+  const { client, workers } = await start(t, { maxFrameBytes: 2048 });
+  const session = await client.createSession({ preset: 'quiet' });
+  const socket = await client.connect(session.id);
+  workers[0].ready();
+  await socket.ready;
+  workers[0].stdin.pause();
+  const closed = once(socket, 'close');
+  for (let i = 0; i < 100; i++) socket.send(FRAME + '\n' + 'x'.repeat(1800));
+  const [{ error }] = await closed;
+  assert.equal(error.code, 'rate-limited');
+  assert.equal(workers[0].killed, true);
+  assert.ok(workers[0].stdin.writableLength < 7 * 2048);
+});
+
 test('ends the session if the worker proposes a command that is not a move', async t => {
   const { client, workers } = await start(t);
   const session = await client.createSession({ preset: 'quiet' });

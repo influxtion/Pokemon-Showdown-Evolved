@@ -16,6 +16,8 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { pipeline } = require('node:stream/promises');
+const { Readable, Transform } = require('node:stream');
 const lock = require('./lock.json');
 
 // Changes whenever any pin changes, so an older install is reported as needing an update.
@@ -93,27 +95,27 @@ async function download(entry, target, { signal, onFraction = () => {}, fetcher 
   const hash = crypto.createHash('sha256');
   const partial = `${target}.partial`;
   await fsp.mkdir(path.dirname(target), { recursive: true });
-  const out = fs.createWriteStream(partial);
   let received = 0;
   try {
-    for await (const chunk of response.body) {
-      hash.update(chunk);
-      received += chunk.length;
-      if (!out.write(chunk)) await new Promise(resolve => out.once('drain', resolve));
-      if (total) onFraction(Math.min(1, received / total));
+    // Pipeline handles disk errors and cancellation even while waiting for backpressure.
+    const progress = new Transform({ transform(chunk, _encoding, done) {
+      try {
+        hash.update(chunk);
+        received += chunk.length;
+        if (total) onFraction(Math.min(1, received / total));
+        done(null, chunk);
+      } catch (error) { done(error); }
+    } });
+    await pipeline(Readable.fromWeb(response.body), progress, fs.createWriteStream(partial), { signal });
+    if (hash.digest('hex') !== entry.sha256) {
+      throw new Error(`Checksum mismatch for ${path.basename(target)}. The download was corrupted or changed upstream.` +
+        (entry.refresh ? ' If it changed upstream, run "npm run refresh-ou" and commit the new pins.' : ''));
     }
-    await new Promise((resolve, reject) => out.end(error => (error ? reject(error) : resolve())));
+    await fsp.rename(partial, target);
   } catch (error) {
-    out.destroy();
-    await fsp.rm(partial, { force: true });
+    await fsp.rm(partial, { force: true }).catch(() => {});
     throw error;
   }
-  if (hash.digest('hex') !== entry.sha256) {
-    await fsp.rm(partial, { force: true });
-    throw new Error(`Checksum mismatch for ${path.basename(target)}. The download was corrupted or changed upstream.` +
-      (entry.refresh ? ' If it changed upstream, run "npm run refresh-ou" and commit the new pins.' : ''));
-  }
-  await fsp.rename(partial, target);
   return target;
 }
 
@@ -160,6 +162,21 @@ async function extract(archive, destination, signal) {
   await fsp.mkdir(destination, { recursive: true });
   // bsdtar ships with Windows 10+, and tar with every Linux and macOS install.
   await run(TAR, ['-xzf', archive, '-C', destination], { signal });
+}
+
+async function promoteRuntime(where, fileSystem = fsp) {
+  const old = path.join(path.dirname(where.current), `old-${crypto.randomBytes(4).toString('hex')}`);
+  let previous = false;
+  try {
+    await fileSystem.rename(where.current, old);
+    previous = true;
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  try { await fileSystem.rename(where.staging, where.current); }
+  catch (error) {
+    if (previous) await fileSystem.rename(old, where.current);
+    throw error;
+  }
+  if (previous) await fileSystem.rm(old, { recursive: true, force: true });
 }
 
 // Uses an existing cargo if there is one; otherwise installs a private, pinned toolchain.
@@ -270,10 +287,7 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   await fsp.writeFile(path.join(where.staging, 'install.json'), JSON.stringify({ version: 1, lock: LOCK_VERSION,
     foulPlay: lock.foulPlay.revision, python: lock.python.version, engine: lock.engine.version,
     installedAt: new Date().toISOString() }, null, 2) + '\n');
-  const old = path.join(dir, `old-${crypto.randomBytes(4).toString('hex')}`);
-  if (fs.existsSync(where.current)) await fsp.rename(where.current, old);
-  await fsp.rename(where.staging, where.current);
-  await fsp.rm(old, { recursive: true, force: true });
+  await promoteRuntime(where);
   if (rust.private && !keepToolchain) await fsp.rm(where.toolchain, { recursive: true, force: true });
   report(1, 'Done');
   return inspect(dir, worker);
@@ -361,5 +375,5 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { install, inspect, remove, paths, platformKey, pythonExecutable, installOuData, refreshOuData,
+module.exports = { install, inspect, remove, paths, platformKey, pythonExecutable, installOuData, refreshOuData, promoteRuntime,
   LOCK_VERSION, STEPS, WORKER, FORMATS, OU_FILES };

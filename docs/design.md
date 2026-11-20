@@ -285,6 +285,69 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 
 ## 7. Testing
 
+### November 20 security, reliability and performance audit
+
+Audited from `371de12` on `codex/full-app-audit`. Reviewed the Electron trust
+boundaries, IPC and navigation policies, optional downloads, local stores,
+practice startup/cancellation, API/worker limits, runtime integrity and release
+configuration. The audit produced these source fixes:
+
+| Finding | Fix and regression evidence |
+| --- | --- |
+| Worker input could accumulate without a memory bound while the engine was busy | The Python reader now blocks at 16 queued frames, preserving pipe backpressure so the API can terminate a flooding session. Python slow-consumer/order tests and an API stalled-worker test cover both boundaries. |
+| An embedded subframe could spoof the battle-width console message and write launcher settings | Only the expected main frame may persist battle width. The Electron security suite verifies a hostile iframe is rejected and the real main-frame path still works. |
+| Download write errors could crash the process or hang cancellation | A stream pipeline handles disk failure, abort, hashing and partial-file cleanup. Tests exercise a real write error in a child process and cancellation of a stalled stream. |
+| Failed runtime promotion could leave the previous installation displaced | A failed staging rename restores the prior runtime. A simulated Windows `EPERM` verifies rollback and a subsequent successful replacement. |
+| Cancelled practice startup could interfere with its replacement | Stale verification completion preserves the newer cancellation handle; late API queue replies release their reservations before touching current state. Both races have regression tests. |
+| Searching a full replay library blocked the renderer for over 100 ms | Reused locale date formatters reduced the sampled filter handler median from 117.3 to 11.1 ms and maximum from 131.5 to 14.1 ms with 1,000 notes of 5,000 characters each. Full-list load fell from 355 to 175 ms. |
+
+Verification on the development Windows PC:
+
+- Syntax checks and **270 Node test cases passed, zero skips**, with the real
+  simulator root enabled and the local Python runtime present. The worker wrapper
+  also runs three Python backpressure/input tests.
+- All **12 isolated desktop suites** passed. Guest live startup, shell, Showdex,
+  Showdex dock, appearance and replay playback passed. Real Foul Play practice
+  with Showdex passed move, switch, Tera, rematch, theme/size and failure cleanup.
+- Two complete local Hard OU games (14 and 12 turns, 30 decisions, median 312 ms)
+  and two hosted Medium Random Battles (12 and 15 turns, 32 decisions, median
+  119 ms) passed. These are private practice sessions, not public account games.
+- Full root, API and simulator production npm audits reported **zero known
+  vulnerabilities**. `pip-audit` found no known vulnerabilities in the ten
+  installed runtime Python packages. A bounded tracked-source credential-pattern
+  scan found no matches; it is not proof that every possible secret is absent.
+- The generated practice runtime was stale against its source. Rebuilt it and
+  passed source/runtime packaging verification with manifest
+  `a4026e465d5e7dd773690d7f2a70d645ff64b6053b0c0a4626cc3d392cbe1f78`.
+- Live startup measured Home at 373 ms, connected formats at 2.40 s and page
+  navigation at 24–88 ms. A separate 30-navigation sample with Showdex enabled
+  had a 51.4 ms median / 70.6 ms p95; session IPC was 1.3 ms median / 2.9 ms p95.
+  Main-process event-loop delay p99 was 19.3 ms, maximum 27.8 ms. No launcher
+  errors or accumulating WebContents were observed.
+
+The performance probe is a short warm-development sample, not a long-session
+leak test or a low-end hardware guarantee. Total Chromium/app working set varied
+around 1.1–1.4 GiB across probes, including live upstream content; main-process
+RSS stayed around 160–180 MiB. The live client remains a significant memory cost.
+Raw logs, measurements and the temporary probe are in ignored
+`out/full-app-audit/`; screenshots are in the existing ignored capture folders.
+
+The shell and practice screenshot harnesses also needed real paint activity:
+transparent background windows can suspend animation frames and freeze Showdex
+midway through a theme transition. Shell capture now drives its flicker observer;
+practice captures use an opaque surface and assert that calculator text and
+background both reach the selected palette.
+One additional practice run timed out restoring the network-blocked online view
+before the capture checks; the unchanged retry passed. That intermittent harness
+visibility check remains a candidate for further soak testing.
+
+No installer was rebuilt, no release was edited, and no hosted service was
+deployed. **The worker queue fix requires a service deployment to protect the
+hosted API**; the hosted games exercised the existing deployment. Signed-in
+account flows, clean-machine installation/upgrades, macOS/Linux and prolonged
+soak testing remain outside this audit. Passing tests and clean advisory scans
+cannot establish that the app has no remaining defects or security flaws.
+
 ### November 19 final Evolved audit
 
 The visible product name is **Pokemon Showdown Evolved**, including page titles,
