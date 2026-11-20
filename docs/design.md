@@ -870,3 +870,21 @@ Regressions cover delayed reads, client-change events, right/left selection,
 native/client transitions, background closes and forfeit guards. Live frame
 sampling observed no intermediate main-menu frame during client tab closes.
 The live suite used only a disposable guest profile and spectated battles.
+
+Home now paints its connecting state with [Gen 9] Random Battle, Team is
+provided, all six random-team slots, the final action controls and unknown
+online/battle counts already in place. The default stays Gen 9 Random Battle
+when formats arrive; an existing saved format choice still restores normally.
+Controls require both a real format snapshot and a connected session, and
+Edit teams is guarded during startup. Transient snapshot failures retain the
+last usable layout and retry promptly; team selections survive reconnects.
+Classic shares a reserved profile area between account text and ladder stats;
+Revamped keeps its shortcuts above the stats so late ratings cannot move them.
+
+Verified syntax, 262 unit tests (one optional real-server test skipped), Home
+appearance and desktop smoke suites. The delayed-startup checks compare panel,
+field, team, action, shortcut and side-box geometry before connection, after
+connection, after sign-in and after ratings arrive, in both layouts/themes at
+1366x768 and 1024x640. All tested bounds remain within one CSS pixel. Connecting
+and connected captures were visually inspected; saved formats and reconnect
+team selection were checked through real launcher IPC with simulated sessions.
