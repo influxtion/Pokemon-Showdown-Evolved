@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Home · Pokemon Showdown Evolved</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="home-appearance.css">
 </head>
 <body>
 <div class="app">
@@ -61,6 +62,8 @@
     <header class="topbar">
       <h1>Home</h1>
       <div class="topbar-actions">
+        <span class="home-background-credit" id="background-credit" role="status" hidden></span>
+        <a class="btn" href="settings.html#home-appearance">Customize Home</a>
         <span class="status status--warn" id="account">Connecting to Showdown…</span>
       </div>
     </header>
@@ -273,6 +276,8 @@
     </div>
   </div>
 </dialog>
+<script src="home-appearance-options.js"></script>
+<script src="home-appearance.js"></script>
 <script src="home.js"></script>
 <script src="showdex-onboarding.js"></script>
 <script src="daily-challenge.js"></script>

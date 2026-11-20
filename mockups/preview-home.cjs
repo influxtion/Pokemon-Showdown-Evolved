@@ -11,10 +11,10 @@ app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'showdown-home-pre
 let html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8')
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
   .replace('href="styles.css"', `href="${pathToFileURL(path.join(root, 'renderer', 'styles.css'))}"`)
+  .replace('href="home-appearance.css"', `href="${pathToFileURL(path.join(root, 'renderer', 'home-appearance.css'))}"`)
   .replace('src="assets/logo.png"', `src="${pathToFileURL(path.join(root, 'renderer', 'assets', 'logo.png'))}"`)
   .replace("default-src 'self'", "default-src 'self'; script-src 'self'")
-  .replace('</head>', `<link rel="stylesheet" href="${pathToFileURL(path.join(__dirname, 'home-themes.css'))}"></head>`)
-  .replace('</body>', `<script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
+  .replace('</body>', `<script src="${pathToFileURL(path.join(root, 'renderer', 'home-appearance-options.js'))}"></script><script src="${pathToFileURL(path.join(root, 'renderer', 'home-appearance.js'))}"></script><script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
 fs.writeFileSync(path.join(output, 'index.html'), html);
 let win;
 let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft', backgroundFit: 'fill' };

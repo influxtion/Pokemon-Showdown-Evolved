@@ -1,26 +1,26 @@
-/* Appearance study only. Layout, spacing and wording come from the current Home. */
+/* Home appearance. Loaded only by Home; battles and other pages keep their own styles. */
 html[data-home-theme] {
   --radius: 6px;
-  --study-radius: 10px;
-  --study-highlight: #ffffff65;
-  --study-shadow: #1b273318;
+  --home-radius: 10px;
+  --home-highlight: #ffffff65;
+  --home-shadow: #1b273318;
 }
 html[data-home-theme] .app { background: var(--bg-app); }
 html[data-home-theme] .hub {
   background:
-    radial-gradient(ellipse at 4% 0%, color-mix(in srgb, var(--study-daily) 42%, transparent), transparent 58%),
-    radial-gradient(ellipse at 100% 95%, color-mix(in srgb, var(--study-rooms) 50%, transparent), transparent 64%),
+    radial-gradient(ellipse at 4% 0%, color-mix(in srgb, var(--home-daily) 42%, transparent), transparent 58%),
+    radial-gradient(ellipse at 100% 95%, color-mix(in srgb, var(--home-rooms) 50%, transparent), transparent 64%),
     var(--bg-app);
 }
 html[data-texture="true"] .hub {
   background-image:
     repeating-linear-gradient(0deg, transparent 0 3px, color-mix(in srgb, var(--text) 2%, transparent) 3px 4px),
-    radial-gradient(ellipse at 4% 0%, color-mix(in srgb, var(--study-daily) 42%, transparent), transparent 58%),
-    radial-gradient(ellipse at 100% 95%, color-mix(in srgb, var(--study-rooms) 50%, transparent), transparent 64%);
+    radial-gradient(ellipse at 4% 0%, color-mix(in srgb, var(--home-daily) 42%, transparent), transparent 58%),
+    radial-gradient(ellipse at 100% 95%, color-mix(in srgb, var(--home-rooms) 50%, transparent), transparent 64%);
 }
 /* Anchor the wallpaper to the Home viewport while panels scroll over it. */
 html[data-background-state="ready"] .hub {
-  background-image: linear-gradient(var(--study-background-tint), var(--study-background-tint)), var(--study-background-image);
+  background-image: linear-gradient(var(--home-background-tint), var(--home-background-tint)), var(--home-background-image);
   background-size: 100% 100%, cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -49,10 +49,10 @@ html[data-home-theme] .tabstrip .nav-item[aria-current="page"] {
 }
 html[data-home-theme] .topbar { background: var(--topbar-bg); }
 html[data-home-theme] .hero {
-  background: linear-gradient(145deg, var(--hero-bg), var(--study-hero-end));
-  border-radius: var(--study-radius);
+  background: linear-gradient(145deg, var(--hero-bg), var(--home-hero-end));
+  border-radius: var(--home-radius);
   border-color: var(--hero-border);
-  box-shadow: inset 0 1px #ffffff22, 0 3px 0 var(--study-shadow);
+  box-shadow: inset 0 1px #ffffff22, 0 3px 0 var(--home-shadow);
 }
 html[data-home-theme] .hero::before { opacity: .105; }
 html[data-home-theme] .hero .select {
@@ -75,52 +75,52 @@ html[data-home-theme] .btn-primary {
 }
 html[data-home-theme] .btn-primary:hover { background: var(--primary-hover); }
 html[data-home-theme] .window, html[data-home-theme] .hub-tile {
-  border-radius: var(--study-radius);
-  box-shadow: inset 0 1px var(--study-highlight), 0 3px 0 var(--study-shadow);
+  border-radius: var(--home-radius);
+  box-shadow: inset 0 1px var(--home-highlight), 0 3px 0 var(--home-shadow);
 }
-html[data-home-theme] .window-head { background: var(--study-news); border-bottom-color: color-mix(in srgb, var(--study-news) 55%, var(--border-strong)); }
-html[data-home-theme] .hub-news { border-color: color-mix(in srgb, var(--study-news) 48%, var(--border-strong)); }
-html[data-home-theme] .hub-rooms { border-color: color-mix(in srgb, var(--study-rooms) 50%, var(--border-strong)); }
-html[data-home-theme] .hub-friends { border-color: color-mix(in srgb, var(--study-friends) 50%, var(--border-strong)); }
-html[data-home-theme] .hub-rooms .window-head, html[data-home-theme] .hub-rooms .window-foot { background: var(--study-rooms); }
-html[data-home-theme] .hub-friends .window-head { background: var(--study-friends); }
+html[data-home-theme] .window-head { background: var(--home-news); border-bottom-color: color-mix(in srgb, var(--home-news) 55%, var(--border-strong)); }
+html[data-home-theme] .hub-news { border-color: color-mix(in srgb, var(--home-news) 48%, var(--border-strong)); }
+html[data-home-theme] .hub-rooms { border-color: color-mix(in srgb, var(--home-rooms) 50%, var(--border-strong)); }
+html[data-home-theme] .hub-friends { border-color: color-mix(in srgb, var(--home-friends) 50%, var(--border-strong)); }
+html[data-home-theme] .hub-rooms .window-head, html[data-home-theme] .hub-rooms .window-foot { background: var(--home-rooms); }
+html[data-home-theme] .hub-friends .window-head { background: var(--home-friends); }
 html[data-home-theme] .post-toggle:hover { background: var(--bg-hover); }
-html[data-home-theme] .room-row:nth-child(even) { background: color-mix(in srgb, var(--study-rooms) 22%, var(--bg-panel)); }
-html[data-home-theme] .hub-tile:nth-child(1) { background: var(--study-daily); border-color: color-mix(in srgb, var(--study-daily) 55%, var(--border-strong)); }
-html[data-home-theme] .hub-tile:nth-child(2) { background: var(--study-rooms); border-color: color-mix(in srgb, var(--study-rooms) 55%, var(--border-strong)); }
-html[data-home-theme] .hub-tile:nth-child(3) { background: var(--study-news); border-color: color-mix(in srgb, var(--study-news) 55%, var(--border-strong)); }
+html[data-home-theme] .room-row:nth-child(even) { background: color-mix(in srgb, var(--home-rooms) 22%, var(--bg-panel)); }
+html[data-home-theme] .hub-tile:nth-child(1) { background: var(--home-daily); border-color: color-mix(in srgb, var(--home-daily) 55%, var(--border-strong)); }
+html[data-home-theme] .hub-tile:nth-child(2) { background: var(--home-rooms); border-color: color-mix(in srgb, var(--home-rooms) 55%, var(--border-strong)); }
+html[data-home-theme] .hub-tile:nth-child(3) { background: var(--home-news); border-color: color-mix(in srgb, var(--home-news) 55%, var(--border-strong)); }
 html[data-home-theme] .daily-compact {
-  background: var(--study-daily);
+  background: var(--home-daily);
   color: var(--text);
-  border-color: color-mix(in srgb, var(--study-daily) 55%, var(--border-strong));
-  border-left-color: var(--study-coral);
-  border-radius: var(--study-radius);
-  box-shadow: inset 0 1px var(--study-highlight), 0 3px 0 var(--study-shadow);
+  border-color: color-mix(in srgb, var(--home-daily) 55%, var(--border-strong));
+  border-left-color: var(--home-coral);
+  border-radius: var(--home-radius);
+  box-shadow: inset 0 1px var(--home-highlight), 0 3px 0 var(--home-shadow);
 }
 html[data-home-theme] .daily-summary h2 span,
 html[data-home-theme] .daily-summary p { color: var(--text); }
 html[data-home-theme] .daily-details, html[data-home-theme] .daily-compact .daily-streak { color: var(--text); }
-html[data-home-theme] .daily-emblem { background: var(--study-coral); color: #fff7ec; border-radius: 7px; box-shadow: inset 0 1px #ffffff40; }
+html[data-home-theme] .daily-emblem { background: var(--home-coral); color: #fff7ec; border-radius: 7px; box-shadow: inset 0 1px #ffffff40; }
 html[data-home-theme] .window, html[data-home-theme] .daily-compact { position: relative; }
 
 /* Only the fills let artwork through; text, controls, and header bars stay solid. */
 html[data-background-state="ready"] .window {
-  background: color-mix(in srgb, color-mix(in srgb, var(--bg-panel) var(--study-surface-strength), #000) 80%, transparent);
-  --text-2: var(--study-readable-muted);
-  --text-3: var(--study-readable-muted);
+  background: color-mix(in srgb, color-mix(in srgb, var(--bg-panel) var(--home-surface-strength), #000) 80%, transparent);
+  --text-2: var(--home-readable-muted);
+  --text-3: var(--home-readable-muted);
 }
 html[data-background-state="ready"] .hero {
   background: linear-gradient(145deg,
     color-mix(in srgb, color-mix(in srgb, var(--hero-bg) 68%, #000) 80%, transparent),
-    color-mix(in srgb, color-mix(in srgb, var(--study-hero-end) 68%, #000) 80%, transparent));
+    color-mix(in srgb, color-mix(in srgb, var(--home-hero-end) 68%, #000) 80%, transparent));
 }
 html[data-background-state="ready"] .daily-compact,
-html[data-background-state="ready"] .hub-tile { --text: var(--study-surface-text); }
+html[data-background-state="ready"] .hub-tile { --text: var(--home-surface-text); }
 html[data-background-state="ready"] .daily-compact,
-html[data-background-state="ready"] .hub-tile:nth-child(1) { background: color-mix(in srgb, color-mix(in srgb, var(--study-daily) var(--study-surface-strength), #000) 80%, transparent); }
-html[data-background-state="ready"] .hub-tile:nth-child(2) { background: color-mix(in srgb, color-mix(in srgb, var(--study-rooms) var(--study-surface-strength), #000) 80%, transparent); }
-html[data-background-state="ready"] .hub-tile:nth-child(3) { background: color-mix(in srgb, color-mix(in srgb, var(--study-news) var(--study-surface-strength), #000) 80%, transparent); }
-html[data-background-state="ready"] .room-row:nth-child(even) { background: color-mix(in srgb, var(--study-rooms) 18%, transparent); }
+html[data-background-state="ready"] .hub-tile:nth-child(1) { background: color-mix(in srgb, color-mix(in srgb, var(--home-daily) var(--home-surface-strength), #000) 80%, transparent); }
+html[data-background-state="ready"] .hub-tile:nth-child(2) { background: color-mix(in srgb, color-mix(in srgb, var(--home-rooms) var(--home-surface-strength), #000) 80%, transparent); }
+html[data-background-state="ready"] .hub-tile:nth-child(3) { background: color-mix(in srgb, color-mix(in srgb, var(--home-news) var(--home-surface-strength), #000) 80%, transparent); }
+html[data-background-state="ready"] .room-row:nth-child(even) { background: color-mix(in srgb, var(--home-rooms) 18%, transparent); }
 
 /* Border variants overlay their finish, preserving the app's geometry. */
 html[data-borders="fine"] .window,
@@ -131,7 +131,7 @@ html[data-borders="inset"] .window,
 html[data-borders="inset"] .hero,
 html[data-borders="inset"] .daily-compact,
 html[data-borders="inset"] .hub-tile {
-  box-shadow: 0 2px 0 var(--study-shadow), inset 0 1px var(--study-highlight), inset 0 -2px var(--study-shadow);
+  box-shadow: 0 2px 0 var(--home-shadow), inset 0 1px var(--home-highlight), inset 0 -2px var(--home-shadow);
 }
 html[data-borders="double"] .window::after,
 html[data-borders="double"] .hero::after,
@@ -139,17 +139,19 @@ html[data-borders="double"] .daily-compact::after,
 html[data-borders="stitched"] .window::after,
 html[data-borders="stitched"] .hero::after,
 html[data-borders="stitched"] .daily-compact::after {
-  content: ""; position: absolute; pointer-events: none; inset: 3px; border-radius: max(2px, calc(var(--study-radius) - 3px));
+  content: ""; position: absolute; pointer-events: none; inset: 3px; border-radius: max(2px, calc(var(--home-radius) - 3px));
   border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent); z-index: 3;
 }
 html[data-borders="double"] .hero::after { border-color: #ffffff40; }
-html[data-borders="double"] .window { box-shadow: 0 3px 0 var(--study-shadow); }
+html[data-borders="double"] .window { box-shadow: 0 3px 0 var(--home-shadow); }
 html[data-borders="stitched"] .window::after,
 html[data-borders="stitched"] .daily-compact::after { border-style: dashed; border-color: color-mix(in srgb, var(--border-strong) 80%, transparent); inset: 4px; }
 html[data-borders="stitched"] .hero::after { border-style: dashed; border-color: #ffffff65; inset: 5px; }
 html[data-borders="stitched"] .window-head { border-bottom-style: dashed; }
 html[data-home-theme] .preview-status { color: var(--text-2); font-size: 11px; }
-html[data-home-theme] .preview-credit { color: var(--text-2); font-size: 11px; margin-right: 16px; }
+html[data-home-theme] .topbar-actions { min-width: 0; }
+html[data-home-theme] .home-background-credit { color: var(--text-2); font-size: 11px; margin-right: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-home-theme] .topbar-actions > .btn, html[data-home-theme] #account { flex-shrink: 0; }
 
 /* Desktop spacing options keep Classic's arrangement and let Home scroll naturally. */
 html[data-home-theme] .hub--classic .hub-side { width: 100%; max-width: 620px; justify-self: end; }

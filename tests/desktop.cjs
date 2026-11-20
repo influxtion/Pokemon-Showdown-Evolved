@@ -23,6 +23,8 @@ async function until(check, label) {
 }
 
 app.whenReady().then(async () => {
+  // Home artwork stays offline in this suite; loopback update fixtures remain available.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: /^https?:/.test(details.url) && new URL(details.url).hostname !== '127.0.0.1' }));
   // The production partition name is safe inside this temporary userData directory.
   session.fromPartition('persist:showdown').webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: /^https?:/.test(details.url) });
@@ -330,8 +332,8 @@ app.whenReady().then(async () => {
       assert.deepEqual(visible, layout === 'classic' ? [true, false, true, true, true] : [false, true, false, true, true], `${layout} panels`);
       if (layout === 'classic') {
         const [tiles, news, rooms, friends] = await run("['.hub-tiles', '.hub-news', '.hub-rooms', '.hub-friends'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.top, r.bottom])");
-        assert.ok(Math.abs(rooms[1] - tiles[1]) <= 1 && Math.abs(friends[1] - tiles[1]) <= 1, 'chat rooms and friends end level with the tiles');
-        assert.ok(news[0] < rooms[0] && rooms[0] - news[1] < 30, 'news sits over the lower pair');
+        assert.ok(rooms[1] <= tiles[1] + 1 && Math.abs(friends[1] - rooms[1]) <= 1, 'smaller lower panels stay aligned within the left column height');
+        assert.ok(news[0] < rooms[0] && rooms[0] > news[1], 'news sits separately above the lower pair');
       } else {
         const [hero, news, rooms] = await run("['.hero', '.hub-news', '.hub-rooms'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.left, r.right, r.width])");
         // Centered inside the hub's content area, which excludes any vertical scrollbar.

@@ -686,3 +686,48 @@ wrapped text. Checked desktop/minimum layouts, news expand/collapse, and
 all twelve palette contrast combinations; the checked minimum remains 4.61:1.
 The three-box group is aligned to the right edge of its grid column at the
 owner's request, preserving its sizes and the existing outer inset.
+
+### Home appearance implementation (November 19, 2026)
+
+The approved study is now the real Home screen. The six palettes (Hearth,
+Garden, Seaside, Rosewood, Amber, Twilight), five Showdown wallpapers plus
+plain color, tint, framing, four border finishes, three corner sizes, three
+spacing choices, and plain-background texture are saved in launcher settings.
+Home's Customize Home link opens Settings at Home appearance; See Home returns
+to the working screen. Defaults are Hearth, Ocean, Soft tint, Fill Home,
+Soft inset borders, Soft corners, Relaxed spacing, and subtle plain texture.
+The background is a fixed saved choice, not random. Existing Home layout and
+app appearance preferences are preserved; palettes follow native light/dark
+appearance, including system changes.
+
+`renderer/home-appearance-options.js` supplies the same catalog/defaults and
+allowlists to the settings store, Home, Settings, and isolated preview.
+`renderer/home-appearance.js` applies tokens and bounded asynchronous artwork
+loading. `renderer/home-appearance.css` is loaded only on Home. The mockup uses
+these production files while retaining its separate sample data. Home's real
+Showdown snapshot/actions, daily challenge, news expansion, and navigation stay
+in their existing controllers. No new IPC or arbitrary artwork URL is exposed.
+
+The art remains hosted by Showdown, with a visible artist credit. A failed or
+12-second image load leaves solid palette panels and does not block Home;
+stale completion cannot replace a newer selection. Fill uses the Home viewport
+and proportional cropping, not the height of scrolling content. Artwork is
+not bundled, and this change makes no offline artwork availability guarantee.
+Loaded panels retain 20% transparency with solid controls and text. The compact
+daily gaps, reduced interiors, smaller right-aligned secondary panels, and
+larger inter-panel gaps match the approved study.
+
+Validation: syntax checks and 252 unit tests passed (one optional real-server
+test skipped), and all eleven isolated desktop suites passed. The Home desktop suite exercises real settings IPC, persistence,
+all palettes/background choices, native theme changes, both layouts at 1440x900
+and 1024x640, daily spacing, news expansion without duplicate summaries, client
+preservation, and offline fallback. Rendered checked text contrast across all
+twelve palette variants remained at least 4.61:1 against both extreme artwork
+colors. All five actual hosted images decoded in the optional live-art run;
+screenshots were inspected. The rest of the desktop regression suite uses
+blocked launcher artwork requests to remain isolated. No installer or release
+is part of this change.
+
+A separate fresh guest profile also loaded the production Home against live
+Showdown, with real formats, news, room counts, and the Ocean artwork. No search,
+challenge, or signed-in account was used; that review window was left open.

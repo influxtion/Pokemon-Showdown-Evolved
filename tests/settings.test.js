@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { Settings, DEFAULTS } = require('../app/settings');
+const homeAppearance = require('../renderer/home-appearance-options');
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'showdown-settings-test-'));
@@ -44,7 +45,7 @@ test('defaults, validation and all settings persist across restarts', (t) => {
   assert.equal(settings.set('practiceEngine', 'local'), true);
   for (const bad of [639, 2001, 900.5, NaN, '900', null]) assert.equal(settings.set('battleWidth', bad), false, String(bad));
   assert.equal(settings.set('battleWidth', 900), true);
-  const expected = { theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true, homeLayout: 'classic',
+  const expected = { ...DEFAULTS, theme: 'dark', startPage: 'replays', confirmOnClose: false, showdexEnabled: true, notifyMessages: true, homeLayout: 'classic',
     battleStyle: 'showdown', practiceEngine: 'local', battleWidth: 900, showdexPrompted: false };
   assert.deepEqual(new Settings(dir).snapshot(), expected);
   assert.deepEqual(disk(dir), expected);
@@ -57,7 +58,7 @@ test('legacy theme-only settings gain new defaults and reset persists defaults',
   const dir = fixture(t);
   fs.writeFileSync(path.join(dir, 'settings.json'), '{"theme":"light"}');
   const settings = new Settings(dir);
-  assert.deepEqual(settings.snapshot(), { theme: 'light', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640, showdexPrompted: true });
+  assert.deepEqual(settings.snapshot(), { ...DEFAULTS, theme: 'light', showdexPrompted: true });
   assert.deepEqual(settings.reset(), { ...DEFAULTS, showdexPrompted: true });
   assert.deepEqual(disk(dir), { ...DEFAULTS, showdexPrompted: true });
 });
@@ -82,6 +83,28 @@ test('home layout starts unchosen, keeps a choice across restarts and cannot be 
   const invalid = new Settings(dir);
   assert.equal(invalid.get('homeLayout'), null);
   assert.ok(fs.readdirSync(dir).some((file) => file.startsWith('settings.json.corrupt-')));
+});
+
+test('Home choices migrate, persist, reset, and reject arbitrary artwork or style values', (t) => {
+  const dir = fixture(t);
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ theme: 'dark', homeLayout: 'modern' }));
+  const settings = new Settings(dir);
+  assert.equal(settings.get('homePalette'), 'hearth');
+  assert.equal(settings.get('homeBackground'), 'ocean');
+  assert.equal(settings.get('homeLayout'), 'modern', 'upgrade keeps the existing layout');
+  for (const [key, choices] of Object.entries(homeAppearance.choices)) {
+    for (const value of choices) {
+      assert.equal(settings.set(key, value), true);
+      assert.equal(new Settings(dir).get(key), value);
+    }
+    const before = fs.readFileSync(settings.file, 'utf8');
+    for (const bad of [null, {}, [], '__proto__', 'https://example.com/picture.jpg', '../secret', 'url(file:///secret)', 11]) {
+      assert.equal(settings.set(key, bad), false, `${key}: ${String(bad)}`);
+    }
+    assert.equal(fs.readFileSync(settings.file, 'utf8'), before, 'invalid choices never write');
+  }
+  settings.reset();
+  for (const [key, value] of Object.entries(homeAppearance.defaults)) assert.equal(new Settings(dir).get(key), value);
 });
 
 test('invalid settings are preserved before a new file is saved', (t) => {
@@ -125,7 +148,7 @@ test('failed write or rename preserves previous settings on disk and in memory',
     const settings = new Settings(dir, fileSystem);
     assert.throws(() => settings.set('theme', 'light'), /failed/);
     assert.equal(settings.get('theme'), 'dark');
-    assert.deepEqual(disk(dir), { theme: 'dark', startPage: 'home', confirmOnClose: true, showdexEnabled: false, notifyMessages: true, homeLayout: null, battleStyle: 'launcher', practiceEngine: 'cloud', battleWidth: 640, showdexPrompted: false });
+    assert.deepEqual(disk(dir), { ...DEFAULTS, theme: 'dark' });
     assert.equal(fs.readdirSync(dir).some((file) => file.includes('.tmp-')), false);
   }
 });

@@ -17,6 +17,8 @@ async function until(check, label) {
   throw new Error(`Timed out: ${label}`);
 }
 app.whenReady().then(async () => {
+  // Home artwork stays offline in this suite; loopback update fixtures remain available.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: /^https?:/.test(details.url) && new URL(details.url).hostname !== '127.0.0.1' }));
   let server;
   try {
     const { NsisUpdater } = require('electron-updater');

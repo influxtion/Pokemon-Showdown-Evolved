@@ -21,6 +21,8 @@ async function until(check, label) {
 }
 
 app.whenReady().then(async () => {
+  // Home artwork stays offline in this suite; loopback update fixtures remain available.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: /^https?:/.test(details.url) && new URL(details.url).hostname !== '127.0.0.1' }));
   const remote = session.fromPartition('persist:showdown');
   const requests = [];
   await remote.protocol.handle('https', request => {
