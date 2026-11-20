@@ -196,6 +196,16 @@ html[data-spacing="airy"] .hub-tiles { gap: 32px; }
 /* Classic keeps Daily and the shortcuts close to Battle. Modern retains its wider panel gaps. */
 html[data-spacing="relaxed"] .hub--modern .daily-compact { margin-bottom: -44px; }
 html[data-spacing="airy"] .hub--modern .daily-compact { margin-bottom: -60px; }
+/* Keep Classic's shortcut row visible below the battle controls at desktop height. */
+html[data-home-theme] .hub--classic .hero--menu { padding: 10px 18px; gap: 8px; }
+html[data-home-theme] .hub--classic .hero-record { padding: 4px 12px; }
+html[data-home-theme] .hub--classic .hero-pickers { gap: 8px; }
+html[data-home-theme] .hub--classic .hero .select { height: 34px; }
+html[data-home-theme] .hub--classic .hero-team { gap: 6px; }
+html[data-home-theme] .hub--classic .hero-team-grid img,
+html[data-home-theme] .hub--classic .hero-team-slot { max-height: 48px; }
+html[data-home-theme] .hub--classic .hero-actions { gap: 6px; }
+html[data-home-theme] .hub--classic .btn-battle { height: 44px; }
 @media (max-width: 1180px) {
   html[data-home-theme] .hub--classic .hub-news { flex-basis: 300px; }
   html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 28px 28px; }
