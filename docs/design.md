@@ -569,8 +569,9 @@ the other panel gaps retain their chosen spacing.
 The top inset above Daily Foul Play is also 20 px at both desktop widths.
 
 The preview has no launcher preload or account session and performs no
-matchmaking, bot startup, or external navigation. Its only artwork is the
-existing local logo and keystone. The guest, daily state, news, and room list
+matchmaking, bot startup, or external navigation. Artwork includes the
+existing local logo and keystone, plus optional Showdown wallpapers described
+below. The guest, daily state, news, and room list
 are sample content labeled in the preview chrome. Battle/search/cancel and
 the format picker demonstrate local states. Reopening resets the study.
 
@@ -623,3 +624,19 @@ The embedded client's art is currently suppressed by the explicit `body`
 background rule in `app/client-theme.css`. A Home-only background needs no
 change to that stylesheet or to battle rendering. Restoring client wallpaper
 or importing custom local images would be separate extensions.
+
+The owner subsequently requested backgrounds in the mockup. The native
+Background menu now offers Plain color, Ocean, Horizon, Shaymin, Charizards,
+and Showdown Day. Ocean starts selected with the existing Hearth palette.
+Artwork tint offers Natural, Soft, and Muted; Soft mixes in 12% of the palette
+background in light appearance and 24% in dark appearance. Opaque panels and
+all existing spacing remain. The artist credit appears in the top bar.
+
+The mockup loads only the five allowlisted images from Showdown's image host
+under the existing CSP. It displays the palette background while decoding,
+falls back to it on failure or a 12-second timeout, and ignores stale loads
+after another selection. No wallpaper files are bundled or added to the
+production app. Verification covered all five images, credits, both
+appearances, both layouts at minimum size, rapid switching, plain color, and
+a blocked-network fallback in an isolated Electron session. Captures are in
+ignored `out/home-themes/background-*.png`.

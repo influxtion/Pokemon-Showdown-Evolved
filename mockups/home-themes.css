@@ -18,6 +18,14 @@ html[data-texture="true"] .hub {
     radial-gradient(ellipse at 4% 0%, color-mix(in srgb, var(--study-daily) 42%, transparent), transparent 58%),
     radial-gradient(ellipse at 100% 95%, color-mix(in srgb, var(--study-rooms) 50%, transparent), transparent 64%);
 }
+/* Anchor the wallpaper to the Home viewport while panels scroll over it. */
+html[data-background-state="ready"] .hub {
+  background-image: linear-gradient(var(--study-background-tint), var(--study-background-tint)), var(--study-background-image);
+  background-size: cover;
+  background-position: left center;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+}
 html[data-home-theme] .rail {
   background: linear-gradient(155deg, var(--rail-bg), var(--rail-selected));
   border-right-color: color-mix(in srgb, var(--primary) 25%, var(--rail-border));
@@ -121,6 +129,7 @@ html[data-borders="stitched"] .daily-compact::after { border-style: dashed; bord
 html[data-borders="stitched"] .hero::after { border-style: dashed; border-color: #ffffff65; inset: 5px; }
 html[data-borders="stitched"] .window-head { border-bottom-style: dashed; }
 html[data-home-theme] .preview-status { color: var(--text-2); font-size: 11px; }
+html[data-home-theme] .preview-credit { color: var(--text-2); font-size: 11px; margin-right: 16px; }
 
 /* Desktop spacing options keep Classic's arrangement and let Home scroll naturally. */
 html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 40px 36px; }

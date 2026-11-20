@@ -17,17 +17,22 @@ let html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8')
   .replace('</body>', `<script src="${pathToFileURL(path.join(__dirname, 'home-themes.js'))}"></script></body>`);
 fs.writeFileSync(path.join(output, 'index.html'), html);
 let win;
-let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed' };
+let selection = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft' };
 async function change(next) {
   Object.assign(selection, next);
   await win.webContents.executeJavaScript(`applyHomeStudy(${JSON.stringify(selection)})`);
-  win.setTitle(`Home appearance preview · ${selection.palette} · ${selection.appearance}`);
+  win.setTitle(`Home appearance preview · ${selection.palette} · ${selection.appearance} · ${selection.background}`);
   setMenu();
 }
 function setMenu() {
   const radios = (key, entries) => entries.map(([label, value]) => ({ label, type: 'radio', checked: selection[key] === value, click: () => change({[key]: value}) }));
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Palette', submenu: radios('palette', [['Hearth · warm cream and petrol','hearth'],['Garden · sage and honey','garden'],['Seaside · sea glass and apricot','seaside'],['Rosewood · rose and parchment','rosewood'],['Amber · olive and butter','amber'],['Twilight · blue and copper','twilight']]) },
+    { label: 'Background', submenu: [
+      ...radios('background', [['Plain color','none'],['Ocean','ocean'],['Horizon','horizon'],['Shaymin','shaymin'],['Charizards','charizards'],['Showdown Day','psday']]),
+      {type:'separator'},
+      {label:'Artwork tint',submenu:radios('backgroundTone', [['Natural','natural'],['Soft','soft'],['Muted','muted']])},
+    ] },
     { label: 'Borders', submenu: radios('borders', [['Fine outline','fine'],['Soft inset','inset'],['Double frame','double'],['Stitched edge','stitched']]) },
     { label: 'Appearance', submenu: [...radios('appearance', [['Light','light'],['Dark','dark']]), {type:'separator'}, {label:'Subtle surface texture',type:'checkbox',checked:selection.texture,click:()=>change({texture:!selection.texture})}] },
     { label: 'Corners', submenu: radios('radius', [['Slight · 6 px',6],['Soft · 10 px',10],['Round · 14 px',14]]) },
@@ -46,7 +51,11 @@ app.whenReady().then(async () => {
   await win.loadFile(path.join(output, 'index.html'));
   await change(selection);
   if (!capture) return;
+  console.log('background', await win.webContents.executeJavaScript('homeBackgroundReady.then(() => document.documentElement.dataset.backgroundState)'));
   await win.webContents.executeJavaScript('Promise.all([...document.images].map(i=>i.decode().catch(()=>{})))');
+  // Give the offscreen compositor a fresh frame after the wallpaper is decoded.
+  win.webContents.invalidate();
+  await new Promise(resolve=>setTimeout(resolve,300));
   const variants = [['hearth','light','inset'],['garden','light','double'],['seaside','light','fine'],['rosewood','light','stitched'],['amber','light','double'],['twilight','dark','inset'],['hearth','dark','stitched']];
   for (const [palette,appearance,borders] of variants) {
     await change({palette,appearance,borders});

@@ -11,7 +11,54 @@ const HOME_PALETTES = {
   twilight: { name: 'Twilight', light: ['#e6eaf3','#f8f9ff','#eef1f8','#35445b','#63718a','#b8c5d9','#334965','#47658a','#3b5376','#436e9f','#eac97d','#f1dfc4','#dce6f3','#dce8e2','#eadce2','#b67966'], dark: ['#25334e','#30415c','#2a3b54','#edf1f7','#becbe0','#596e8e','#202f49','#3e5b7d','#304865','#a8cbef','#eaca7e','#5a4d45','#3d5675','#3e5a5b','#584a5e','#c48e75'] },
 };
 
-const homeStudy = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed' };
+// Artist credits follow the classic Showdown client's Storage.bg catalog.
+const HOME_BACKGROUNDS = {
+  ocean: { title: 'Sunrise Ocean', artist: 'Quanyails' },
+  horizon: { title: 'Horizon', artist: 'Vivian Zou' },
+  shaymin: { title: 'Shaymin', artist: 'Daniel Kong' },
+  charizards: { title: 'Charizards', artist: 'Jessica Valencia' },
+  psday: { title: 'Showdown Day', artist: 'LifeisDANK' },
+};
+const homeStudy = { palette: 'hearth', appearance: 'light', borders: 'inset', radius: 10, texture: true, layout: 'classic', spacing: 'relaxed', background: 'ocean', backgroundTone: 'soft' };
+let backgroundKey;
+let backgroundRevision = 0;
+let homeBackgroundReady = Promise.resolve();
+function applyHomeBackground() {
+  const key = Object.hasOwn(HOME_BACKGROUNDS, homeStudy.background) ? homeStudy.background : 'none';
+  if (backgroundKey === key) return;
+  backgroundKey = key;
+  const revision = ++backgroundRevision;
+  const root = document.documentElement;
+  const credit = document.getElementById('background-credit');
+  root.dataset.backgroundState = key === 'none' ? 'plain' : 'loading';
+  root.style.removeProperty('--study-background-image');
+  credit.hidden = key === 'none';
+  if (key === 'none') {
+    credit.textContent = '';
+    homeBackgroundReady = Promise.resolve();
+    return;
+  }
+  const { title, artist } = HOME_BACKGROUNDS[key];
+  credit.textContent = `${title} by ${artist} · Loading…`;
+  const image = new Image();
+  image.referrerPolicy = 'no-referrer';
+  const src = `https://play.pokemonshowdown.com/fx/client-bg-${key}.jpg`;
+  image.src = src;
+  let timer;
+  homeBackgroundReady = Promise.race([
+    image.decode(),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Background timeout')), 12000); }),
+  ]).then(() => {
+    if (revision !== backgroundRevision) return;
+    root.style.setProperty('--study-background-image', `url("${src}")`);
+    root.dataset.backgroundState = 'ready';
+    credit.textContent = `${title} by ${artist}`;
+  }, () => {
+    if (revision !== backgroundRevision) return;
+    root.dataset.backgroundState = 'unavailable';
+    credit.textContent = `${title} unavailable · Showing plain color`;
+  }).finally(() => clearTimeout(timer));
+}
 function applyHomeStudy(next = {}) {
   Object.assign(homeStudy, next);
   const p = HOME_PALETTES[homeStudy.palette] || HOME_PALETTES.hearth;
@@ -38,7 +85,10 @@ function applyHomeStudy(next = {}) {
   document.documentElement.dataset.borders = homeStudy.borders;
   document.documentElement.dataset.texture = String(homeStudy.texture);
   document.documentElement.dataset.spacing = homeStudy.spacing;
+  const tint = { natural: 0, soft: 12, muted: 32 }[homeStudy.backgroundTone] ?? 12;
+  document.documentElement.style.setProperty('--study-background-tint', `color-mix(in srgb, ${bg} ${tint && dark ? tint + 12 : tint}%, transparent)`);
   document.querySelector('#hub').className = `hub hub--${homeStudy.layout}`;
+  applyHomeBackground();
   return { ...homeStudy };
 }
 
@@ -46,6 +96,11 @@ function setupHomePreview() {
   const $ = id => document.getElementById(id);
   $('account').className = 'preview-status';
   $('account').textContent = 'Appearance preview · sample data';
+  const credit = document.createElement('span');
+  credit.id = 'background-credit';
+  credit.className = 'preview-credit';
+  credit.setAttribute('role', 'status');
+  $('account').before(credit);
   $('hero-format').textContent = '[Gen 9] Random Battle';
   $('hero-sub').textContent = 'Playing as a guest. Sign in on Showdown to keep a ladder rating.';
   $('format').innerHTML = '<option value="random">[Gen 9] Random Battle</option><option value="ou">[Gen 9] OU</option>';
