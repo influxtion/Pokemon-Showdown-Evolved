@@ -25,7 +25,7 @@ const fs = require('node:fs');
 const root = path.join(__dirname, '..');
 const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
   preset: { type: 'string', default: 'quiet' }, opponent: { type: 'string', default: 'foulplay' },
-  'local-metamon': { type: 'boolean' }, 'metamon-runtime': { type: 'string' }, 'metamon-python': { type: 'string' },
+  'resource-budget': { type: 'boolean' }, 'local-metamon': { type: 'boolean' }, 'metamon-runtime': { type: 'string' }, 'metamon-python': { type: 'string' },
   format: { type: 'string', default: 'gen9randombattle' }, team: { type: 'string' } } });
 if (!values['metamon-runtime'] && !values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
 const simulatorRoot = path.join(root, 'vendor/practice/dist');
@@ -82,7 +82,8 @@ async function main() {
     if (runtime) assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
     const metamonRuntime = values['metamon-runtime'] ? { root: path.resolve(values['metamon-runtime']), python: path.resolve(values['metamon-python']), worker: path.join(root, 'api/metamon/worker.py'), formats: ['gen9ou'] } : null;
     const key = crypto.randomBytes(32).toString('hex');
-    service = createApiServer({ runtime, metamonRuntime, apiKey: key, launch: options => {
+    service = createApiServer({ runtime, metamonRuntime, apiKey: key,
+      ...(values['resource-budget'] ? { resources: { threads: 2, memoryMb: 3072, reserveMb: 1024, foulplayMb: 512, metamonMb: 2048, availableMb: () => process.availableMemory() / 1024 / 1024 } } : {}), launch: options => {
       const worker = spawnWorker(options);
       if (process.env.BOT_TEST_DIAGNOSTICS === '1') worker.stderr.on('data', data => process.stderr.write(data));
       return worker;

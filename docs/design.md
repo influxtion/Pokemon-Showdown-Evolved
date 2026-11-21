@@ -969,3 +969,10 @@ Bots now has a Downloads tab alongside Random Battle, OU and Anything Goes. It s
 Download management uses fixed profile directories and practice-page IPC checks, cancellation, removal confirmation, active local battle guards and a recheck after confirmation. Each local engine owns its authenticated loopback API and closes it before replacement/removal. Model and runtime files are excluded from the package allowlist.
 
 Verified: syntax checks, 283 unit tests with zero skips, all 13 desktop suites and an expanded roster/downloads suite covering real IPC, cancel/retry/removal, separate preferences and local Metamon routing. Inspected Downloads captures in both themes at 1366x768 and 1024x640. The actual Windows Metamon installer completed with retained notices, and two local OU battles finished (13 and 14 turns). No installer build, public release or hosted deployment.
+
+
+## Eligible bot queue and host budgets - November 21, 2026
+
+The shared bot queue now admits the earliest eligible player, skipping blocked Metamon tickets while preserving their place and both total/model session caps. Eligible queued players retain priority over newcomers. Hosted admission adds CPU and RAM reservations, live memory headroom checks and capacity retention until terminated workers exit. Defaults reserve at least 25% CPU (whole-thread rounding, minimum one usable thread) and max(1 GiB, 25%) RAM. Foul Play reserves 512 MiB and Metamon 2 GiB per session. These estimates can be raised; aggregate budgets can be tightened. Implementation, configuration, regression and real-battle evidence, and host-sizing limits are in docs/bots.md. Source is ready for the friend's host; no remote deployment or installer/release work occurred.
+
+Verified syntax, 292 unit tests with zero skips (including package allowlist checks), standalone API startup with effective resource reporting, two real Metamon OU battles and two Medium Random Battles under explicit resource budgets. No renderer changes or desktop-suite rerun for this server-only change. Windows loopback verification does not establish capacity or cgroup behavior on the Linux host.

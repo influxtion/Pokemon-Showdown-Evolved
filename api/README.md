@@ -58,7 +58,7 @@ Supported hosts: Linux x64/arm64, macOS x64/arm64 and Windows x64.
 | `MAX_QUEUE` | `20` | Players who may wait in line for an engine; `0` turns the queue off |
 | `SESSIONS_PER_HOUR`, `SESSION_BURST` | `30`, `6` | Token bucket for starting battles, per client network |
 
-CPU use is roughly `MAX_SESSIONS × MAX_THREADS` cores while every battle is thinking. A decision takes about 200 ms of search.
+The hosted entry point also limits the sum of worker threads and reserves RAM before admitting each session. See the resource-budget details in [docs/bots.md](../docs/bots.md#queue-admission-and-host-headroom). `MAX_SESSIONS` is an upper bound, not a guarantee that all slots can run simultaneously.
 
 ### Rate limits
 
@@ -80,10 +80,10 @@ A single battle needs one session; rematches reuse it.
 
 ### The queue
 
-When every engine is busy, a client that sends `"queue": true` with `POST /v1/sessions` gets `202 {queued: true, ticket, position, waiting, checkInMs}` instead of `503`. Players are served first come, first served:
+When every engine is busy, a client that sends `"queue": true` with `POST /v1/sessions` gets `202 {queued: true, ticket, position, waiting, checkInMs}` instead of `503`. The earliest eligible player starts:
 
 - The client checks in with `GET /v1/queue/:ticket` (the desktop app does so every 3 s). Each check-in answers `200` with the current place, or, once it is the client's turn and an engine is free, `201` with the new session, exactly as `POST /v1/sessions` would.
-- A free engine is held for whoever is first in line until their next check-in. Nobody behind them, and no new client, can take it first.
+- The earliest ticket that fits the total session limit, Metamon limit, CPU budget and memory checks gets the next start on its check-in. Blocked tickets keep their order but do not block eligible bots. New arrivals cannot pass an eligible waiting ticket; they can start when all waiting tickets are blocked. Position is the overall queue position, not a promise of strict start order across different bots. Workers still exiting retain their capacity until they exit.
 - A client that misses check-ins for 15 s loses its place, so a closed app never blocks the line. `DELETE /v1/queue/:ticket` leaves at once.
 - Starting a battle uses one rate-limit token when the client joins the line, not again when it starts.
 - An OU team waits with the ticket in memory and goes only to the worker that starts. It is never logged or returned.
@@ -103,7 +103,7 @@ The steps assume Ubuntu or Debian and a user with `sudo`. Commands marked **(VM)
 
 ### 1. Get a machine, an address and a name
 
-- **CPU:** each battle searches with up to `MAX_THREADS` cores (default 2). `MAX_SESSIONS` (default half the vCPUs) caps battles at once. With the defaults, a 16-vCPU VM serves 8 battles and is fully busy only when all 8 are thinking.
+- **CPU:** each battle searches with up to `MAX_THREADS` cores (default 2). `MAX_SESSIONS` (default half the vCPUs) caps battles at once. The aggregate CPU budget additionally leaves 25% headroom, rounded down to whole worker threads (minimum one). On a 16-vCPU host that permits at most six simultaneous two-thread workers, subject to RAM and other limits.
 - **Address:** a public IPv4 address that does not change. On a cloud provider, reserve it as static.
 - **Firewall:** allow inbound TCP 80 and 443. Port 80 is needed for the certificate. Keep 8787 closed.
 - **Name:** HTTPS needs a hostname. Either point an `A` record of your own domain at the IP, or use [sslip.io](https://sslip.io) without a domain: the IP `203.0.113.7` becomes `203-0-113-7.sslip.io`. An sslip.io name changes if the IP changes, so the IP must be static.

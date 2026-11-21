@@ -13,8 +13,9 @@
 //   DELETE /v1/queue/:ticket        leave the queue
 //
 // Queue: when every engine is busy, "queue": true gets a place (202) instead of 503. A client
-// keeps it by checking in every `queueCheckInMs`; the first in line takes the next free engine and
-// nobody can jump ahead. Past `maxQueue` waiting, the answer is 503 again.
+// keeps it by checking in every `queueCheckInMs`; the earliest eligible player takes capacity.
+// A bot-specific limit never blocks players who can use remaining capacity.
+// Past `maxQueue` waiting, the answer is 503 again.
 
 const http = require('node:http');
 const os = require('node:os');
@@ -138,6 +139,7 @@ function createApiServer({
   runtime,
   metamonRuntime = null,
   maxMetamonSessions = 1,
+  resources = null,
   apiKey = null,
   maxSessions = 4,
   maxSessionsPerClient = 1,
@@ -166,8 +168,17 @@ function createApiServer({
   }
   if (!Number.isInteger(maxQueue) || maxQueue < 0 || maxQueue > 1000) throw new Error('Invalid maxQueue');
   const resolveRuntime = bot => { const source = bot === 'metamon' ? metamonRuntime : runtime; return typeof source === 'function' ? source() : source; };
+  if (resources) {
+    for (const key of ['threads', 'memoryMb', 'reserveMb', 'foulplayMb', 'metamonMb']) {
+      if (!Number.isSafeInteger(resources[key]) || resources[key] < (key === 'memoryMb' || key === 'reserveMb' ? 0 : 1)) throw new Error(`Invalid resources.${key}`);
+    }
+    if (typeof resources.availableMb !== 'function') throw new Error('Invalid resources.availableMb');
+    maxThreads = Math.min(maxThreads, resources.threads);
+  }
   const sessions = new Map();
-  // Waiting clients, first first: { id, client, options, joined, seen }. Options (maybe an OU team)
+  const retiring = new Set();
+  const workersInUse = () => [...sessions.values(), ...retiring];
+  // Waiting clients, oldest first: { id, client, options, joined, seen }. Options (maybe an OU team)
   // are kept only while waiting and never logged.
   const queue = [];
   const limiter = new RateLimiter({ capacity: sessionBurst, perHour: sessionsPerHour, now });
@@ -219,6 +230,11 @@ function createApiServer({
     const failed = Boolean(code);
     session.state = 'closed';
     sessions.delete(session.id);
+    if (session.worker && !session.workerExited) {
+      retiring.add(session);
+      session.killTimer = setTimeout(() => session.worker.kill('SIGKILL'), 5000);
+      session.killTimer.unref();
+    }
     clearTimeout(session.startupTimer);
     if (session.worker) {
       session.worker.stdin?.end?.();
@@ -272,8 +288,13 @@ function createApiServer({
     if (team && session.bot !== 'metamon') child.stdin?.write(`${JSON.stringify({ type: 'team', data: team })}\n`);
     child.stderr?.on('data', () => {}); // Upstream diagnostics can include battle state; never log them.
     child.stdin?.on('error', () => {});
-    child.once('error', () => end(session, 'engine-failed'));
-    child.once('exit', () => end(session, session.state === 'closed' ? null : 'engine-failed'));
+    const exited = () => {
+      session.workerExited = true;
+      retiring.delete(session);
+      clearTimeout(session.killTimer);
+    };
+    child.once('error', () => { if (!child.pid) exited(); end(session, 'engine-failed'); });
+    child.once('exit', () => { exited(); end(session, session.state === 'closed' ? null : 'engine-failed'); });
     let buffer = '';
     child.stdout.on('data', data => {
       buffer += data.toString('utf8');
@@ -291,8 +312,22 @@ function createApiServer({
     session.startupTimer.unref?.();
   }
 
-  const modelSlot = bot => bot !== 'metamon' || [...sessions.values()].filter(session => session.bot === 'metamon').length < maxMetamonSessions;
-  const freeSlots = () => Math.max(0, maxSessions - sessions.size);
+  const workerThreads = options => options.bot === 'metamon' ? Math.min(4, maxThreads) : threadsFor(options.preset);
+  const memoryFor = bot => bot === 'metamon' ? resources.metamonMb : resources.foulplayMb;
+  function eligible(options) {
+    const used = workersInUse();
+    if (used.length >= maxSessions || (options.bot === 'metamon' && used.filter(s => s.bot === 'metamon').length >= maxMetamonSessions)) return false;
+    if (!resources) return true;
+    const memory = memoryFor(options.bot);
+    let available;
+    try { available = resources.availableMb(); } catch { return false; }
+    // Reserve loading workers before their full RSS is visible to the OS.
+    const startingMemory = used.filter(s => s.state === 'starting').reduce((sum, s) => sum + memoryFor(s.bot), 0);
+    return Number.isFinite(available) && available >= memory + resources.reserveMb + startingMemory &&
+      used.reduce((sum, s) => sum + s.threads, 0) + workerThreads(options) <= resources.threads &&
+      used.reduce((sum, s) => sum + memoryFor(s.bot), 0) + memory <= resources.memoryMb;
+  }
+  const firstEligible = () => queue.find(ticket => now() - ticket.seen <= queueCheckInMs && eligible(ticket.options));
   const place = ticket => ({ queued: true, ticket: ticket.id, position: queue.indexOf(ticket) + 1, waiting: queue.length,
     checkInMs: queueCheckInMs });
   function leaveQueue(ticket, reason) {
@@ -306,7 +341,7 @@ function createApiServer({
   function openSession(response, client, options, paths) {
     const format = options.format === undefined ? FORMAT : options.format;
     const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, format, preset: options.preset,
-      threads: options.bot === 'metamon' ? Math.min(4, maxThreads) : threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
+      threads: workerThreads(options), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
       decisions: 0, battles: 0, frames: new FrameBudget({ burst: frameBurst, perSecond: framesPerSecond, now }) };
     sessions.set(session.id, session);
     startWorker(session, paths, TEAM_FORMATS.includes(format) ? options.team : null);
@@ -332,6 +367,7 @@ function createApiServer({
     }
     const paths = resolveRuntime(options.bot);
     if (!paths) return failure(response, 503, 'unavailable', 'This bot is not installed on this server.');
+    if (resources && memoryFor(options.bot) > resources.memoryMb) return failure(response, 503, 'unavailable', 'The server memory budget is too small for this bot.');
     if (paths.formats && !paths.formats.includes(format)) return failure(response, 503, 'unavailable', 'Update the bot runtime for this format.');
     const client = clientKey(request, trustProxy);
     const mine = [...sessions.values()].filter(session => session.client === client).length;
@@ -347,8 +383,8 @@ function createApiServer({
       return failure(response, 429, 'rate-limited', `Too many practice battles started. Try again in ${Math.ceil(seconds / 60)} min.`, { 'Retry-After': String(seconds) });
     }
     const wanted = { bot: options.bot, preset: options.preset, format, ...(needsTeam ? { team: options.team } : {}) };
-    // A free engine goes to the first in line; a new client takes one only when nobody waits.
-    if (!queue.length && freeSlots() > 0 && modelSlot(options.bot)) return openSession(response, client, wanted, paths);
+    // New arrivals can pass blocked tickets, but never an eligible waiting player.
+    if (eligible(wanted) && !firstEligible()) return openSession(response, client, wanted, paths);
     if (options.queue === true && queue.length < maxQueue) {
       const ticket = { id: crypto.randomBytes(32).toString('hex'), client, options: wanted, joined: now(), seen: now() };
       queue.push(ticket);
@@ -356,15 +392,14 @@ function createApiServer({
       return send(response, 202, place(ticket));
     }
     return failure(response, 503, 'at-capacity', queue.length >= maxQueue && options.queue === true
-      ? 'Every engine is busy and the queue is full. Try again in a few minutes.' : 'Every engine is busy right now. Try again shortly.',
+      ? 'The queue is full. Try again in a few minutes.' : 'No capacity is available for this bot right now. Try again shortly.',
     { 'Retry-After': '30' });
   }
 
-  // A check-in keeps the place; once enough engines are free for its position, the ticket becomes a
-  // session here, so a slot is held only until the next check-in.
+  // Admission and reservation happen synchronously. Poll order cannot overbook or overtake an eligible ticket.
   function checkIn(response, ticket) {
     ticket.seen = now();
-    if (queue.indexOf(ticket) + 1 > freeSlots() || !modelSlot(ticket.options.bot)) return send(response, 200, place(ticket));
+    if (firstEligible() !== ticket) return send(response, 200, place(ticket));
     const paths = resolveRuntime(ticket.options.bot);
     if (!paths) return failure(response, 503, 'unavailable', 'This bot is not installed on this server.');
     leaveQueue(ticket, 'started');
@@ -383,10 +418,12 @@ function createApiServer({
       if (request.method === 'GET' && url.pathname === '/v1/info') {
         return send(response, 200, { api: API_VERSION,
           bots: Object.values(BOTS).map(bot => { const runtimeInfo = resolveRuntime(bot.id); return ({ id: bot.id, name: bot.name, description: bot.description, level: bot.level,
-            formats: bot.formats.filter(format => !runtimeInfo?.formats || runtimeInfo.formats.includes(format)), available: Boolean(runtimeInfo),
+            formats: bot.formats.filter(format => !runtimeInfo?.formats || runtimeInfo.formats.includes(format)), available: Boolean(runtimeInfo) && (!resources || memoryFor(bot.id) <= resources.memoryMb),
             presets: Object.fromEntries(Object.keys(PRESETS).map(preset => [preset, bot.id === 'metamon' ? Math.min(4, maxThreads) : threadsFor(preset)])) }); }),
           limits: { maxSessionsPerClient, sessionsPerHour, sessionBurst, lifetimeMs, idleMs, maxDecisions },
-          capacity: { active: sessions.size, max: maxSessions, waiting: queue.length, queueMax: maxQueue, checkInMs: queueCheckInMs } });
+          ...(resources ? { resources: { threads: resources.threads, memoryMb: resources.memoryMb, reserveMb: resources.reserveMb,
+            foulplayMb: resources.foulplayMb, metamonMb: resources.metamonMb, retiring: retiring.size } } : {}),
+          capacity: { active: sessions.size + retiring.size, max: maxSessions, waiting: queue.length, queueMax: maxQueue, checkInMs: queueCheckInMs } });
       }
       if (url.pathname === '/v1/sessions') {
         if (request.method === 'POST') return await createSession(request, response);
@@ -515,8 +552,10 @@ async function main() {
     if (!installed.installed) throw new Error('Metamon is not installed in METAMON_RUNTIME_DIR.');
     metamonRuntime = installed;
   }
+  const resources = require('./resources').hostResources();
+  console.log(JSON.stringify({ event: 'resource-budget', threads: resources.threads, memoryMb: resources.memoryMb, reserveMb: resources.reserveMb, foulplayMb: resources.foulplayMb, metamonMb: resources.metamonMb }));
   const api = createApiServer({
-    runtime, metamonRuntime, maxMetamonSessions: integer('MAX_METAMON_SESSIONS', 1),
+    resources, runtime, metamonRuntime, maxMetamonSessions: integer('MAX_METAMON_SESSIONS', 1),
     apiKey: process.env.API_KEY || null,
     maxSessions: integer('MAX_SESSIONS', Math.max(1, Math.floor(os.availableParallelism() / 2))),
     maxSessionsPerClient: integer('MAX_SESSIONS_PER_CLIENT', 1),

@@ -469,3 +469,99 @@ test('Metamon cannot silently fall back to the Foul Play runtime', async t => {
   assert.equal((await client.info()).bots.find(bot => bot.id === 'metamon').available, false);
   await assert.rejects(client.createSession({ bot: 'metamon', preset: 'quiet', format: 'gen9ou', team: 'Kingambit\n- Sucker Punch' }), /not installed/);
 });
+
+
+const metamonRuntime = { python: 'python', worker: 'metamon.py', root: '/metamon', formats: ['gen9ou'] };
+const modelOptions = { bot: 'metamon', preset: 'quiet', format: 'gen9ou', team: 'Kingambit\n- Sucker Punch', queue: true };
+const foulOptions = { preset: 'quiet', queue: true };
+const resourceOptions = extra => ({ threads: 4, memoryMb: 4096, reserveMb: 1024, foulplayMb: 512, metamonMb: 2048, availableMb: () => 16384, ...extra });
+
+test('earliest eligible queue skips a capped Metamon, retains its place, and preserves both limits', async t => {
+  const { url, api } = await start(t, { metamonRuntime, maxSessions: 2, maxMetamonSessions: 1, trustProxy: true });
+  const [a,b,c,d,e] = [1,2,3,4,5].map(i => player(url, `10.1.0.${i}`));
+  const model = await a.createSession(modelOptions);
+  const firstFoul = await b.createSession(foulOptions);
+  const waitingModel = await c.createSession(modelOptions);
+  const waitingFoul = await d.createSession(foulOptions);
+  const laterFoul = await e.createSession(foulOptions);
+  await b.deleteSession(firstFoul.id);
+  assert.equal((await c.checkIn(waitingModel.ticket)).queued, true);
+  assert.equal((await e.checkIn(laterFoul.ticket)).queued, true, 'later poll cannot overtake eligible Foul Play');
+  const startedFoul = await d.checkIn(waitingFoul.ticket);
+  assert.equal(startedFoul.bot, 'foulplay');
+  assert.equal(api.sessions.size, 2);
+  assert.equal((await e.checkIn(laterFoul.ticket)).queued, true, 'total cap remains enforced');
+  await a.deleteSession(model.id);
+  assert.equal((await e.checkIn(laterFoul.ticket)).queued, true, 'Metamon regains priority when eligible');
+  assert.equal((await c.checkIn(waitingModel.ticket)).bot, 'metamon');
+  assert.equal(api.sessions.size, 2);
+});
+
+test('new Foul Play can use spare capacity behind only blocked Metamon tickets', async t => {
+  const { url } = await start(t, { metamonRuntime, maxSessions: 3, trustProxy: true });
+  const [a,b,c] = [1,2,3].map(i => player(url, `10.2.0.${i}`));
+  await a.createSession(modelOptions);
+  const waiting = await b.createSession(modelOptions);
+  assert.equal(waiting.queued, true);
+  assert.equal((await c.createSession(foulOptions)).bot, 'foulplay');
+  assert.equal((await b.checkIn(waiting.ticket)).position, 1);
+});
+
+test('CPU reservations select eligible work and concurrent polls cannot exceed the budget', async t => {
+  const { url, api } = await start(t, { maxSessions: 8, trustProxy: true, resources: resourceOptions({ threads: 3 }) });
+  const [a,b,c,d] = [1,2,3,4].map(i => player(url, `10.3.0.${i}`));
+  const first = await a.createSession({ preset: 'balanced' });
+  const large = await b.createSession({ preset: 'balanced', queue: true });
+  assert.equal(large.queued, true);
+  const small = await c.createSession(foulOptions);
+  assert.equal(small.threads, 1);
+  const later = await d.createSession(foulOptions);
+  await a.deleteSession(first.id);
+  const replies = await Promise.all([b.checkIn(large.ticket), b.checkIn(large.ticket), d.checkIn(later.ticket)].map(p => p.catch(error => error)));
+  assert.equal(replies.filter(reply => reply.id).length, 1);
+  assert.equal([...api.sessions.values()].reduce((n,s) => n + s.threads, 0), 3);
+  assert.equal((await d.checkIn(later.ticket)).queued, true);
+});
+
+test('memory reservations, live headroom and pending startup memory block admission until safe', async t => {
+  let available = 3000;
+  const { url, workers } = await start(t, { metamonRuntime, maxSessions: 8, trustProxy: true,
+    resources: resourceOptions({ memoryMb: 2560, availableMb: () => available }) });
+  const [a,b,c,d] = [1,2,3,4].map(i => player(url, `10.4.0.${i}`));
+  const model = await a.createSession(modelOptions);
+  assert.equal(model.queued, true, 'free memory must cover model plus headroom');
+  const foul = await b.createSession(foulOptions);
+  assert.ok(foul.id);
+  available = 1900;
+  const pending = await c.createSession(foulOptions);
+  assert.equal(pending.queued, true, 'startup reservations count before RSS grows');
+  workers[0].ready();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok((await c.checkIn(pending.ticket)).id);
+  available = 16384;
+  assert.equal((await a.checkIn(model.ticket)).queued, true, 'fixed memory budget still applies despite free RAM');
+  assert.ok((await d.createSession(foulOptions)).id, 'smaller eligible job fits');
+});
+
+test('retiring workers hold slots and resources until exit, including the Metamon cap', async t => {
+  const { url, api, workers } = await start(t, { metamonRuntime, maxSessions: 1, trustProxy: true, resources: resourceOptions() });
+  const [a,b] = [1,2].map(i => player(url, `10.5.0.${i}`));
+  const first = await a.createSession(modelOptions);
+  workers[0].kill = () => true; // A worker that has not acknowledged termination yet.
+  await a.deleteSession(first.id);
+  assert.equal(api.sessions.size, 0);
+  assert.equal((await a.info()).capacity.active, 1);
+  const waiting = await b.createSession(foulOptions);
+  assert.equal(waiting.queued, true);
+  workers[0].emit('exit', 0);
+  assert.equal((await b.checkIn(waiting.ticket)).bot, 'foulplay');
+});
+
+
+test('a bot that cannot fit the configured memory budget is unavailable instead of queued forever', async t => {
+  const { client } = await start(t, { metamonRuntime, resources: resourceOptions({ memoryMb: 1024 }) });
+  const info = await client.info();
+  assert.equal(info.bots.find(b => b.id === 'metamon').available, false);
+  assert.equal(info.bots.find(b => b.id === 'foulplay').available, true);
+  await assert.rejects(client.createSession(modelOptions), { code: 'unavailable', message: /memory budget/ });
+});

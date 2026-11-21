@@ -80,7 +80,7 @@ async function verifyPracticePackage(context) {
 // opt-in local mode, the installer, pins, local server and worker (unpacked from app.asar for
 // Python). Foul Play itself is downloaded only on request; nothing else from api/ may ship.
 const METAMON_FILES = ['install.js', 'lock.json', 'requirements.txt', 'bootstrap.txt', 'worker.py', 'CODE-LICENSE', 'MODEL-LICENSE', 'MODEL-CARD', 'ATTRIBUTION.txt'];
-const SHIPPED_API = ['metamon', ...METAMON_FILES.map(name => `metamon/${name}`), 'client.js', 'protocol.js', 'install.js', 'server.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
+const SHIPPED_API = ['metamon', ...METAMON_FILES.map(name => `metamon/${name}`), 'client.js', 'protocol.js', 'install.js', 'server.js', 'resources.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
 const UNPACKED_API = ['worker', 'worker/foulplay_worker.py', 'metamon', 'metamon/worker.py'];
 
 function listFiles(dir, prefix = '') {

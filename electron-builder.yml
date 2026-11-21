@@ -42,6 +42,7 @@ files:
   - api/protocol.js
   - api/install.js
   - api/server.js
+  - api/resources.js
   - api/lock.json
   - api/worker/foulplay_worker.py
   # Only the optional installer, adapter and notices. Models/runtimes download on request.

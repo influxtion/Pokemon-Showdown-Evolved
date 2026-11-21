@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /opt/api
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
-COPY lock.json install.js protocol.js server.js client.js ./
+COPY lock.json install.js protocol.js server.js resources.js client.js ./
 COPY worker ./worker
 COPY metamon ./metamon
 ARG WITH_METAMON=0
