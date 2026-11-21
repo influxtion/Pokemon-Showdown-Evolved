@@ -55,9 +55,9 @@ test('reports bots, presets capped to the server limit, and capacity', async t =
   const { client } = await start(t, { maxThreads: 2, maxSessions: 3 });
   const info = await client.info();
   assert.equal(info.api, 1);
-  assert.deepEqual(info.bots.map(bot => [bot.id, bot.level]), [['foulplay', 'hard'], ['foulplay-medium', 'medium'], ['foulplay-casual', 'casual']]);
-  assert.deepEqual(info.bots[0].formats, ['gen9randombattle', 'gen9ou']);
-  assert.deepEqual(info.bots[1].formats, ['gen9randombattle']);
+  assert.deepEqual(info.bots.map(bot => [bot.id, bot.level]), [['foulplay', 'hard'], ['foulplay-medium', 'medium'], ['foulplay-casual', 'casual'], ['metamon', 'trained']]);
+  assert.deepEqual(info.bots[0].formats, ['gen9randombattle', 'gen9ou', 'gen9anythinggoes']);
+  assert.deepEqual(info.bots[1].formats, ['gen9randombattle', 'gen9ou', 'gen9anythinggoes']);
   assert.deepEqual(info.bots[0].presets, { quiet: 1, balanced: 2, full: 2 });
   assert.deepEqual(info.capacity, { active: 0, max: 3, waiting: 0, queueMax: 20, checkInMs: 15000 });
 });
@@ -159,7 +159,7 @@ test('refuses OU without a team, a team outside OU, and levels that do not play 
     [{ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: 'x\u0000y' }, 'invalid-team'],
     [{ bot: 'foulplay', preset: 'full', format: 'gen9ou', team: 'x'.repeat(9000) }, 'invalid-team'],
     [{ bot: 'foulplay', preset: 'full', team: TEAM }, 'invalid-team'],
-    [{ bot: 'foulplay-medium', preset: 'full', format: 'gen9ou', team: TEAM }, 'invalid-format'],
+    [{ bot: 'foulplay-medium', preset: 'full', format: 'gen9doublesou', team: TEAM }, 'invalid-format'],
     [{ bot: 'foulplay', preset: 'full', format: 'gen9uu', team: TEAM }, 'invalid-format'],
   ];
   for (const [body, code] of cases) {
@@ -294,7 +294,7 @@ test('reports a worker crash to the client', async t => {
   workers[0].emitEvent({ type: 'error', code: 'engine-failed' });
   const [{ error }] = await once(socket, 'close');
   assert.equal(error.code, 'engine-failed');
-  assert.match(error.message, /Foul Play stopped/);
+  assert.match(error.message, /The bot stopped/);
 });
 
 test('refuses browser WebSocket upgrades and second sockets', async t => {
@@ -445,4 +445,27 @@ test('the client falls back to a plain request on a server without the queue', a
   const session = await client.createSession({ preset: 'quiet', queue: true });
   assert.equal(session.id, 'a'.repeat(64));
   assert.deepEqual(bodies, [{ bot: 'foulplay', preset: 'quiet', queue: true }, { bot: 'foulplay', preset: 'quiet' }]);
+});
+
+test('Metamon is separately installed, OU-only, and uses the shared API with a model concurrency cap', async t => {
+  const { client, workers } = await start(t, { metamonRuntime: { python: 'private-python', worker: 'metamon.py', root: '/metamon', formats: ['gen9ou'] }, maxSessionsPerClient: 2, maxThreads: 8 });
+  assert.equal((await client.info()).bots.find(bot => bot.id === 'metamon').available, true);
+  const options = { bot: 'metamon', preset: 'quiet', format: 'gen9ou', team: 'Kingambit\n- Sucker Punch' };
+  const session = await client.createSession(options);
+  assert.equal(session.threads, 4);
+  assert.equal(workers[0].level, 'trained');
+  assert.deepEqual(workers[0].frames, [], 'unused team export is not forwarded to Metamon');
+  workers[0].ready({ bot: 'metamon' });
+  const socket = await client.connect(session.id);
+  assert.equal((await socket.ready).bot, 'metamon');
+  const queued = await client.createSession({ ...options, queue: true });
+  assert.equal(queued.queued, true, 'one model worker by default even when global slots are free');
+  await client.deleteSession(session.id);
+  const next = await client.checkIn(queued.ticket);
+  assert.equal(next.bot, 'metamon');
+});
+test('Metamon cannot silently fall back to the Foul Play runtime', async t => {
+  const { client } = await start(t);
+  assert.equal((await client.info()).bots.find(bot => bot.id === 'metamon').available, false);
+  await assert.rejects(client.createSession({ bot: 'metamon', preset: 'quiet', format: 'gen9ou', team: 'Kingambit\n- Sucker Punch' }), /not installed/);
 });

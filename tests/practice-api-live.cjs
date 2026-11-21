@@ -18,15 +18,16 @@ const { PracticeSession } = require('../app/practice-session');
 const crypto = require('node:crypto');
 const { CloudEngine } = require('../app/practice-engines');
 const { inspect } = require('../api/install');
-const { createApiServer } = require('../api/server');
+const { createApiServer, spawnWorker } = require('../api/server');
 const { PracticeTeams } = require('../app/practice-teams');
 const fs = require('node:fs');
 
 const root = path.join(__dirname, '..');
 const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
   preset: { type: 'string', default: 'quiet' }, opponent: { type: 'string', default: 'foulplay' },
+  'metamon-runtime': { type: 'string' }, 'metamon-python': { type: 'string' },
   format: { type: 'string', default: 'gen9randombattle' }, team: { type: 'string' } } });
-if (!values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
+if (!values['metamon-runtime'] && !values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
 const simulatorRoot = path.join(root, 'vendor/practice/dist');
 const FORMAT = values.format;
 // OU: one team, checked the way the app checks teams, used for both sides.
@@ -74,23 +75,28 @@ async function main() {
   // With --runtime, the same server the cloud runs starts here on loopback with an API key.
   let service = null;
   let target = { url: values.url, key: values.key || null };
-  if (values.runtime) {
-    const runtime = inspect(path.resolve(values.runtime));
-    assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
+  if (values.runtime || values['metamon-runtime']) {
+    const runtime = values.runtime ? inspect(path.resolve(values.runtime)) : null;
+    if (runtime) assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
+    const metamonRuntime = values['metamon-runtime'] ? { root: path.resolve(values['metamon-runtime']), python: path.resolve(values['metamon-python']), worker: path.join(root, 'api/metamon/worker.py'), formats: ['gen9ou'] } : null;
     const key = crypto.randomBytes(32).toString('hex');
-    service = createApiServer({ runtime, apiKey: key });
+    service = createApiServer({ runtime, metamonRuntime, apiKey: key, launch: options => {
+      const worker = spawnWorker(options);
+      if (process.env.BOT_TEST_DIAGNOSTICS === '1') worker.stderr.on('data', data => process.stderr.write(data));
+      return worker;
+    } });
     target = { url: await service.listen(), key };
   }
   const cloud = new CloudEngine(target);
-  const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/practice'),
-    target: () => cloud.target(),
+  const session = new PracticeSession({ root: simulatorRoot, scripts: path.join(root, 'scripts/practice'), target: () => cloud.target(),
     verify: () => ({ promise: Promise.resolve({ ok: true }), cancel() {} }), installed: () => true });
   const decisions = [];
   let thinking = false;
   session.on('change', status => {
+    if (status.state === 'failed') { console.error(status.error); process.exit(1); }
     // One decision is one thinking -> chosen transition (a battle ending mid-search does not count).
     const now = Boolean(status.battle?.thinking);
-    if (thinking && !now && !status.battle?.finished) decisions.push(status.battle.elapsedMs);
+    if (thinking && !now && status.battle && !status.battle.finished) decisions.push(status.battle.elapsedMs);
     thinking = now;
   });
   const timeout = setTimeout(() => { console.error('Timed out', session.status()); process.exit(1); }, 600000);

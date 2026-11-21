@@ -45,7 +45,7 @@
       const value = await window.desktop.getPractice();
       daily = Boolean(value.dailyChallenge);
       NAME = value.opponents?.find(bot => bot.id === value.opponent)?.name || 'the bot';
-      subtitle.textContent = `vs. ${NAME} · ${({ gen9ou: 'Gen 9 OU' })[value.format] || 'Gen 9 Random Battle'}`;
+      subtitle.textContent = `vs. ${NAME} · ${({ gen9ou: 'Gen 9 OU', gen9anythinggoes: 'Gen 9 Anything Goes' })[value.format] || 'Gen 9 Random Battle'}`;
       if (daily) subtitle.textContent = `Daily Bot Gauntlet Challenge · Medium · Gen 9 Random Battle`;
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
@@ -58,7 +58,7 @@
       empty.hidden = true;
       const queue = starting ? value.queue : null;
       queueActions.hidden = !queue;
-      useLocal.hidden = !(queue && value.local?.installed && !value.local.installing);
+      useLocal.hidden = !(value.opponent !== 'metamon' && queue && value.local?.installed && !value.local.installing);
       useLocal.disabled = leaveQueue.disabled = busy;
       if (queue) {
         showEmpty('Waiting for a cloud engine', `Every cloud engine is busy, so you're in line: ${ordinal(queue.position)} of ${queue.waiting}. ` +
@@ -78,7 +78,7 @@
       else if (finished) text = ({ win: 'You won', loss: `${NAME} won`, tie: 'Battle tied' })[value.battle.result] || 'Battle finished';
       else if (running && value.battle?.turn) text = `Turn ${value.battle.turn} · last search ${((value.battle.elapsedMs || 0) / 1000).toFixed(1)}s`;
       // OU opens on team preview: the battle exists, but no turn has started.
-      else if (running && value.battle && value.format === 'gen9ou') text = 'Team preview';
+      else if (running && value.battle && value.format !== 'gen9randombattle') text = 'Team preview';
       else if (running) text = 'Connecting…';
       else if (value.state === 'failed' || value.clientError) text = 'Practice stopped';
       status.textContent = text;

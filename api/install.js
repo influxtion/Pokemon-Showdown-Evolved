@@ -40,7 +40,7 @@ const STEPS = Object.freeze([
 ]);
 const TOTAL_WEIGHT = STEPS.reduce((sum, step) => sum + step.weight, 0);
 // Formats the worker checks after a build; each must load without a download.
-const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou']);
+const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou', 'gen9anythinggoes']);
 // Where Foul Play looks for each OU file, relative to fp/data. Usage stats drop their "info"
 // header, as Foul Play's cache does.
 const OU_FILES = Object.freeze({
@@ -77,6 +77,7 @@ function inspect(dir, worker = WORKER) {
     fs.existsSync(path.join(where.source, 'fp', 'run_battle.py')));
   return { installed, current: installed && manifest.lock === LOCK_VERSION, lock: LOCK_VERSION,
     revision: installed ? manifest.foulPlay : null, installedAt: installed ? manifest.installedAt : null,
+    formats: FORMATS.filter(format => format !== 'gen9anythinggoes' || fs.existsSync(path.join(where.source, 'fp/data/smogon_stats_cache/gen9anythinggoes-0.json'))),
     python: where.python, source: where.source, worker: where.worker };
 }
 
@@ -276,6 +277,8 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   await installOuData(path.join(where.staging, 'foul-play', 'fp', 'data'), downloads,
     { signal, onFraction: fraction => report(0.9 + fraction * 0.1, 'OU') });
 
+  await installAgData(path.join(where.staging, 'foul-play', 'fp', 'data'), downloads, { signal });
+
   next('verify');
   for (const format of FORMATS) {
     await run(python, ['-I', '-B', worker, '--check', '--format', format, '--source', path.join(where.staging, 'foul-play')],
@@ -311,6 +314,16 @@ async function installOuData(dataDir, downloads, { signal, onFraction = () => {}
     }
     onFraction((index + 1) / names.length);
   }
+}
+
+// AG uses its own usage distribution; full-set endpoints are unavailable.
+async function installAgData(dataDir, downloads, { signal, fetcher = fetch, pins = lock.agData } = {}) {
+  const file = await download(pins.usageStats, path.join(downloads, 'ag-usageStats.json'), { signal, fetcher });
+  const stats = JSON.parse(await fsp.readFile(file, 'utf8'));
+  if (!stats?.data || typeof stats.data !== 'object' || !Object.keys(stats.data).length) throw new Error('The Anything Goes usage stats are empty.');
+  const target = path.join(dataDir, 'smogon_stats_cache', 'gen9anythinggoes-0.json');
+  await fsp.mkdir(path.dirname(target), { recursive: true });
+  await fsp.writeFile(target, JSON.stringify(stats.data));
 }
 
 // `npm run refresh-ou`: points lock.json's OU pins at the newest usage stats and current set data.
@@ -376,4 +389,4 @@ if (require.main === module) main().catch(error => {
 });
 
 module.exports = { install, inspect, remove, paths, platformKey, pythonExecutable, installOuData, refreshOuData, promoteRuntime,
-  LOCK_VERSION, STEPS, WORKER, FORMATS, OU_FILES };
+  LOCK_VERSION, STEPS, WORKER, FORMATS, OU_FILES, installAgData, download, extract, run };

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "setup": "node install.js",
+    "setup:metamon": "node metamon/install.js",
     "status": "node install.js --status",
     "refresh-ou": "node install.js --refresh-ou",
     "start": "node server.js",

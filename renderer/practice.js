@@ -18,9 +18,9 @@
   let built = '';
 
   const GROUPS = [['hard', 'Hard'], ['medium', 'Medium'], ['easy', 'Easy']];
-  const FORMATS = { gen9randombattle: 'Random Battle', gen9ou: 'OU' };
+  const FORMATS = { gen9randombattle: 'Random Battle', gen9ou: 'OU', gen9anythinggoes: 'Anything Goes' };
   // Formats where the player brings both teams.
-  const TEAM_FORMATS = ['gen9ou'];
+  const TEAM_FORMATS = ['gen9ou', 'gen9anythinggoes'];
   const COLLAPSED = 'bots.collapsed';
   const FORMAT_KEY = 'bots.format';
   // The last Teambuilder team picked for each side, by index and name. Pasted teams are never saved.
@@ -95,12 +95,12 @@
     let text = '';
     let tone = '';
     if (state.checking) { text = 'Checking the team…'; tone = 'quiet'; }
-    else if (state.result?.ok) text = `${state.result.species.join(' · ')}. Legal for OU.`;
+    else if (state.result?.ok) text = `${state.result.species.join(' · ')}. Legal for ${FORMATS[format]}.`;
     else if (failed) { text = state.result.error || 'This team cannot be used.'; tone = 'err'; }
     else if (state.source === 'paste') { text = 'Paste the text from the Teambuilder’s Import/Export.'; tone = 'quiet'; }
     else if (!teambuilder.ready) { text = 'Loading your Teambuilder teams…'; tone = 'quiet'; }
-    else if (!teambuilder.teams.length) { text = 'No OU teams in your Teambuilder yet. Build one there, or paste a team.'; tone = 'quiet'; }
-    else { text = 'Choose one of your OU teams.'; tone = 'quiet'; }
+    else if (!teambuilder.teams.length) { text = `No ${FORMATS[format]} teams in your Teambuilder yet. Build one there, or paste a team.`; tone = 'quiet'; }
+    else { text = `Choose one of your ${FORMATS[format]} teams.`; tone = 'quiet'; }
     state.note.textContent = text;
     state.note.className = `team-slot-note${tone ? ` team-slot-note--${tone}` : ''}`;
   }
@@ -136,7 +136,7 @@
     for (const side of SIDES) {
       const state = sides[side];
       const options = [];
-      const blank = element('option', '', teambuilder.teams.length ? 'Choose a team' : teambuilder.ready ? 'No OU teams' : 'Loading…');
+      const blank = element('option', '', teambuilder.teams.length ? 'Choose a team' : teambuilder.ready ? `No ${FORMATS[format]} teams` : 'Loading…');
       blank.value = '';
       options.push(blank);
       for (const team of teambuilder.teams) {
@@ -164,8 +164,9 @@
 
   async function loadTeams() {
     if (!TEAM_FORMATS.includes(format)) return;
-    const value = await window.desktop.getPracticeTeams(format).catch(() => null);
-    if (!value) return;
+    const requested = format;
+    const value = await window.desktop.getPracticeTeams(requested).catch(() => null);
+    if (!value || requested !== format) return;
     teambuilder = { ready: Boolean(value.ready), teams: Array.isArray(value.teams) ? value.teams : [] };
     fillTeams();
   }
@@ -227,7 +228,10 @@
       format = tab.dataset.format;
       remember(FORMAT_KEY, format);
       actionError = '';
+      teamsKey = '';
+      for (const side of SIDES) { sides[side].ticket++; sides[side].result = null; sides[side].checking = false; clearTimeout(sides[side].timer); }
       showFormat();
+      for (const side of SIDES) if (sides[side].source === 'paste' && TEAM_FORMATS.includes(format)) check(side);
       refresh();
     });
   }
@@ -266,7 +270,7 @@
     play.type = 'button';
     play.setAttribute('aria-label', `Play against ${bot.name}`);
     play.addEventListener('click', () => begin(bot.id));
-    if (bot.id === 'foulplay-casual') {
+    if (bot.id === 'foulplay-casual' && format === 'gen9randombattle') {
       const daily = element('button', 'btn btn-primary bot-daily', 'Play daily');
       daily.type = 'button';
       daily.disabled = true;
@@ -418,7 +422,14 @@
 
   // Where Foul Play will run for the next battle, and what its cards say about it.
   const runsLocally = value => value.engineChoice === 'local' && Boolean(value.local?.installed);
-  function engineState(value) {
+  function engineState(value, bot) {
+    if (bot?.id === 'metamon') {
+      const remote = value.cloud?.bots?.find(item => item.id === 'metamon');
+      return { ...cloudState(value.cloud), icon: 'cloud', ready: Boolean(remote?.available && remote.formats?.includes(format)),
+        text: remote?.available ? 'Cloud server  - Kakuna' : 'Needs Metamon installed on the cloud server', tone: remote?.available ? '' : 'warn' };
+    }
+    const supported = runsLocally(value) ? value.local?.formats : value.cloud?.bots?.find(item => item.id === bot?.id)?.formats;
+    if (supported && !supported.includes(format)) return { ready: false, text: runsLocally(value) ? "Update Foul Play for this format" : "This level/format needs a cloud server update; local play is available", tone: "warn", icon: runsLocally(value) ? "computer" : "cloud" };
     if (!runsLocally(value)) return { ...cloudState(value.cloud), icon: 'cloud' };
     if (value.local.installing) return { ready: false, text: 'Updating on this computer…', tone: 'warn', icon: 'computer' };
     return { ready: true, text: 'This computer', icon: 'computer' };
@@ -429,10 +440,10 @@
     const value = last;
     const active = value.state === 'ready' || value.state === 'starting';
     const list = Array.isArray(value.opponents) ? value.opponents : [];
-    const cloud = engineState(value);
     const needsTeams = TEAM_FORMATS.includes(format);
     for (const article of groups.querySelectorAll('.bot-card')) {
       const bot = list.find(item => item.id === article.dataset.bot);
+      const cloud = engineState(value, bot);
       const note = article.querySelector('.bot-card-cloud');
       if (note) {
         note.className = `bot-card-cloud${cloud.tone ? ` bot-card-cloud--${cloud.tone}` : ''}`;

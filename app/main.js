@@ -505,7 +505,7 @@ ipcMain.handle('practice:start', async (event, options) => {
   const { opponent, preset, format } = options;
   // Foul Play runs where the player chose on the Bots page; the cloud unless they opted in to local.
   const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
-  if (engine === 'local' && !localEngine.inspect().installed) {
+  if (['foulplay', 'foulplay-medium', 'foulplay-casual'].includes(opponent) && engine === 'local' && !localEngine.inspect().installed) {
     return { ok: false, error: 'Foul Play is not on this computer any more. Download it again, or switch to the cloud server.' };
   }
   if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset, engine });
@@ -514,7 +514,7 @@ ipcMain.handle('practice:start', async (event, options) => {
   try {
     const [player, bot] = await Promise.all([practiceTeam(format, options.teams.player), practiceTeam(format, options.teams.bot)]);
     if (!player.ok) return { ok: false, error: `Your team: ${player.error}`, side: 'player' };
-    if (!bot.ok) return { ok: false, error: `Foul Play's team: ${bot.error}`, side: 'bot' };
+    if (!bot.ok) return { ok: false, error: `Opponent's team: ${bot.error}`, side: 'bot' };
     return await practice.start({ opponent, preset, format, engine, teams: { player: player.packed, bot: bot.packed, botExport: bot.exported } });
   } finally { preparingPractice--; }
 });

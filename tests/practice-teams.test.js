@@ -45,6 +45,9 @@ test('checks teams with the practice simulator', { skip: !fs.existsSync(path.joi
   const fixture = real.check('gen9ou', 'export', fs.readFileSync(path.join(__dirname, 'fixtures/ou-team.txt'), 'utf8'));
   assert.equal(fixture.ok, true);
   assert.equal(fixture.species.length, 6);
+  const ag = fs.readFileSync(path.join(__dirname, 'fixtures/ag-team.txt'), 'utf8');
+  assert.equal(real.check('gen9anythinggoes', 'export', ag).ok, true);
+  assert.equal(real.check('gen9ou', 'export', ag).ok, false);
   assert.equal(real.check('gen9ou', 'packed', fixture.packed).ok, true);
   assert.match(real.check('gen9ou', 'export', 'Koraidon @ Choice Scarf\nAbility: Orichalcum Pulse\n- Flare Blitz').error, /Koraidon/);
 });

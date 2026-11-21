@@ -6,7 +6,7 @@
 const path = require('node:path');
 const { MAX_TEAM } = require('../api/protocol');
 
-const FORMATS = Object.freeze({ gen9ou: 'OU' });
+const FORMATS = Object.freeze({ gen9ou: 'OU', gen9anythinggoes: 'Anything Goes' });
 const MAX_PASTE = MAX_TEAM;
 
 class PracticeTeams {

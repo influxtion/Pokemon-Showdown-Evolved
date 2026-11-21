@@ -53,7 +53,7 @@ app.whenReady().then(async () => {
   assert.equal(await run("document.querySelector('.bot-daily').textContent"), 'Play daily');
   assert.equal(await run("document.querySelector('[data-bot=foulplay-casual] .bot-play').textContent"), 'Play');
   await run("document.querySelector('.bots-format[data-format=gen9ou]').click(); 0");
-  await until(() => run("!document.querySelector('.bot-daily')"), 'OU hides the Random Battle-only Casual card');
+  await until(() => run("!document.querySelector('.bot-daily')"), 'OU hides the Random Battle-only daily shortcut');
   await run("document.querySelector('.bots-format[data-format=gen9randombattle]').click(); 0");
   await until(() => run("document.querySelector('.bot-daily')?.disabled === false"), 'rebuilt shortcut shares daily state');
   await run("document.querySelector('.bot-daily').click(); document.getElementById('daily-start').click(); 0");

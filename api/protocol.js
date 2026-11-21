@@ -5,22 +5,24 @@
 const API_VERSION = 1;
 // The default format, for clients that do not name one.
 const FORMAT = 'gen9randombattle';
-const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou']);
+const FORMATS = Object.freeze(['gen9randombattle', 'gen9ou', 'gen9anythinggoes']);
 // Formats where the client brings the bot's team (a Showdown export, at most MAX_TEAM characters).
-const TEAM_FORMATS = Object.freeze(['gen9ou']);
+const TEAM_FORMATS = Object.freeze(['gen9ou', 'gen9anythinggoes']);
 const MAX_TEAM = 8192;
 // Search threads per computation preset. A server may cap these (MAX_THREADS).
 const PRESETS = Object.freeze({ quiet: 1, balanced: 2, full: 8 });
-// Every bot is Foul Play at a level (see worker/foulplay_worker.py). All play as the FoulPlay account.
+// Hosted inference bots. Metamon uses its own separately installed model and worker.
 const BOTS = Object.freeze({
   foulplay: Object.freeze({ id: 'foulplay', name: 'Foul Play', account: 'FoulPlay', level: 'hard', formats: FORMATS,
     description: 'Monte Carlo search over possible opposing teams.' }),
   'foulplay-medium': Object.freeze({ id: 'foulplay-medium', name: 'Foul Play Medium', account: 'FoulPlay', level: 'medium',
-    formats: Object.freeze(['gen9randombattle']), description: 'Foul Play with a shorter search and a looser pick.' }),
+    formats: FORMATS, description: 'Foul Play with a shorter search and a looser pick.' }),
   'foulplay-casual': Object.freeze({ id: 'foulplay-casual', name: 'Foul Play Casual', account: 'FoulPlay', level: 'casual',
-    formats: Object.freeze(['gen9randombattle']), description: 'Foul Play with a short search on one guess, and the odd second-best move.' }),
+    formats: FORMATS, description: 'Foul Play with a short search on one guess, and the odd second-best move.' }),
+  metamon: Object.freeze({ id: 'metamon', name: 'Metamon', account: 'Metamon', level: 'trained', formats: ['gen9ou'],
+    description: 'Kakuna, a trained Metamon policy running on the server CPU.' }),
 });
-const ROOM = /^battle-(?:gen9randombattle|gen9ou)-\d{1,16}(?:-[a-z0-9]{1,32}pw)?$/;
+const ROOM = /^battle-(?:gen9randombattle|gen9ou|gen9anythinggoes)-\d{1,16}(?:-[a-z0-9]{1,32}pw)?$/;
 // The only commands a bot may send into a battle.
 const CHOICE = /^(?:\/choose move [a-z0-9]{1,40}(?: terastallize)?|\/switch [1-6]|\/team [1-6]{1,6})$/;
 const RQID = /^\d{1,9}$/;

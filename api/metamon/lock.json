@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "sources": {
+    "metamon": {
+      "url": "https://codeload.github.com/UT-Austin-RPL/metamon/tar.gz/0a00a759c9a4382a2877088d828302ec294a05a5",
+      "revision": "0a00a759c9a4382a2877088d828302ec294a05a5",
+      "sha256": "79f39d35c56ba9a4b488d56d7fa5381b6d6fb331f7e28624727256c59fe7bed3",
+      "folder": "metamon-0a00a759c9a4382a2877088d828302ec294a05a5"
+    },
+    "amago": {
+      "url": "https://codeload.github.com/UT-Austin-RPL/amago/tar.gz/0974781a9096ff43df1b708312256f96fc2ab127",
+      "revision": "0974781a9096ff43df1b708312256f96fc2ab127",
+      "sha256": "9ff53b8c1d88b7b6e0fbc0cd09538c441a092383ea93d4ace94f15fd938cc38d",
+      "folder": "amago-0974781a9096ff43df1b708312256f96fc2ab127"
+    },
+    "poke-env": {
+      "url": "https://codeload.github.com/UT-Austin-RPL/poke-env/tar.gz/e1268d270c3f2bd32c7ff5713e01062302020579",
+      "revision": "e1268d270c3f2bd32c7ff5713e01062302020579",
+      "sha256": "3dfabdd148a687c567cdb2738ab086e2b080aef565059a537b24218e2b11bb4f",
+      "folder": "poke-env-e1268d270c3f2bd32c7ff5713e01062302020579"
+    }
+  },
+  "model": {
+    "name": "Kakuna",
+    "url": "https://huggingface.co/jakegrigsby/metamon/resolve/ac8e88e7da8dc2a2b85176d88f81fd8854b1445b/kakuna/ckpts/policy_weights/policy_epoch_34.pt",
+    "sha256": "7e7474d5b2ec6624afdeb29a7cf1dc5c84817d5aee8ec39c1d35a153b18df26c",
+    "size": 571581627,
+    "license": "Apache-2.0"
+  },
+  "torch": {
+    "win32-x64": {
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
+      "sha256": "4027d982eb2781c93825ab9527f17fbbb12dbabf422298e4b954be60016f87d8"
+    },
+    "linux-x64": {
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-linux_x86_64.whl",
+      "sha256": "59e78aa0c690f70734e42670036d6b541930b8eabbaa18d94e090abf14cc4d91"
+    },
+    "darwin-arm64": {
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.6.0-cp312-none-macosx_11_0_arm64.whl",
+      "sha256": "9a610afe216a85a8b9bc9f8365ed561535c93e804c2a317ef7fabcc5deda0989"
+    }
+  }
+}

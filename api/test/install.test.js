@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { installOuData, refreshOuData, promoteRuntime, paths, OU_FILES } = require('../install');
+const { installAgData, installOuData, refreshOuData, promoteRuntime, paths, OU_FILES } = require('../install');
 const lock = require('../lock.json');
 
 const sha = text => crypto.createHash('sha256').update(text).digest('hex');
@@ -44,7 +44,7 @@ test('a download write failure rejects without crashing the app process', t => {
   const downloads = path.join(dir, 'downloads');
   fs.mkdirSync(path.join(downloads, 'ou-usageStats.json.partial'), { recursive: true });
   const script = `
-    const { installOuData, OU_FILES } = require(${JSON.stringify(require.resolve('../install'))});
+    const { installAgData, installOuData, OU_FILES } = require(${JSON.stringify(require.resolve('../install'))});
     const pins = Object.fromEntries(Object.keys(OU_FILES).map(name => [name, { url: 'https://example.test/' + name, sha256: '0'.repeat(64) }]));
     installOuData(${JSON.stringify(path.join(dir, 'data'))}, ${JSON.stringify(downloads)}, {
       pins, fetcher: async () => new Response('x'.repeat(1024 * 1024))
@@ -105,4 +105,15 @@ test('refresh moves the usage stats to the newest published month and re-pins th
   assert.equal(pins.fullSets.sha256, sha(`{"u":"${lock.ouData.fullSets.url}"}`));
   assert.deepEqual(JSON.parse(fs.readFileSync(lockFile, 'utf8')).ouData, pins);
   assert.deepEqual(JSON.parse(fs.readFileSync(lockFile, 'utf8')).foulPlay, lock.foulPlay);
+});
+
+test('Anything Goes installs its own pinned stats and rejects changed or empty data', async t => {
+  const dir = temp(t);
+  let body = JSON.stringify({ data: { Miraidon: { usage: 1 } } });
+  const pins = { usageStats: { url: 'https://example.test/ag', sha256: sha(body) } };
+  await installAgData(path.join(dir, 'data'), path.join(dir, 'downloads'), { pins, fetcher: async () => reply(body) });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'data/smogon_stats_cache/gen9anythinggoes-0.json'))), { Miraidon: { usage: 1 } });
+  await assert.rejects(installAgData(path.join(dir, 'data'), path.join(dir, 'bad'), { pins, fetcher: async () => reply('{}') }), /hash|checksum/i);
+  body = '{"data":{}}'; pins.usageStats.sha256 = sha(body);
+  await assert.rejects(installAgData(path.join(dir, 'data'), path.join(dir, 'empty'), { pins, fetcher: async () => reply(body) }), /empty/);
 });

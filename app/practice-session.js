@@ -33,12 +33,13 @@ function childEnvironment() {
 const SIMPLE = { local: true, search: false, difficulty: 'easy', kind: 'Rule-based bot', formats: [FORMAT] };
 const SEARCH = { local: false, search: true, kind: 'Search bot' };
 const OPPONENTS = Object.freeze({
-  foulplay: Object.freeze({ ...BOTS.foulplay, ...SEARCH, difficulty: 'hard', formats: [FORMAT, 'gen9ou'],
+  foulplay: Object.freeze({ ...BOTS.foulplay, ...SEARCH, difficulty: 'hard', formats: BOTS.foulplay.formats,
     description: 'Searches possible futures every turn, guessing what your team could be holding.' }),
-  'foulplay-medium': Object.freeze({ ...BOTS['foulplay-medium'], ...SEARCH, difficulty: 'medium', formats: [FORMAT],
+  'foulplay-medium': Object.freeze({ ...BOTS['foulplay-medium'], ...SEARCH, difficulty: 'medium', formats: BOTS.foulplay.formats,
     description: 'Foul Play with less time to think. Plays well, but does not always find the best move.' }),
-  'foulplay-casual': Object.freeze({ ...BOTS['foulplay-casual'], ...SEARCH, difficulty: 'medium', formats: [FORMAT],
+  'foulplay-casual': Object.freeze({ ...BOTS['foulplay-casual'], ...SEARCH, difficulty: 'medium', formats: BOTS.foulplay.formats,
     description: 'Foul Play on a quick read. Settles on one guess about your team and sometimes plays its second choice.' }),
+  metamon: Object.freeze({ id: 'metamon', name: 'Metamon', account: 'Metamon', local: false, search: true, difficulty: 'hard', kind: 'Learned bot', formats: ['gen9ou'], description: 'Kakuna, a trained Metamon policy. Plays on the cloud server, with no model download.' }),
   heuristic: Object.freeze({ ...LOCAL_BOTS.heuristic, ...SIMPLE }),
   greedy: Object.freeze({ ...LOCAL_BOTS.greedy, ...SIMPLE }),
   random: Object.freeze({ ...LOCAL_BOTS.random, ...SIMPLE }),
@@ -54,7 +55,7 @@ const ERRORS = Object.freeze({
   timeout: 'Practice took too long to start. Stop and try again.',
   client: 'The battle client failed. Start a new session to try again.',
   integrity: 'The practice battle server failed its integrity check. Rebuild or reinstall it.',
-  engine: 'Lost the connection to Foul Play. Start a new session to try again.',
+  engine: 'Lost the connection to the bot. Start a new session to try again.',
   bot: 'The bot stopped unexpectedly. Start a new session to try again.',
 });
 
@@ -146,7 +147,7 @@ class PracticeSession extends EventEmitter {
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { bot, format, preset: bot.search ? preset : null, engine: bot.search ? engine : 'cloud',
+    Object.assign(this, { bot, format, preset: bot.search ? preset : null, engine: bot.id === 'metamon' ? 'cloud' : bot.search ? engine : 'local',
       state: 'starting', error: '', battle: null,
       teams: withTeams ? { player: teams.player, bot: teams.bot, botExport: teams.botExport } : null });
     this.reset();
@@ -281,7 +282,7 @@ class PracticeSession extends EventEmitter {
 
   // While waiting for a cloud engine, the player can move to Foul Play on this computer.
   useEngine(engine) {
-    if (!this.queue || !ENGINES.includes(engine) || engine === this.engine) return { ok: false };
+    if (this.bot.id === 'metamon' || !this.queue || !ENGINES.includes(engine) || engine === this.engine) return { ok: false };
     this.engine = engine;
     this.changed();
     return { ok: true };

@@ -13,7 +13,11 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
-All bots play Gen 9 Random Battle (`gen9randombattle`) on a private simulator, read the standard battle protocol and answer with standard `/choose` commands. **The Bots page offers six opponents**, hardest first: **Foul Play** (Hard), then **Foul Play Medium** and **Foul Play Casual** (Medium), whose moves all come from the practice API (`api/`) in the cloud, then three simple rule-based bots, all rated Easy (**Heuristic**, **Greedy**, **Random**), that run inside the app with no internet connection (section 2). Foul Play (Hard) also plays **Gen 9 OU** (`gen9ou`), with both teams chosen by the player ([section 5](#ou)). Only the Foul Play cards show the cloud server's state. Most of this document is about Foul Play, the search bot. It does not see hidden information. It solves the hidden-information problem by **determinization**: fill in the opponent's unknown moves, item, ability and Tera type with plausible guesses ("worlds"), search each world with a Rust engine as if it were fully known, and combine the results.
+The Bots page offers seven opponents on a private simulator. **Foul Play**, **Foul Play Medium**, and **Foul Play Casual** support Gen 9 Random Battle, OU, and Anything Goes. **Metamon (Kakuna)** supports Gen 9 OU through the cloud API only. **Heuristic**, **Greedy**, and **Random** are simple local Gen 9 Random Battle bots. OU and Anything Goes require both teams from the Teambuilder or pasted exports. All teams are checked with the simulator's validator for the selected format.
+
+Foul Play defaults to the cloud, with its existing optional local download. Metamon has no local download, bundled model, Python environment, or CPU inference in the desktop app. Its large runtime stays on the host. Cloud cards check the host's advertised per-bot formats; older hosts cannot start newly supported combinations. Metamon stays unavailable until its separate server runtime is configured.
+
+Most of this document describes Foul Play. It sees only its own battle seat, samples plausible hidden opposing sets, searches each sampled world with a Rust engine, and combines the results.
 
 | | Foul Play |
 | --- | --- |
@@ -243,9 +247,35 @@ The weaker levels only ever play moves the search itself rated: they never pick 
 | Foul Play Medium vs. Foul Play Casual | 64–36 |
 | Foul Play (Hard) vs. Foul Play Medium | 66–34 |
 
+### Anything Goes
+
+All three Foul Play levels support `gen9anythinggoes`. The player supplies both teams, validated against actual Gen 9 Anything Goes rules. The installer pins the October 2026 `gen9anythinggoes-0` Smogon usage stats in `api/lock.json`. AG has no pinned full-set corpus: the adapter disables the unavailable full-set endpoints and uses upstream Smogon trait/move sampling. It never substitutes OU data or fetches data during play.
+
+The adapter handles crowned Zacian/Zamazenta exports, matches own nature/EVs by initial slot, and preserves duplicate Pokemon in reserve tracking. AG switches resolve known nicknames; upstream search represents switches by species, so when multiple healthy reserves share a species, the adapter chooses the first matching healthy slot. This is an approximation, not an AG strength benchmark. Identical nicknames, Illusion and unusual form combinations have not had exhaustive coverage.
+
+### Metamon (cloud only)
+
+The owner's final direction on November 21 is cloud hosting to avoid a large player download. The app runs only the simulator and streams the bot seat to the existing practice API. It forces Metamon to cloud even if local Foul Play is selected and does not offer the queue's local fallback.
+
+The server installer and inference worker live in `api/metamon/`, excluded by the desktop's explicit API packaging allowlist. The Kakuna checkpoint is 571,581,627 bytes; Python, CPU PyTorch and dependencies also stay on the host. `lock.json` pins the Metamon, AMAGO and poke-env source revisions, CPU PyTorch artifacts and Hugging Face checkpoint by SHA-256. Dependencies have exact versions and artifact hashes. Source licenses, the Apache-2.0 model license and `SOURCE.json` are retained in the installed runtime. Metamon, AMAGO and poke-env source are MIT licensed.
+
+The worker loads strict model weights with `weights_only=True`, disables online dataset/telemetry clients and rejects remote socket access. It uses CPU scaled-dot-product attention with Kakuna's causal 96-step window in place of FlashAttention. No weights are retrained or modified. The published default random team-preview order is retained. Decisions use the legal-action mask and the existing bounded API pipes, authentication, queue, lifecycle and session limits. `MAX_THREADS` caps model CPU threads at up to four. `MAX_METAMON_SESSIONS` defaults to one to avoid loading multiple large models; increase it only after measuring host RAM and load.
+
+Server setup, run from `api/`:
+
+```powershell
+node metamon/install.js --dir C:\bots\metamon
+$env:METAMON_RUNTIME_DIR = 'C:\bots\metamon'
+npm start
+```
+
+On Linux use an absolute directory and `METAMON_RUNTIME_DIR=/path/to/metamon npm start`. Foul Play is installed with the existing `npm run setup`. The Dockerfile supports `--build-arg WITH_METAMON=1`; configure `METAMON_RUNTIME_DIR=/opt/api/metamon-runtime` at container startup. A missing variable leaves Metamon unavailable while Foul Play continues working. Do not run setup over an active runtime; drain sessions first. Installation verifies downloads, checks model loading, and promotes the staged runtime with rollback on a failed rename.
+
+Validation on Windows: a fresh isolated install, real model loading, two API-backed OU games with a rematch (40 decisions, 62 ms median on the development PC), and cloud-only routing/availability/concurrency tests. These timings exclude network latency and are not a host capacity promise. Linux Docker installation and the production host are not yet verified. No hosted deployment or installer rebuild occurred. The owner's friend controls the host; access and real hosted battles remain pending.
+
 ### OU
 
-Only Foul Play (Hard) plays OU. There are no built-in teams: on the Bots page the player picks both **their own team** and **Foul Play's team**, each from their Teambuilder's OU teams or as a pasted Showdown export; the same team may be used for both. The launcher reads Teambuilder teams from the Showdown client's storage in its main process and checks both teams with the practice simulator's own validator (`app/practice-teams.js`), so Play stays disabled until both are legal, with the reason shown next to the team at fault. The bridge then gives the bot its packed team in the simulator (`/utm`) and sends its export to the API, where the team goes straight to the worker's stdin; the worker turns it into Foul Play's team dictionary. Rematches keep both teams. Teams are held in memory for the session only and are never logged or stored by the launcher or the API. The page remembers which Teambuilder teams were last chosen (by name), never a pasted team.
+All three Foul Play levels play OU. Metamon also plays OU through its separately installed cloud worker. There are no built-in teams: on the Bots page the player picks both **their own team** and **the opponent's team**, each from their Teambuilder's OU teams or as a pasted Showdown export; the same team may be used for both. The launcher reads Teambuilder teams from the Showdown client's storage in its main process and checks both teams with the practice simulator's own validator (`app/practice-teams.js`), so Play stays disabled until both are legal, with the reason shown next to the team at fault. The bridge then gives the bot its packed team in the simulator (`/utm`) and sends its export to the API, where the team goes straight to the worker's stdin; the worker turns it into Foul Play's team dictionary. Rematches keep both teams. Teams are held in memory for the session only and are never logged or stored by the launcher or the API. The page remembers which Teambuilder teams were last chosen (by name), never a pasted team.
 
 Foul Play's OU play relies on Smogon's monthly usage stats (`gen9ou-0`) and set data, pinned in `api/lock.json` and refreshed by hand with `npm run refresh-ou` ([api/README.md](../api/README.md#refreshing-the-ou-data)).
 

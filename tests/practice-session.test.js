@@ -37,7 +37,7 @@ async function fakeSimulator(t) {
 
 function fakeWorkers() {
   const workers = [];
-  const launch = ({ threads, level, format }) => {
+  const launch = ({ threads, level, format, bot = 'foulplay' }) => {
     const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), frames: [],
       level, format, lines: [] });
     child.kill = () => setImmediate(() => child.emit('exit', 0));
@@ -49,7 +49,7 @@ function fakeWorkers() {
         if (value.type === 'frame') child.frames.push(value.data);
       }
     });
-    setImmediate(() => child.send({ type: 'ready', protocol: 1, bot: 'foulplay', level, format, threads, searchMs: 100 }));
+    setImmediate(() => child.send({ type: 'ready', protocol: 1, bot: bot === 'metamon' ? 'metamon' : 'foulplay', level, format, threads, searchMs: 100 }));
     workers.push(child);
     return child;
   };
@@ -72,7 +72,7 @@ function fakeBots() {
 async function setup(t, { target, server = {}, localUrl } = {}) {
   const sim = await fakeSimulator(t);
   const fake = fakeWorkers();
-  const api = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch, ...server });
+  const api = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, metamonRuntime: { python: 'python', worker: 'm.py', root: '/metamon' }, launch: fake.launch, ...server });
   const url = await api.listen();
   t.after(() => api.close());
   const spawned = [];
@@ -156,7 +156,7 @@ test('fails when the engine connection drops mid-battle', async t => {
   workers[0].send({ type: 'error', code: 'engine-failed' });
   assert.deepEqual(await failure, ['engine']);
   assert.equal(session.status().state, 'failed');
-  assert.match(session.status().error, /Foul Play stopped/);
+  assert.match(session.status().error, /The bot stopped/);
 });
 
 test('rejects other opponents, presets and engines', async t => {
@@ -197,14 +197,16 @@ test('Foul Play uses the full preset when the page sends none', async t => {
 test('lists the Foul Play levels first, then the simple bots, hardest first', async t => {
   const { session } = await setup(t);
   const opponents = session.status().opponents;
-  assert.deepEqual(opponents.map(bot => bot.id), ['foulplay', 'foulplay-medium', 'foulplay-casual', 'heuristic', 'greedy', 'random']);
+  assert.deepEqual(opponents.map(bot => bot.id), ['foulplay', 'foulplay-medium', 'foulplay-casual', 'metamon', 'heuristic', 'greedy', 'random']);
   assert.deepEqual(opponents.map(bot => bot.name).slice(0, 3), ['Foul Play', 'Foul Play Medium', 'Foul Play Casual']);
-  assert.deepEqual(opponents.map(bot => bot.difficulty), ['hard', 'medium', 'medium', 'easy', 'easy', 'easy']);
-  assert.deepEqual(opponents.map(bot => bot.kind), ['Search bot', 'Search bot', 'Search bot', 'Rule-based bot', 'Rule-based bot', 'Rule-based bot']);
-  assert.deepEqual(opponents[0].formats, ['gen9randombattle', 'gen9ou']);
-  assert.ok(opponents.slice(1).every(bot => bot.formats.length === 1 && bot.formats[0] === 'gen9randombattle'));
-  assert.deepEqual(opponents.map(bot => bot.local), [false, false, false, true, true, true]);
-  assert.deepEqual(opponents.map(bot => bot.search), [true, true, true, false, false, false]);
+  assert.deepEqual(opponents.map(bot => bot.difficulty), ['hard', 'medium', 'medium', 'hard', 'easy', 'easy', 'easy']);
+  assert.deepEqual(opponents.map(bot => bot.kind), ['Search bot', 'Search bot', 'Search bot', 'Learned bot', 'Rule-based bot', 'Rule-based bot', 'Rule-based bot']);
+  assert.deepEqual(opponents[0].formats, ['gen9randombattle', 'gen9ou', 'gen9anythinggoes']);
+  assert.deepEqual(opponents[1].formats, opponents[0].formats);
+  assert.deepEqual(opponents[2].formats, opponents[0].formats);
+  assert.ok(opponents.slice(4).every(bot => bot.formats.length === 1 && bot.formats[0] === 'gen9randombattle'));
+  assert.deepEqual(opponents.map(bot => bot.local), [false, false, false, false, true, true, true]);
+  assert.deepEqual(opponents.map(bot => bot.search), [true, true, true, true, false, false, false]);
 });
 
 test('starts a weaker level on the cloud with its own level', async t => {
@@ -212,7 +214,7 @@ test('starts a weaker level on the cloud with its own level', async t => {
   assert.deepEqual(await session.start({ opponent: 'foulplay-casual' }), { ok: true });
   assert.equal(workers[0].level, 'casual');
   assert.equal(workers[0].format, 'gen9randombattle');
-  assert.match((await (session.stop(), session.start({ opponent: 'foulplay-medium', format: 'gen9ou' }))).error, /does not play/);
+  assert.match((await (session.stop(), session.start({ opponent: 'foulplay-medium', format: 'gen9ou' }))).error, /both teams/);
 });
 
 const OU_ROOM = 'battle-gen9ou-3';
@@ -374,7 +376,7 @@ test('a queued player can move to Foul Play on this computer', async t => {
   let localUrl = null;
   const { session, api, url, engines } = await setup(t, { server: { maxSessions: 1, maxSessionsPerClient: 2 }, localUrl: () => localUrl });
   const fake = fakeWorkers();
-  const local = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, launch: fake.launch });
+  const local = createApiServer({ runtime: { python: 'python', worker: 'w.py', source: '/fp' }, metamonRuntime: { python: 'python', worker: 'm.py', root: '/metamon' }, launch: fake.launch });
   localUrl = await local.listen();
   t.after(() => local.close());
   await new InferenceClient({ url }).createSession({ preset: 'quiet' });
@@ -427,4 +429,31 @@ test('daily controller observes real bridge results and blocks unreserved rematc
   assert.equal(sim.received.filter(text => text === '|/accept Player').length, 1);
   session.simulatorFrame(`>${ROOM}\n|win|Player`);
   assert.equal(store.status().total, 1);
+});
+
+for (const format of ['gen9ou', 'gen9anythinggoes']) {
+  for (const opponent of ['foulplay-casual', 'foulplay-medium']) {
+    test(`${opponent} supports ${format} with its own team and level`, async t => {
+      const { session, workers } = await setup(t);
+      assert.deepEqual(await session.start({ opponent, format, teams: TEAMS }), { ok: true });
+      assert.equal(workers[0].format, format);
+      assert.equal(workers[0].level, opponent.split('-')[1]);
+      assert.deepEqual(workers[0].lines[0], { type: 'team', data: TEAMS.botExport });
+    });
+  }
+}
+
+test('Metamon always uses the cloud, even with local Foul Play selected', async t => {
+  const { session, requested, workers, sim, engines } = await setup(t);
+  assert.equal((await session.start({ opponent: 'metamon', format: 'gen9anythinggoes', teams: TEAMS })).ok, false);
+  assert.deepEqual(await session.start({ opponent: 'metamon', format: 'gen9ou', teams: TEAMS, engine: 'local' }), { ok: true });
+  assert.equal(requested(), 1);
+  assert.deepEqual(engines, ['cloud']);
+  assert.equal(session.status().engine, 'cloud');
+  assert.equal(workers[0].level, 'trained');
+  assert.equal(session.useEngine('local').ok, false);
+  sim.socket.send('|pm| Player| Metamon|/challenge gen9ou|gen9ou|||');
+  await until(() => sim.received.includes('|/accept Player'), 'Metamon accept');
+  assert.ok(sim.received.includes(`|/utm ${TEAMS.bot}`));
+  session.stop();
 });

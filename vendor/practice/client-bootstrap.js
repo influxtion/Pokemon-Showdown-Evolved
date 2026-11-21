@@ -15,7 +15,7 @@
   state.practiceState = 'connecting';
   if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535 ||
       !/^[a-f0-9]{32,128}$/.test(token) || !guest.test(human) || !guest.test(bot) ||
-      human.toLowerCase() === bot.toLowerCase() || !['gen9randombattle', 'gen9ou'].includes(format) ||
+      human.toLowerCase() === bot.toLowerCase() || !['gen9randombattle', 'gen9ou', 'gen9anythinggoes'].includes(format) ||
       (format === 'gen9randombattle' ? team !== '' : !team || team.length > 8192 || /[\r\n]/.test(team))) {
     state.practiceState = 'failed';
     return;

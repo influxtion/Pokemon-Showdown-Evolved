@@ -951,3 +951,12 @@ connection, after sign-in and after ratings arrive, in both layouts/themes at
 1366x768 and 1024x640. All tested bounds remain within one CSS pixel. Connecting
 and connected captures were visually inspected; saved formats and reconnect
 team selection were checked through real launcher IPC with simulated sessions.
+
+
+## November 21: expanded practice roster
+
+Foul Play Casual and Medium now support OU alongside Hard. All three support Gen 9 Anything Goes, with a format tab, per-format validation for both teams, pinned AG usage stats, crowned-form export handling and duplicate-species reserve tracking. Switching formats invalidates pending validation and ignores stale Teambuilder replies. The Bots page checks the cloud host's per-bot format capabilities and offers runtime updates for older local Foul Play installs.
+
+Metamon's Kakuna policy is a cloud-only Gen 9 OU opponent. This follows the owner's final instruction to avoid increasing player install/download size. Its model, Python, CPU inference dependencies and installer stay in the server-only `api/metamon/` directory; the desktop package's existing API allowlist excludes them. The local Foul Play setting cannot redirect Metamon, and queued Metamon sessions cannot switch to local Foul Play. The Bots footer credits Metamon as well as Foul Play. See `docs/bots.md` for exact setup, pins, licensing, adapter behavior and limitations.
+
+Verified: 280 Node tests with zero skips, isolated roster UI checks in both themes at 1366x768 and 1024x640, real Casual/Medium OU games, Casual/Medium/Hard AG games including duplicate Miraidon sets, a clean Metamon runtime install and two real API-backed Kakuna games with rematch. These use private local simulators/API servers; they do not deploy anything to the friend-owned host. All 13 desktop suites passed across the full run and a friends-suite retry after a screenshot UnknownVizError. The simulator was rebuilt and packaging source verification passed. No public accounts, installer build, release upload or production deployment.

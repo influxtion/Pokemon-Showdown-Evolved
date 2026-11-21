@@ -111,9 +111,10 @@ function workerEnvironment() {
 }
 
 // `lowPriority` is for the in-app copy, so a search never starves the player's computer.
-function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT, lowPriority = false }) {
-  const child = spawn(runtime.python, ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads),
-    '--level', level, '--format', format],
+function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT, bot = 'foulplay', lowPriority = false }) {
+  const args = bot === 'metamon' ? ['-I', '-B', runtime.worker, '--runtime', runtime.root, '--threads', String(threads)]
+    : ['-I', '-B', runtime.worker, '--source', runtime.source, '--threads', String(threads), '--level', level, '--format', format];
+  const child = spawn(runtime.python, args,
     { cwd: path.dirname(runtime.worker), env: workerEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   if (lowPriority && child.pid) {
     try { os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* Best effort. */ }
@@ -122,9 +123,9 @@ function spawnWorker({ runtime, threads, level = 'hard', format = FORMAT, lowPri
 }
 
 const ERRORS = Object.freeze({
-  'engine-failed': 'Foul Play stopped unexpectedly. Start a new battle to try again.',
-  'engine-timeout': 'Foul Play took too long to start.',
-  'invalid-team': "Foul Play couldn't read its team. Check the team and try again.",
+  'engine-failed': 'The bot stopped unexpectedly. Start a new battle to try again.',
+  'engine-timeout': 'The bot took too long to start.',
+  'invalid-team': "The bot couldn't read its team. Check the team and try again.",
   'expired': 'This practice session reached its time limit. Start a new one.',
   'idle': 'This practice session was idle for too long.',
   'decision-limit': 'This practice session reached its move limit. Start a new one.',
@@ -135,6 +136,8 @@ const ERRORS = Object.freeze({
 
 function createApiServer({
   runtime,
+  metamonRuntime = null,
+  maxMetamonSessions = 1,
   apiKey = null,
   maxSessions = 4,
   maxSessionsPerClient = 1,
@@ -158,11 +161,11 @@ function createApiServer({
   log = () => {},
 } = {}) {
   if (apiKey !== null && (typeof apiKey !== 'string' || apiKey.length < 32)) throw new Error('API_KEY must be at least 32 characters.');
-  for (const [name, value] of Object.entries({ maxSessions, maxSessionsPerClient, maxThreads })) {
+  for (const [name, value] of Object.entries({ maxSessions, maxSessionsPerClient, maxThreads, maxMetamonSessions })) {
     if (!Number.isInteger(value) || value < 1 || value > 256) throw new Error(`Invalid ${name}`);
   }
   if (!Number.isInteger(maxQueue) || maxQueue < 0 || maxQueue > 1000) throw new Error('Invalid maxQueue');
-  const resolveRuntime = typeof runtime === 'function' ? runtime : () => runtime;
+  const resolveRuntime = bot => { const source = bot === 'metamon' ? metamonRuntime : runtime; return typeof source === 'function' ? source() : source; };
   const sessions = new Map();
   // Waiting clients, first first: { id, client, options, joined, seen }. Options (maybe an OU team)
   // are kept only while waiting and never logged.
@@ -172,7 +175,6 @@ function createApiServer({
   let closing = false;
 
   const threadsFor = preset => Math.min(PRESETS[preset], maxThreads);
-  const available = () => Boolean(resolveRuntime());
 
   function authorized(request) {
     if (apiKey === null) return true;
@@ -232,7 +234,7 @@ function createApiServer({
   function workerEvent(session, event) {
     if (event.type === 'error') return end(session, event.code === 'invalid-team' ? 'invalid-team' : 'engine-failed');
     if (event.type === 'ready') {
-      if (session.state !== 'starting' || event.protocol !== 1 || event.bot !== 'foulplay' || event.threads !== session.threads ||
+      if (session.state !== 'starting' || event.protocol !== 1 || event.bot !== (session.bot === 'metamon' ? 'metamon' : 'foulplay') || event.threads !== session.threads ||
           event.level !== BOTS[session.bot].level || event.format !== session.format) {
         return end(session, 'engine-failed');
       }
@@ -264,10 +266,10 @@ function createApiServer({
   function startWorker(session, paths, team) {
     let child;
     try {
-      child = launch({ runtime: paths, threads: session.threads, level: BOTS[session.bot].level, format: session.format, lowPriority });
+      child = launch({ runtime: paths, bot: session.bot, threads: session.threads, level: BOTS[session.bot].level, format: session.format, lowPriority });
     } catch { return end(session, 'engine-failed'); }
     session.worker = child;
-    if (team) child.stdin?.write(`${JSON.stringify({ type: 'team', data: team })}\n`);
+    if (team && session.bot !== 'metamon') child.stdin?.write(`${JSON.stringify({ type: 'team', data: team })}\n`);
     child.stderr?.on('data', () => {}); // Upstream diagnostics can include battle state; never log them.
     child.stdin?.on('error', () => {});
     child.once('error', () => end(session, 'engine-failed'));
@@ -289,6 +291,7 @@ function createApiServer({
     session.startupTimer.unref?.();
   }
 
+  const modelSlot = bot => bot !== 'metamon' || [...sessions.values()].filter(session => session.bot === 'metamon').length < maxMetamonSessions;
   const freeSlots = () => Math.max(0, maxSessions - sessions.size);
   const place = ticket => ({ queued: true, ticket: ticket.id, position: queue.indexOf(ticket) + 1, waiting: queue.length,
     checkInMs: queueCheckInMs });
@@ -303,7 +306,7 @@ function createApiServer({
   function openSession(response, client, options, paths) {
     const format = options.format === undefined ? FORMAT : options.format;
     const session = { id: crypto.randomBytes(32).toString('hex'), client, bot: options.bot, format, preset: options.preset,
-      threads: threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
+      threads: options.bot === 'metamon' ? Math.min(4, maxThreads) : threadsFor(options.preset), created: now(), touched: now(), state: 'starting', worker: null, socket: null,
       decisions: 0, battles: 0, frames: new FrameBudget({ burst: frameBurst, perSecond: framesPerSecond, now }) };
     sessions.set(session.id, session);
     startWorker(session, paths, TEAM_FORMATS.includes(format) ? options.team : null);
@@ -327,8 +330,9 @@ function createApiServer({
     if (needsTeam ? !isTeamText(options.team) : options.team !== undefined) {
       return failure(response, 400, 'invalid-team', needsTeam ? 'This format needs a team for the bot.' : 'This format has no team to send.');
     }
-    const paths = resolveRuntime();
-    if (!paths) return failure(response, 503, 'unavailable', 'Foul Play is not installed on this server.');
+    const paths = resolveRuntime(options.bot);
+    if (!paths) return failure(response, 503, 'unavailable', 'This bot is not installed on this server.');
+    if (paths.formats && !paths.formats.includes(format)) return failure(response, 503, 'unavailable', 'Update the bot runtime for this format.');
     const client = clientKey(request, trustProxy);
     const mine = [...sessions.values()].filter(session => session.client === client).length;
     if (mine >= maxSessionsPerClient) {
@@ -344,7 +348,7 @@ function createApiServer({
     }
     const wanted = { bot: options.bot, preset: options.preset, format, ...(needsTeam ? { team: options.team } : {}) };
     // A free engine goes to the first in line; a new client takes one only when nobody waits.
-    if (!queue.length && freeSlots() > 0) return openSession(response, client, wanted, paths);
+    if (!queue.length && freeSlots() > 0 && modelSlot(options.bot)) return openSession(response, client, wanted, paths);
     if (options.queue === true && queue.length < maxQueue) {
       const ticket = { id: crypto.randomBytes(32).toString('hex'), client, options: wanted, joined: now(), seen: now() };
       queue.push(ticket);
@@ -360,9 +364,9 @@ function createApiServer({
   // session here, so a slot is held only until the next check-in.
   function checkIn(response, ticket) {
     ticket.seen = now();
-    if (queue.indexOf(ticket) + 1 > freeSlots()) return send(response, 200, place(ticket));
-    const paths = resolveRuntime();
-    if (!paths) return failure(response, 503, 'unavailable', 'Foul Play is not installed on this server.');
+    if (queue.indexOf(ticket) + 1 > freeSlots() || !modelSlot(ticket.options.bot)) return send(response, 200, place(ticket));
+    const paths = resolveRuntime(ticket.options.bot);
+    if (!paths) return failure(response, 503, 'unavailable', 'This bot is not installed on this server.');
     leaveQueue(ticket, 'started');
     log('queue-wait', { seconds: Math.round((now() - ticket.joined) / 1000) });
     return openSession(response, ticket.client, ticket.options, paths);
@@ -378,9 +382,9 @@ function createApiServer({
       if (!authorized(request)) return failure(response, 401, 'unauthorized', 'This practice server needs an API key.');
       if (request.method === 'GET' && url.pathname === '/v1/info') {
         return send(response, 200, { api: API_VERSION,
-          bots: Object.values(BOTS).map(bot => ({ id: bot.id, name: bot.name, description: bot.description, level: bot.level,
-            formats: bot.formats, available: available(),
-            presets: Object.fromEntries(Object.keys(PRESETS).map(preset => [preset, threadsFor(preset)])) })),
+          bots: Object.values(BOTS).map(bot => { const runtimeInfo = resolveRuntime(bot.id); return ({ id: bot.id, name: bot.name, description: bot.description, level: bot.level,
+            formats: bot.formats.filter(format => !runtimeInfo?.formats || runtimeInfo.formats.includes(format)), available: Boolean(runtimeInfo),
+            presets: Object.fromEntries(Object.keys(PRESETS).map(preset => [preset, bot.id === 'metamon' ? Math.min(4, maxThreads) : threadsFor(preset)])) }); }),
           limits: { maxSessionsPerClient, sessionsPerHour, sessionBurst, lifetimeMs, idleMs, maxDecisions },
           capacity: { active: sessions.size, max: maxSessions, waiting: queue.length, queueMax: maxQueue, checkInMs: queueCheckInMs } });
       }
@@ -504,8 +508,15 @@ async function main() {
   const runtime = inspect(runtimeDir);
   if (!runtime.installed) throw new Error(`Foul Play is not installed in ${runtimeDir}. Run "npm run setup" first.`);
   if (!runtime.current) console.warn('The installed Foul Play runtime is older than lock.json. Run "npm run setup" to update it.');
+  let metamonRuntime = null;
+  if (process.env.METAMON_RUNTIME_DIR) {
+    const { MetamonRuntime } = require('./metamon/install');
+    const installed = new MetamonRuntime({ dir: process.env.METAMON_RUNTIME_DIR }).inspect();
+    if (!installed.installed) throw new Error('Metamon is not installed in METAMON_RUNTIME_DIR.');
+    metamonRuntime = installed;
+  }
   const api = createApiServer({
-    runtime,
+    runtime, metamonRuntime, maxMetamonSessions: integer('MAX_METAMON_SESSIONS', 1),
     apiKey: process.env.API_KEY || null,
     maxSessions: integer('MAX_SESSIONS', Math.max(1, Math.floor(os.availableParallelism() / 2))),
     maxSessionsPerClient: integer('MAX_SESSIONS_PER_CLIENT', 1),

@@ -6,10 +6,10 @@ own parser, inference, sampling and search run unchanged; only its connection is
 the weaker levels adjust how long it searches and how it picks among the moves it found.
 
 Arguments: --source <Foul Play checkout> [--threads 1-16] [--level hard|medium|casual]
-           [--format gen9randombattle|gen9ou] [--check]
+           [--format gen9randombattle|gen9ou|gen9anythinggoes] [--check]
 
 stdin, one JSON object per line:
-  {"type": "team", "data": "<Showdown export>"}   first line, OU only: the bot's own team
+  {"type": "team", "data": "<Showdown export>"}   first line, team formats only: the bot's own team
   {"type": "frame", "data": ">battle-gen9randombattle-1\\n|init|battle\\n..."}
   {"type": "stop"}                  (closing stdin also stops the worker)
 stdout, one JSON object per line:
@@ -41,7 +41,7 @@ import threading
 import time
 
 PROTOCOL = 1
-FORMATS = ("gen9randombattle", "gen9ou")
+FORMATS = ("gen9randombattle", "gen9ou", "gen9anythinggoes")
 BOT = "FoulPlay"
 ENGINE_VERSION = "0.0.48"
 MAX_LINE = 1 << 20
@@ -106,7 +106,9 @@ def arguments(argv=None):
     return args
 
 
-def data_files(source):
+def data_files(source, battle_format="gen9ou"):
+    if battle_format == "gen9anythinggoes":
+        return [source / "fp/data/smogon_stats_cache/gen9anythinggoes-0.json"]
     return [source.joinpath("fp", "data", *parts) for parts in OU_DATA]
 
 
@@ -157,8 +159,8 @@ def load(args):
         raise RuntimeError("Unsupported poke-engine version")
     if not (args.source / "fp" / "data" / "pkmn_sets_cache" / "gen9randombattle.json").is_file():
         raise RuntimeError("Random battle sets are missing")
-    if args.format == "gen9ou" and not all(path.is_file() for path in data_files(args.source)):
-        raise RuntimeError("OU set data is missing")
+    if args.format != FORMATS[0] and not all(path.is_file() for path in data_files(args.source, args.format)):
+        raise RuntimeError("Team format set data is missing")
     # Keep every search inside this process so stopping it can never orphan workers.
     search.ProcessPoolExecutor = ThreadPoolExecutor
     config = FoulPlayConfig
@@ -172,6 +174,84 @@ def load(args):
     config.save_replay = SaveReplay.never
     apply_mods(config.format_spec)
     apply_level(args.level)
+    # Requests preserve team slot order at initialization. Match our own nature/EVs
+    # by slot, since Anything Goes allows multiple sets of the same species.
+    from fp.battle.state import Battler
+    initialize = Battler.initialize_first_turn_user_from_json
+
+    def initialize_slots(self, request):
+        team = self.team_dict
+        self.team_dict = None
+        try:
+            initialize(self, request)
+        finally:
+            self.team_dict = team
+        if team is not None:
+            for pokemon in [self.active] + self.reserve:
+                if pokemon is None:
+                    continue
+                member = team[pokemon.index - 1]
+                pokemon.nature = member["nature"] or "serious"
+                pokemon.evs = tuple(int(member["evs"][stat] or 0) for stat in ("hp", "atk", "def", "spa", "spd", "spe"))
+
+    Battler.initialize_first_turn_user_from_json = initialize_slots
+    if args.format == "gen9anythinggoes":
+        # AG has usage stats but no pinned full-set corpus. Use upstream's Smogon
+        # trait/move sampler, without fetching missing full-set endpoints in battle.
+        from fp.data.sets import TeamDatasets
+        TeamDatasets._get_sets_dict = lambda self: {}
+        TeamDatasets._get_moves_dict = lambda self: {}
+        # Upstream uses species equality for reserve membership, which drops a
+        # duplicate when it switches out. Preserve individual battle objects.
+        from fp.battle.state import Pokemon
+        import fp.battle.protocol as protocol
+        Pokemon.__eq__ = lambda self, other: self is other
+        upstream_switch = protocol.switch_or_drag
+
+        def switch_with_identity(battle, message, switch_or_drag="switch"):
+            side = battle.opponent if protocol.is_opponent(battle, message) else battle.user
+            nickname = Pokemon.extract_nickname_from_pokemonshowdown_string(message[2])
+            matching = [p for p in side.reserve if p.nickname == nickname]
+            if len(matching) == 1:
+                chosen = matching[0]
+                side.reserve = [chosen] + [p for p in side.reserve if p is not chosen]
+            return upstream_switch(battle, message, switch_or_drag)
+
+        protocol.switch_or_drag = switch_with_identity
+        update = Battler.update_from_request_json
+
+        def update_slots(self, request):
+            # Upstream's update asks for inactive Pokemon by species. Resolve
+            # those calls in request order using the nickname already tracked.
+            pending = iter(p for p in request["side"]["pokemon"] if not p["active"])
+            original = self.find_pokemon_in_reserves
+
+            def find(name):
+                entry = next(pending)
+                nickname = Pokemon.extract_nickname_from_pokemonshowdown_string(entry["ident"])
+                matching = [p for p in self.reserve if p.nickname == nickname]
+                return matching[0] if len(matching) == 1 else original(name)
+
+            self.find_pokemon_in_reserves = find
+            try:
+                return update(self, request)
+            finally:
+                del self.find_pokemon_in_reserves
+
+        Battler.update_from_request_json = update_slots
+        import fp.modes.base as base
+        format_decision = base.format_decision
+
+        def format_ag_decision(battle, decision):
+            if decision.startswith("switch "):
+                species = decision[7:]
+                candidates = [p for p in battle.user.reserve if p.name == species and p.hp > 0 and not p.fainted]
+                if candidates:
+                    return [f"/switch {candidates[0].index}", str(battle.rqid)]
+            return format_decision(battle, decision)
+
+        base.format_decision = format_ag_decision
+
 
 
 def read_team(source, text):
@@ -186,6 +266,9 @@ def read_team(source, text):
     if not 1 <= len(team) <= 6:
         raise ValueError("A team has one to six Pokemon")
     for member in team:
+        # Showdown exports the base form, while the request names its crowned form.
+        if (member["species"], member["item"]) in {("zacian", "rustedsword"), ("zamazenta", "rustedshield")}:
+            member["species"] += "crowned"
         if member["species"] not in pokedex or not 1 <= len(member["moves"]) <= 4:
             raise ValueError("Unreadable team")
     return team
@@ -335,16 +418,16 @@ def check(args):
 
     if poke_engine.monte_carlo_tree_search(poke_engine.State(), 20, threads=1).total_visits <= 0:
         raise RuntimeError("Engine search returned no visits")
-    if args.format == "gen9ou":
+    if args.format != FORMATS[0]:
         # Proves the installed OU data loads without a download.
         from fp.data.sets import SmogonSets, TeamDatasets
         from fp.format_spec import FormatSpec
 
-        spec = FormatSpec.from_format_string("gen9ou")
+        spec = FormatSpec.from_format_string(args.format)
         smogon, sets = SmogonSets(), TeamDatasets()
         smogon.initialize(spec, {"greattusk", "kingambit"})
         sets.initialize(spec, {"greattusk", "kingambit"})
-        if not smogon.all_pkmn_counts or not sets.pkmn_sets.get("greattusk"):
+        if not smogon.all_pkmn_counts or (args.format == "gen9ou" and not sets.pkmn_sets.get("greattusk")):
             raise RuntimeError("OU set data did not load")
 
 

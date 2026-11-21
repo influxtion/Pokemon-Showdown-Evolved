@@ -46,6 +46,7 @@ class CloudEngine {
       this.value = { configured: true, checked: true, online: true, available: Boolean(bot?.available),
         busy: Boolean(info.capacity && (info.capacity.active >= info.capacity.max || info.capacity.waiting > 0)),
         waiting: Number.isInteger(info.capacity?.waiting) ? info.capacity.waiting : 0,
+        bots: (info.bots || []).map(({ id, formats, available }) => ({ id, formats, available })),
         queue: Number.isInteger(info.capacity?.queueMax) && info.capacity.queueMax > 0, presets: bot?.presets || null,
         error: bot?.available ? '' : 'Foul Play is not available on the cloud server right now.' };
     } catch (error) {
@@ -93,7 +94,7 @@ class LocalEngine extends EventEmitter {
   status() {
     const runtime = this.inspect();
     return { supported: this.supported, installed: runtime.installed, current: runtime.current,
-      installing: Boolean(this.installing), progress: this.progress, error: this.error,
+      formats: runtime.formats, installing: Boolean(this.installing), progress: this.progress, error: this.error,
       log: this.log.slice(-4), revision: runtime.revision ? runtime.revision.slice(0, 7) : null, threads: this.threads };
   }
 
