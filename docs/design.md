@@ -164,7 +164,7 @@ Launcher pages ask main for a snapshot. Main runs `readClient()` inside the clie
 
 ### Daily Bot Gauntlet Challenge
 
-Home includes a compact cobalt Daily Bot Gauntlet Challenge strip in both layouts, with a yellow flame tile, highlighted active streak, remaining attempts, a Play daily action, and a Details link to Bots. The fuller challenge panel on Bots holds rules, best streak and total clears, and can also start or resume a daily attempt. Win one Gen 9 Random Battle against Foul Play Medium in at most three attempts per UTC calendar day. A clear adds exactly one day to the streak and locks further daily play until 00:00 UTC. Missing a day or finishing all three attempts without a win resets the current streak; personal best and total daily clears remain. Ordinary practice does not count and remains available.
+Home includes a compact cobalt Daily Bot Gauntlet Challenge strip in both layouts, with a yellow flame tile, highlighted active streak, remaining attempts, a Play daily action, and a Details link to Bots. The fuller challenge panel on Bots holds rules, best streak and total clears, and can also start or resume a daily attempt. Win one Gen 9 Random Battle against Foul Play Casual in at most three attempts per UTC calendar day. A clear adds exactly one day to the streak and locks further daily play until 00:00 UTC. Missing a day or finishing all three attempts without a win resets the current streak; personal best and total daily clears remain. Ordinary practice does not count and remains available.
 
 The card offers Start challenge or Return to challenge, remaining attempts, current/best streak, lifetime clears, and the rules. Daily battles use the existing battle tab, with a guarded daily retry after a loss. Each retry starts a fresh session and random teams. Finish before midnight UTC: a late result cannot clear either the expired challenge or the next day's challenge. Ties and deliberate exits from active battles consume an attempt; cancelling setup or a detected runtime/engine failure refunds it. The app cannot resume a simulator after restart: an interrupted active attempt counts, while interrupted setup is refunded.
 
@@ -881,7 +881,7 @@ emblem. Its position below the bot choices is retained.
 Syntax, Daily desktop flow and Home appearance checks passed; the twelve
 palette contrast checks still meet 4.61:1. Light/dark screenshots were inspected.
 
-Foul Play Medium's Bots card now includes a violet Play daily shortcut beside
+Foul Play Casual's Bots card now includes a violet Play daily shortcut beside
 its regular Play action. Both daily entry points share the same controller,
 availability, start lock and existing main-process attempt reservation. A
 running challenge shows Return to daily; a completed challenge shows a disabled
@@ -897,7 +897,7 @@ The owner subsequently swapped the Bots sections: Daily Bot Gauntlet Challenge n
 the former local-download position above the opponent groups, and Foul Play on
 this computer sits below those groups. Daily is shorter: its action shares the
 title/streak row, its description, attempts and record wrap along one line,
-and its existing expandable rules stay below. Home and the Medium card's daily
+and its existing expandable rules stay below. Home and the Casual card's daily
 shortcut keep their layouts and behavior.
 Syntax checks and the Daily/app appearance desktop suites passed; both desktop
 sizes and themes were visually checked with the compact strip above the cards.

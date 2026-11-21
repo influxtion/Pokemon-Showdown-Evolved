@@ -266,7 +266,7 @@
     play.type = 'button';
     play.setAttribute('aria-label', `Play against ${bot.name}`);
     play.addEventListener('click', () => begin(bot.id));
-    if (bot.id === 'foulplay-medium') {
+    if (bot.id === 'foulplay-casual') {
       const daily = element('button', 'btn btn-primary bot-daily', 'Play daily');
       daily.type = 'button';
       daily.disabled = true;

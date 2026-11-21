@@ -88,7 +88,7 @@ class Session extends EventEmitter {
   stop(reason = 'stop') { this.emit('ending', reason); this.dailyChallenge = false; this.battle = null; this.state = 'idle'; }
   play(result) { this.battle = { finished: Boolean(result), result }; this.emit('change', this); }
 }
-test('controller pins Medium and counts only daily simulator results', async t => {
+test('controller pins Casual and counts only daily simulator results', async t => {
   const { store } = setup(t); const session = new Session(); const daily = new DailyChallenge(store, session);
   session.play('win');
   assert.equal(store.status().total, 0);

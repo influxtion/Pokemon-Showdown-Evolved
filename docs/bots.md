@@ -303,7 +303,7 @@ All of these use disposable profiles and private servers, never the player's acc
 
 ## Daily Bot Gauntlet Challenge
 
-The Home challenge pins `foulplay-medium`, `gen9randombattle`, and the `full` computation preset. It respects the player's existing cloud/local engine choice. No teams are authored: the simulator generates both sides. Daily attempts use separate sessions; same-session rematches are blocked in both the IPC handler and the bot challenge-accept path.
+The Home challenge pins `foulplay-casual`, `gen9randombattle`, and the `full` computation preset. It respects the player's existing cloud/local engine choice. No teams are authored: the simulator generates both sides. Daily attempts use separate sessions; same-session rematches are blocked in both the IPC handler and the bot challenge-accept path.
 
 Medium is an existing worker level, not a new difficulty adjustment. `api/worker/foulplay_worker.py` sets a 40 ms base search budget and keeps upstream world sampling: in the current pinned Random Battle mode, normally four worlds at 20 ms early and two at 40 ms later (fewer under time pressure). Move selection is weighted by search visit share among candidates with at least 50% of the best share. Medium has no additional deliberate-slip probability. The Full preset requests eight search threads, subject to the API server's cap; it does not alter the level. This is a computation configuration, not a measured skill rating.
 

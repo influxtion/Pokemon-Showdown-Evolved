@@ -5,7 +5,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const DAY = 86400000;
 const dayAt = now => Math.floor(now / DAY);
-const OPTIONS = Object.freeze({ opponent: 'foulplay-medium', format: 'gen9randombattle', preset: 'full' });
+const OPTIONS = Object.freeze({ opponent: 'foulplay-casual', format: 'gen9randombattle', preset: 'full' });
 const empty = day => ({ version: 1, day, attempts: 0, cleared: false, streak: 0, best: 0, total: 0, lastWin: null, pending: null });
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 function valid(data) {
