@@ -1,0 +1,19 @@
+Metamon / Kakuna
+
+Code: Copyright (c) 2025 UT Robot Perception and Learning Lab.
+MIT license; see CODE-LICENSE and metamon/LICENSE in the downloaded runtime.
+Project: https://github.com/UT-Austin-RPL/metamon
+Credits: Jake Grigsby, UT Austin Robot Perception and Learning Lab, and contributors.
+
+Kakuna checkpoint: jakegrigsby/metamon on Hugging Face, revision
+ac8e88e7da8dc2a2b85176d88f81fd8854b1445b.
+Apache License 2.0; see MODEL-LICENSE and the pinned MODEL-CARD.
+The checkpoint is downloaded unmodified. No model weights are bundled with the app.
+No upstream NOTICE file was present at the pinned model repository root or Kakuna directory.
+
+The desktop/server inference adapter is maintained by Pokemon Showdown Evolved.
+It replaces FlashAttention with CPU attention and connects the policy to a private
+battle session. Upstream source archives and model weights remain unmodified.
+The downloaded runtime retains the original source licenses for Metamon, AMAGO,
+and poke-env, Python's license, and dependency wheel license metadata.
+SOURCE.json records exact upstream revisions, URLs and SHA-256 hashes.

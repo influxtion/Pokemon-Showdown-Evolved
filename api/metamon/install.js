@@ -11,7 +11,10 @@ const lock = require('./lock.json');
 
 const ASSETS = __dirname;
 const WORKER = path.join(ASSETS, 'worker.py');
-const IDENTITY = crypto.createHash('sha256').update(JSON.stringify(lock)).update(fs.readFileSync(path.join(ASSETS, 'requirements.txt'))).update(fs.readFileSync(path.join(ASSETS, 'bootstrap.txt'))).digest('hex');
+const NOTICE_FILES = ['MODEL-LICENSE', 'MODEL-CARD', 'CODE-LICENSE', 'ATTRIBUTION.txt'];
+const identity = crypto.createHash('sha256').update(JSON.stringify(lock)).update(JSON.stringify(pythonLock));
+for (const name of ['requirements.txt', 'bootstrap.txt', ...NOTICE_FILES]) identity.update(fs.readFileSync(path.join(ASSETS, name)));
+const IDENTITY = identity.digest('hex');
 
 class MetamonRuntime extends EventEmitter {
   constructor({ dir, platform = `${process.platform}-${process.arch}`, worker = WORKER } = {}) {
@@ -90,7 +93,7 @@ class MetamonRuntime extends EventEmitter {
     }
     const model = await fetchFile(lock.model, 'model.pt', 'Downloading Kakuna model');
     await fsp.copyFile(model, path.join(staging, 'model.pt'));
-    await fsp.copyFile(path.join(ASSETS, 'MODEL-LICENSE'), path.join(staging, 'MODEL-LICENSE'));
+    for (const name of NOTICE_FILES) await fsp.copyFile(path.join(ASSETS, name), path.join(staging, name));
     await fsp.writeFile(path.join(staging, 'SOURCE.json'), JSON.stringify(lock, null, 2) + '\n');
     report('Checking Metamon on CPU');
     await run(python, ['-I', '-B', this.worker, '--runtime', staging, '--check'], { env, signal });
@@ -111,7 +114,7 @@ class MetamonRuntime extends EventEmitter {
 
 }
 
-module.exports = { MetamonRuntime, WORKER, IDENTITY };
+module.exports = { MetamonRuntime, WORKER, IDENTITY, NOTICE_FILES };
 
 if (require.main === module) {
   const { parseArgs } = require('node:util');

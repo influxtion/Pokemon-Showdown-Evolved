@@ -17,7 +17,7 @@ const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
 const { DailyStore, DailyChallenge } = require('./daily-challenge');
 const { PracticeSession } = require('./practice-session');
-const { CloudEngine, LocalEngine } = require('./practice-engines');
+const { CloudEngine, LocalEngine, MetamonEngine } = require('./practice-engines');
 const { PracticeView } = require('./practice-view');
 const { battleResizeScript, widthFromMessage } = require('./battle-resize');
 const { PracticeTeams, FORMATS: TEAM_FORMATS } = require('./practice-teams');
@@ -77,6 +77,7 @@ let practiceTeams = null;
 // Where Foul Play's moves are computed: the cloud (default) or an opted-in local download.
 let cloudEngine = null;
 let localEngine = null;
+let metamonEngine = null;
 // Key of the battle stylesheet in the client, so the Battle screen setting can toggle it live.
 // Changes run in order so a quick toggle can't insert it twice; a new document starts without it.
 let clientBattleCssKey = null;
@@ -322,7 +323,7 @@ function createWindow() {
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
     : path.join(__dirname, '..', 'scripts', 'practice');
   // The simulator runs here; only Foul Play's moves come from the cloud or the local engine.
-  const target = engine => (engine === 'local' ? localEngine : cloudEngine).target();
+  const target = (engine, bot) => (engine === 'local' ? bot === 'metamon' ? metamonEngine : localEngine : cloudEngine).target();
   practice = new PracticeSession({ root: practiceRoot, scripts: practiceScripts, target });
   dailyChallenge = new DailyChallenge(dailyStore, practice);
   practiceTeams = new PracticeTeams({ root: practiceRoot });
@@ -401,9 +402,9 @@ function createWindow() {
     (async () => {
       if (maintenance) return;
       if (replayDirty && !(await confirmDiscardReplay())) return;
-      if (localEngine?.installing) {
+      if (localEngine?.installing || metamonEngine?.installing) {
         const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep downloading', 'Cancel download and close'],
-          defaultId: 0, cancelId: 0, message: 'Foul Play is still downloading.', detail: 'Closing cancels the download. You can start it again later on the Bots page.' });
+          defaultId: 0, cancelId: 0, message: 'A bot is still downloading.', detail: 'Closing cancels the download. You can start it again later on the Bots page.' });
         if (result.response !== 1) return;
       }
       if (settings.get('confirmOnClose') && practice?.battle && !practice.battle.finished) {
@@ -455,7 +456,8 @@ ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
   const clientState = await practiceView.status();
   return { ...practice.status(), daily: dailyChallenge.status(), clientState: clientState.state, clientError: clientState.error, cloud: cloudEngine.status(),
-    local: localEngine.status(), engineChoice: settings.get('practiceEngine') };
+    local: localEngine.status(), engineChoice: settings.get('practiceEngine'),
+    metamon: metamonEngine.status(), metamonEngineChoice: settings.get('metamonEngine') };
 });
 ipcMain.handle('daily:status', event => {
   if (!isLauncherFrame(event)) return null;
@@ -503,10 +505,11 @@ ipcMain.handle('practice:start', async (event, options) => {
   if (!isPracticeFrame(event) || !options || typeof options !== 'object') return { ok: false };
   if (dailyChallenge.starting || dailyChallenge.attempt) return { ok: false, error: 'End the daily challenge first.' };
   const { opponent, preset, format } = options;
-  // Foul Play runs where the player chose on the Bots page; the cloud unless they opted in to local.
-  const engine = settings.get('practiceEngine') === 'local' ? 'local' : 'cloud';
-  if (['foulplay', 'foulplay-medium', 'foulplay-casual'].includes(opponent) && engine === 'local' && !localEngine.inspect().installed) {
-    return { ok: false, error: 'Foul Play is not on this computer any more. Download it again, or switch to the cloud server.' };
+  const selected = opponent === 'metamon' ? metamonEngine : localEngine;
+  const engine = settings.get(opponent === 'metamon' ? 'metamonEngine' : 'practiceEngine') === 'local' ? 'local' : 'cloud';
+  if (['foulplay', 'foulplay-medium', 'foulplay-casual', 'metamon'].includes(opponent) && engine === 'local' &&
+      (!selected.inspect().installed || selected.installing || selected.removing)) {
+    return { ok: false, error: 'The local bot is unavailable. Check Downloads on the Bots page, or switch to the cloud server.' };
   }
   if (format === undefined || format === 'gen9randombattle') return practice.start({ opponent, preset, engine });
   if (!Object.hasOwn(TEAM_FORMATS, format) || !options.teams || typeof options.teams !== 'object') return { ok: false, error: 'Choose both teams first.' };
@@ -523,38 +526,44 @@ ipcMain.handle('practice:start', async (event, options) => {
 ipcMain.handle('practice:use-local', event => {
   if (!isBattleFrame(event)) return { ok: false };
   if (!practice.queue) return { ok: false, error: 'The battle is no longer waiting for a cloud engine.' };
-  if (!localEngine.inspect().installed || localEngine.installing) return { ok: false, error: 'Download Foul Play on the Bots page first.' };
-  try { settings.set('practiceEngine', 'local'); } catch { /* The battle still moves; the choice just is not remembered. */ }
+  const selected = practice.bot.id === 'metamon' ? metamonEngine : localEngine;
+  if (!selected.inspect().installed || selected.installing || selected.removing) return { ok: false, error: 'Download this bot from the Bots page first.' };
+  try { settings.set(practice.bot.id === 'metamon' ? 'metamonEngine' : 'practiceEngine', 'local'); } catch { /* The current battle can still switch. */ }
   return practice.useEngine('local');
 });
-// Local Foul Play (opt-in). The download takes minutes; the Bots page follows it via practice:status.
-const localBattleOn = () => practice.engine === 'local' && ['starting', 'ready'].includes(practice.state);
-ipcMain.handle('practice:install-local', event => {
-  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
-  if (localEngine.installing) return { ok: true };
-  // Updating replaces the runtime and restarts the local server, which would end a local battle.
-  if (localBattleOn()) return { ok: false, error: 'End the practice battle first.' };
-  localEngine.install().then(result => logger.write(result.ok ? 'foulplay-installed' : result.cancelled ? 'foulplay-install-cancelled' : 'foulplay-install-failed'));
-  return { ok: true };
-});
-ipcMain.handle('practice:cancel-install', event => {
-  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
-  return localEngine.cancel();
-});
-ipcMain.handle('practice:remove-local', async event => {
-  if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
-  if (localBattleOn()) return { ok: false, error: 'End the practice battle first.' };
-  const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep', 'Remove'], defaultId: 0, cancelId: 0,
-    message: 'Remove Foul Play from this computer?', detail: 'Foul Play will play on the cloud server again. You can download it again later.' });
-  if (result.response !== 1) return { ok: false, cancelled: true };
-  try {
-    const removed = await localEngine.remove();
-    if (removed.ok && settings.get('practiceEngine') === 'local') settings.set('practiceEngine', 'cloud');
-    return removed;
-  } catch {
-    return { ok: false, error: 'Foul Play could not be removed. Close other apps using it and try again.' };
-  }
-});
+// Only the Bots page can manage downloads, using fixed profile directories.
+function registerBotDownload(id, getEngine, setting, name) {
+  const usingLocal = () => preparingPractice > 0 || (practice.engine === 'local' &&
+    (id === 'metamon' ? practice.bot.id === 'metamon' : practice.bot.id.startsWith('foulplay')) && ['starting', 'ready'].includes(practice.state));
+  const suffix = id === 'metamon' ? 'metamon' : 'local';
+  ipcMain.handle(`practice:install-${suffix}`, event => {
+    if (!isPracticeFrame(event, ['/practice.html']) || updates?.restarting || updateInstalling) return { ok: false };
+    if (usingLocal()) return { ok: false, error: 'End the local practice battle first.' };
+    const engine = getEngine();
+    if (engine.removing) return { ok: false, error: 'Wait for removal to finish.' };
+    engine.install().then(result => logger.write(`${id}-${result.ok ? 'installed' : result.cancelled ? 'install-cancelled' : 'install-failed'}`));
+    return { ok: true };
+  });
+  ipcMain.handle(id === 'metamon' ? 'practice:cancel-metamon-install' : 'practice:cancel-install', event => {
+    if (!isPracticeFrame(event, ['/practice.html'])) return { ok: false };
+    return getEngine().cancel();
+  });
+  ipcMain.handle(`practice:remove-${suffix}`, async event => {
+    if (!isPracticeFrame(event, ['/practice.html']) || updates?.restarting || updateInstalling) return { ok: false };
+    if (usingLocal()) return { ok: false, error: 'End the local practice battle first.' };
+    const result = await dialog.showMessageBox(win, { type: 'question', buttons: ['Keep', 'Remove'], defaultId: 0, cancelId: 0,
+      message: `Remove ${name} from this computer?`, detail: 'You can use the cloud server or download it again later.' });
+    if (result.response !== 1) return { ok: false, cancelled: true };
+    if (usingLocal()) return { ok: false, error: 'End the local practice battle first.' };
+    try {
+      const removed = await getEngine().remove();
+      if (removed.ok && settings.get(setting) === 'local') settings.set(setting, 'cloud');
+      return removed;
+    } catch { return { ok: false, error: `${name} could not be removed. Close other apps using it and try again.` }; }
+  });
+}
+registerBotDownload('foulplay', () => localEngine, 'practiceEngine', 'Foul Play');
+registerBotDownload('metamon', () => metamonEngine, 'metamonEngine', 'Metamon');
 // Closing the battle tab, from any page, ends practice. An unfinished battle is forfeited, so the
 // launcher confirms in its own popup first, then calls again with confirmed set.
 ipcMain.handle('practice:stop', async (event, confirmed) => {
@@ -1043,7 +1052,8 @@ app.whenReady().then(async () => {
   replayImports = new ReplayImports(replays);
   cloudEngine = new CloudEngine();
   localEngine = new LocalEngine({ dir: process.env.SHOWDOWN_FOULPLAY_DIR || path.join(app.getPath('userData'), 'foulplay') });
-  app.on('will-quit', () => { localEngine?.dispose(); });
+  metamonEngine = new MetamonEngine({ dir: process.env.SHOWDOWN_METAMON_DIR || path.join(app.getPath('userData'), 'metamon') });
+  app.on('will-quit', () => { localEngine?.dispose(); metamonEngine?.dispose(); });
   try {
     showdexBundle = await showdex.registerAssets(electronSession.fromPartition(CLIENT_PARTITION));
   } catch {
@@ -1076,7 +1086,7 @@ function setupUpdates() {
           !parseUrl(win.webContents.getURL())?.pathname.endsWith('/settings.html')) return 'Open Settings to restart for an update.';
       return restartBlocker({ session: state, dirty: replayDirty || draft !== false,
         busy: maintenance || confirmingClose || exportingReplays || choosingReplayImport || undoingReplayImport ||
-          showdexInstalling || localEngine?.installing || preparingPractice > 0 || dailyChallenge?.starting, practice });
+          showdexInstalling || localEngine?.installing || localEngine?.removing || metamonEngine?.installing || metamonEngine?.removing || preparingPractice > 0 || dailyChallenge?.starting, practice });
     },
     confirm: async () => (await dialog.showMessageBox(win, {
       type: 'question', title: 'Restart to update', message: 'Restart Pokemon Showdown Evolved to install the update?',

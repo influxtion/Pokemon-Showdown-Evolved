@@ -39,7 +39,7 @@ const OPPONENTS = Object.freeze({
     description: 'Foul Play with less time to think. Plays well, but does not always find the best move.' }),
   'foulplay-casual': Object.freeze({ ...BOTS['foulplay-casual'], ...SEARCH, difficulty: 'medium', formats: BOTS.foulplay.formats,
     description: 'Foul Play on a quick read. Settles on one guess about your team and sometimes plays its second choice.' }),
-  metamon: Object.freeze({ id: 'metamon', name: 'Metamon', account: 'Metamon', local: false, search: true, difficulty: 'hard', kind: 'Learned bot', formats: ['gen9ou'], description: 'Kakuna, a trained Metamon policy. Plays on the cloud server, with no model download.' }),
+  metamon: Object.freeze({ id: 'metamon', name: 'Metamon', account: 'Metamon', local: false, search: true, difficulty: 'hard', kind: 'Learned bot', formats: ['gen9ou'], description: 'Kakuna, a trained Metamon policy. Plays on the cloud server or this computer after an optional download.' }),
   heuristic: Object.freeze({ ...LOCAL_BOTS.heuristic, ...SIMPLE }),
   greedy: Object.freeze({ ...LOCAL_BOTS.greedy, ...SIMPLE }),
   random: Object.freeze({ ...LOCAL_BOTS.random, ...SIMPLE }),
@@ -147,7 +147,7 @@ class PracticeSession extends EventEmitter {
     if (this.state === 'starting' || this.state === 'ready') return { ok: false, error: 'Stop the current practice session before starting another.' };
     if (!this.installed()) return { ok: false, error: ERRORS.missing };
     const generation = ++this.generation;
-    Object.assign(this, { bot, format, preset: bot.search ? preset : null, engine: bot.id === 'metamon' ? 'cloud' : bot.search ? engine : 'local',
+    Object.assign(this, { bot, format, preset: bot.search ? preset : null, engine: bot.search ? engine : 'local',
       state: 'starting', error: '', battle: null,
       teams: withTeams ? { player: teams.player, bot: teams.bot, botExport: teams.botExport } : null });
     this.reset();
@@ -218,7 +218,7 @@ class PracticeSession extends EventEmitter {
   async startEngine(generation) {
     if (this.bot.local) return this.startLocalBot(generation);
     const engine = this.engine;
-    const target = await this.target(engine);
+    const target = await this.target(engine, this.bot.id);
     if (generation !== this.generation) return;
     const api = new this.Client({ url: target.url, key: target.key || null });
     this.api = api;
@@ -282,7 +282,7 @@ class PracticeSession extends EventEmitter {
 
   // While waiting for a cloud engine, the player can move to Foul Play on this computer.
   useEngine(engine) {
-    if (this.bot.id === 'metamon' || !this.queue || !ENGINES.includes(engine) || engine === this.engine) return { ok: false };
+    if (!this.queue || !ENGINES.includes(engine) || engine === this.engine) return { ok: false };
     this.engine = engine;
     this.changed();
     return { ok: true };

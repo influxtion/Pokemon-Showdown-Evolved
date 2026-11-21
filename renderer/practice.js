@@ -45,7 +45,7 @@
   const remember = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Remembering is optional. */ } };
   const collapsed = new Set((() => { const value = remembered(COLLAPSED); return Array.isArray(value) ? value : []; })());
   const saveCollapsed = () => remember(COLLAPSED, [...collapsed]);
-  let format = Object.hasOwn(FORMATS, remembered(FORMAT_KEY)) ? remembered(FORMAT_KEY) : 'gen9randombattle';
+  let format = (Object.hasOwn(FORMATS, remembered(FORMAT_KEY)) || remembered(FORMAT_KEY) === 'downloads') ? remembered(FORMAT_KEY) : 'gen9randombattle';
 
   function svg(paths, viewBox, extra = {}) {
     const template = document.createElement('template');
@@ -217,6 +217,12 @@
   // ---- Format tabs and cards ----------------------------------------------------------------
 
   function showFormat() {
+    const downloads = format === 'downloads';
+    $('practice-downloads').hidden = !downloads;
+    $('practice-roster').hidden = downloads;
+    $('daily-challenge').hidden = downloads;
+    $('bots-page-title').textContent = downloads ? 'Download bots' : 'Practice against a bot';
+    $('bots-page-description').textContent = downloads ? 'Optional downloads for this computer. Choose a battle format when you want to play.' : 'Choose a format, then an opponent.';
     for (const tab of document.querySelectorAll('.bots-format')) tab.setAttribute('aria-selected', String(tab.dataset.format === format));
     teamsSection.hidden = !TEAM_FORMATS.includes(format);
     if (TEAM_FORMATS.includes(format)) { for (const side of SIDES) showSide(side); loadTeams(); }
@@ -326,112 +332,89 @@
 
   let last = null;
 
-  // ---- Foul Play on this computer (opt-in) --------------------------------------------------
+  // ---- Downloads ---------------------------------------------------------------------------
+  const downloads = [
+    { id: 'foulplay', name: 'Foul Play', prefix: 'bots-local', state: 'local', setting: 'practiceEngine', choice: 'engineChoice',
+      install: () => window.desktop.installLocalPractice(), cancel: () => window.desktop.cancelLocalPracticeInstall(), remove: () => window.desktop.removeLocalPractice() },
+    { id: 'metamon', name: 'Metamon', prefix: 'metamon', state: 'metamon', setting: 'metamonEngine', choice: 'metamonEngineChoice',
+      install: () => window.desktop.installMetamon(), cancel: () => window.desktop.cancelMetamonInstall(), remove: () => window.desktop.removeMetamon() },
+  ].map(item => ({ ...item, busy: false, error: '', elements: Object.fromEntries(['note', 'progress', 'fill', 'step', 'where', 'download', 'cancel', 'remove'].map(key => [key, $(`${item.prefix}-${key}`)])) }));
 
-  const local = {
-    panel: $('practice-local'), note: $('bots-local-note'), progress: $('bots-local-progress'), fill: $('bots-local-fill'),
-    bar: document.querySelector('.bots-local-bar'), step: $('bots-local-step'), where: $('bots-local-where'),
-    download: $('bots-local-download'), cancel: $('bots-local-cancel'), remove: $('bots-local-remove'),
-  };
-  let localBusy = false;
-  let localError = '';
-  const ABOUT = 'Want to skip the queue or have a strong PC? Download Foul Play and play locally without our cloud servers.';
-
-  function showLocal(value) {
-    const state = value.local;
-    // Only shown next to the Foul Play cards, and only where Foul Play can run.
-    const foulPlayShown = Boolean(groups.querySelector('.bot-card[data-bot^="foulplay"]'));
-    local.panel.hidden = !state || !state.supported || !foulPlayShown;
-    if (local.panel.hidden) return;
-    const active = value.state === 'ready' || value.state === 'starting';
-    const localBattle = active && value.engine === 'local';
-    let note = ABOUT;
-    let tone = '';
-    if (state.installing) {
-      note = 'Downloading Foul Play. You can keep using the app; the cloud server stays available meanwhile.';
-    } else if (localError || state.error) {
-      note = `The download did not finish: ${localError || state.error}`;
-      tone = 'err';
-    } else if (state.installed && !state.current) {
-      note = 'An update for Foul Play on this computer is available.';
-    } else if (state.installed) {
-      note = `Downloaded${state.revision ? ` (Foul Play ${state.revision})` : ''}. On this computer it searches with up to ` +
-        `${state.threads} thread${state.threads === 1 ? '' : 's'}, at low priority so your battle stays smooth.`;
+  function showDownloads(value) {
+    const active = ['starting', 'ready'].includes(value.state);
+    for (const item of downloads) {
+      const state = value[item.state] || {};
+      const el = item.elements;
+      const sameBot = item.id === 'metamon' ? value.opponent === 'metamon' : value.opponent?.startsWith('foulplay');
+      const localBattle = active && sameBot && value.engine === 'local';
+      el.note.textContent = item.error || state.error || (state.removing ? 'Removing download...' : state.installing ? 'Downloading. You can keep using the app.' : !state.supported ? 'Local download is not available for this system yet.' : state.installed ? state.current ? 'Downloaded. Choose where this bot plays below.' : 'An update is available for this download.' : 'Not downloaded. Cloud play remains available.');
+      el.note.className = `bots-local-note${item.error || state.error ? ' bots-local-note--err' : ''}`;
+      el.progress.hidden = !state.installing;
+      const bar = el.progress.querySelector('[role=progressbar]');
+      const progress = state.progress;
+      const measured = typeof progress?.fraction === 'number' && Number.isFinite(progress.fraction);
+      const percent = measured ? Math.round(Math.max(0, Math.min(1, progress.fraction)) * 100) : null;
+      if (measured) bar.setAttribute('aria-valuenow', String(percent)); else bar.removeAttribute('aria-valuenow');
+      bar.hidden = !measured;
+      el.fill.style.width = `${percent || 0}%`;
+      el.step.textContent = `${progress?.label || 'Preparing download'}${measured ? ` - ${percent}%` : ''}`;
+      el.where.hidden = !state.installed || state.installing || state.removing;
+      const choice = value[item.choice] === 'local' && state.installed ? 'local' : 'cloud';
+      for (const button of el.where.querySelectorAll('button')) {
+        button.setAttribute('aria-checked', String(button.dataset.engine === choice));
+        button.tabIndex = button.dataset.engine === choice ? 0 : -1;
+        button.disabled = item.busy || (active && sameBot);
+      }
+      el.download.hidden = Boolean(state.installing || state.removing || (state.installed && state.current));
+      el.download.textContent = state.installed ? 'Update' : item.error || state.error ? 'Try again' : 'Download';
+      el.download.disabled = item.busy || localBattle || !state.supported;
+      el.cancel.hidden = !state.installing;
+      el.cancel.disabled = item.busy;
+      el.remove.hidden = !state.installed || state.installing;
+      el.remove.disabled = item.busy || localBattle || state.removing;
     }
-    local.note.textContent = note;
-    local.note.className = `bots-local-note${tone ? ` bots-local-note--${tone}` : ''}`;
-
-    const progress = state.progress;
-    local.progress.hidden = !state.installing;
-    if (state.installing) {
-      const percent = Math.round(Math.max(0, Math.min(1, progress?.fraction || 0)) * 100);
-      local.fill.style.width = `${percent}%`;
-      local.bar.setAttribute('aria-valuenow', String(percent));
-      local.step.textContent = progress ? `${progress.label} · ${percent}%` : 'Starting…';
-    }
-
-    local.where.hidden = !state.installed || state.installing;
-    const choice = runsLocally(value) ? 'local' : 'cloud';
-    for (const button of local.where.querySelectorAll('button')) {
-      button.setAttribute('aria-checked', String(button.dataset.engine === choice));
-      button.tabIndex = button.dataset.engine === choice ? 0 : -1;
-      button.disabled = localBusy || active;
-    }
-    local.download.hidden = state.installing || (state.installed && state.current);
-    local.download.textContent = state.installed ? 'Update' : localError || state.error ? 'Try again' : 'Download';
-    local.download.disabled = localBusy || localBattle;
-    local.cancel.hidden = !state.installing;
-    local.remove.hidden = !state.installed || state.installing;
-    local.remove.disabled = localBusy || localBattle;
   }
 
-  async function localAction(run) {
-    if (localBusy) return;
-    localBusy = true;
-    localError = '';
-    if (last) showLocal(last);
+  async function downloadAction(item, action) {
+    if (item.busy) return;
+    item.busy = true; item.error = '';
+    if (last) showDownloads(last);
     try {
-      const result = await run();
-      if (result && !result.ok && !result.cancelled && result.error) localError = result.error;
-    } catch {
-      localError = 'Something went wrong. Try again.';
-    } finally {
-      localBusy = false;
-      await refresh();
-    }
+      const result = await action();
+      if (!result?.ok && !result?.cancelled) item.error = result?.error || 'The download could not be updated.';
+    } catch { item.error = 'Something went wrong. Try again.'; }
+    finally { item.busy = false; await refresh(); }
   }
-
-  local.download.addEventListener('click', () => localAction(() => window.desktop.installLocalPractice()));
-  local.cancel.addEventListener('click', () => localAction(() => window.desktop.cancelLocalPracticeInstall()));
-  local.remove.addEventListener('click', () => localAction(() => window.desktop.removeLocalPractice()));
-  const choose = engine => localAction(async () => {
-    const result = await window.desktop.setSetting('practiceEngine', engine);
-    return result?.ok ? { ok: true } : { ok: false, error: result?.error || 'The choice could not be saved.' };
-  });
-  for (const button of local.where.querySelectorAll('button')) {
-    button.addEventListener('click', () => { if (button.getAttribute('aria-checked') !== 'true') choose(button.dataset.engine); });
-    // Arrow keys move between the two options, as in any radio group.
-    button.addEventListener('keydown', event => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-      event.preventDefault();
-      const other = local.where.querySelector(`button:not([data-engine="${button.dataset.engine}"])`);
-      other.focus();
-      choose(other.dataset.engine);
-    });
+  for (const item of downloads) {
+    const el = item.elements;
+    for (const action of ['download', 'cancel', 'remove']) el[action].addEventListener('click', () => downloadAction(item, item[action === 'download' ? 'install' : action]));
+    const choose = engine => downloadAction(item, () => window.desktop.setSetting(item.setting, engine));
+    for (const button of el.where.querySelectorAll('button')) {
+      button.addEventListener('click', () => { if (button.getAttribute('aria-checked') !== 'true') choose(button.dataset.engine); });
+      button.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const other = el.where.querySelector(`button:not([data-engine="${button.dataset.engine}"])`);
+        other.focus(); choose(other.dataset.engine);
+      });
+    }
   }
 
   // Where Foul Play will run for the next battle, and what its cards say about it.
   const runsLocally = value => value.engineChoice === 'local' && Boolean(value.local?.installed);
   function engineState(value, bot) {
     if (bot?.id === 'metamon') {
+      if (value.metamonEngineChoice === 'local' && value.metamon?.installed) return {
+        ready: !value.metamon.installing && !value.metamon.removing, icon: 'computer',
+        text: value.metamon.installing || value.metamon.removing ? 'Updating on this computer...' : 'This computer - Kakuna' };
       const remote = value.cloud?.bots?.find(item => item.id === 'metamon');
       return { ...cloudState(value.cloud), icon: 'cloud', ready: Boolean(remote?.available && remote.formats?.includes(format)),
-        text: remote?.available ? 'Cloud server  - Kakuna' : 'Needs Metamon installed on the cloud server', tone: remote?.available ? '' : 'warn' };
+        text: remote?.available ? 'Cloud server - Kakuna' : 'Needs Metamon installed on the cloud server', tone: remote?.available ? '' : 'warn' };
     }
     const supported = runsLocally(value) ? value.local?.formats : value.cloud?.bots?.find(item => item.id === bot?.id)?.formats;
     if (supported && !supported.includes(format)) return { ready: false, text: runsLocally(value) ? "Update Foul Play for this format" : "This level/format needs a cloud server update; local play is available", tone: "warn", icon: runsLocally(value) ? "computer" : "cloud" };
     if (!runsLocally(value)) return { ...cloudState(value.cloud), icon: 'cloud' };
-    if (value.local.installing) return { ready: false, text: 'Updating on this computer…', tone: 'warn', icon: 'computer' };
+    if (value.local.installing || value.local.removing) return { ready: false, text: 'Updating on this computer…', tone: 'warn', icon: 'computer' };
     return { ready: true, text: 'This computer', icon: 'computer' };
   }
 
@@ -468,12 +451,13 @@
       const active = value.state === 'ready' || value.state === 'starting';
       build(Array.isArray(value.opponents) ? value.opponents : []);
       updatePlay();
-      showLocal(value);
+      showDownloads(value);
 
       // The battle plays in its own tab; while it runs, this page only leads back to it.
-      running.hidden = !active;
+      running.hidden = !active || format === 'downloads';
       go.hidden = !active;
       status.textContent = !value.installed ? 'Battle server unavailable' : active ? 'Battle in progress' : value.state === 'failed' ? 'Practice failed' : 'Ready to play';
+      if (format === 'downloads') status.textContent = value.local?.installing || value.metamon?.installing ? 'Downloading bots' : 'Downloads';
       status.className = `status status--${value.error ? 'err' : active ? 'ok' : 'off'}`;
       message.textContent = actionError || value.error ||
         (!value.installed ? 'The practice battle server is not installed in this build.' : '');

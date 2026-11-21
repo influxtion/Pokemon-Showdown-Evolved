@@ -16,7 +16,7 @@ const { parseArgs } = require('node:util');
 const { WebSocket } = require('ws');
 const { PracticeSession } = require('../app/practice-session');
 const crypto = require('node:crypto');
-const { CloudEngine } = require('../app/practice-engines');
+const { CloudEngine, MetamonEngine } = require('../app/practice-engines');
 const { inspect } = require('../api/install');
 const { createApiServer, spawnWorker } = require('../api/server');
 const { PracticeTeams } = require('../app/practice-teams');
@@ -25,7 +25,7 @@ const fs = require('node:fs');
 const root = path.join(__dirname, '..');
 const { values } = parseArgs({ options: { runtime: { type: 'string' }, url: { type: 'string' }, key: { type: 'string' },
   preset: { type: 'string', default: 'quiet' }, opponent: { type: 'string', default: 'foulplay' },
-  'metamon-runtime': { type: 'string' }, 'metamon-python': { type: 'string' },
+  'local-metamon': { type: 'boolean' }, 'metamon-runtime': { type: 'string' }, 'metamon-python': { type: 'string' },
   format: { type: 'string', default: 'gen9randombattle' }, team: { type: 'string' } } });
 if (!values['metamon-runtime'] && !values.runtime === !values.url) throw new Error('Pass --runtime <dir> (a Foul Play install) or --url <deployed API>.');
 const simulatorRoot = path.join(root, 'vendor/practice/dist');
@@ -75,7 +75,9 @@ async function main() {
   // With --runtime, the same server the cloud runs starts here on loopback with an API key.
   let service = null;
   let target = { url: values.url, key: values.key || null };
-  if (values.runtime || values['metamon-runtime']) {
+  const local = values['local-metamon'] ? new MetamonEngine({ dir: path.dirname(path.resolve(values['metamon-runtime'])) }) : null;
+  if (local) target = await local.target();
+  if (!local && (values.runtime || values['metamon-runtime'])) {
     const runtime = values.runtime ? inspect(path.resolve(values.runtime)) : null;
     if (runtime) assert.equal(runtime.installed, true, 'Foul Play is not installed in --runtime');
     const metamonRuntime = values['metamon-runtime'] ? { root: path.resolve(values['metamon-runtime']), python: path.resolve(values['metamon-python']), worker: path.join(root, 'api/metamon/worker.py'), formats: ['gen9ou'] } : null;
@@ -101,7 +103,7 @@ async function main() {
   });
   const timeout = setTimeout(() => { console.error('Timed out', session.status()); process.exit(1); }, 600000);
   const ready = new Promise(resolve => session.once('ready', resolve));
-  const started = await session.start({ opponent: values.opponent, preset: values.preset, format: FORMAT,
+  const started = await session.start({ engine: local ? 'local' : 'cloud', opponent: values.opponent, preset: values.preset, format: FORMAT,
     ...(team ? { teams: { player: team.packed, bot: team.packed, botExport: team.exported } } : {}) });
   assert.equal(started.ok, true, started.error);
   const connection = await ready;
@@ -128,6 +130,7 @@ async function main() {
   session.stop();
   human.socket.close();
   await service?.close();
+  await local?.dispose();
   clearTimeout(timeout);
   assert.equal(session.status().state, 'idle');
   console.log('OK');

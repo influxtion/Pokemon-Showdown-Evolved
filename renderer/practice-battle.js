@@ -58,7 +58,8 @@
       empty.hidden = true;
       const queue = starting ? value.queue : null;
       queueActions.hidden = !queue;
-      useLocal.hidden = !(value.opponent !== 'metamon' && queue && value.local?.installed && !value.local.installing);
+      const downloaded = value.opponent === 'metamon' ? value.metamon : value.local;
+      useLocal.hidden = !(queue && downloaded?.installed && !downloaded.installing && !downloaded.removing);
       useLocal.disabled = leaveQueue.disabled = busy;
       if (queue) {
         showEmpty('Waiting for a cloud engine', `Every cloud engine is busy, so you're in line: ${ordinal(queue.position)} of ${queue.waiting}. ` +

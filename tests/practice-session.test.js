@@ -443,13 +443,13 @@ for (const format of ['gen9ou', 'gen9anythinggoes']) {
   }
 }
 
-test('Metamon always uses the cloud, even with local Foul Play selected', async t => {
+test('Metamon uses its selected engine and keeps its own account and format', async t => {
   const { session, requested, workers, sim, engines } = await setup(t);
   assert.equal((await session.start({ opponent: 'metamon', format: 'gen9anythinggoes', teams: TEAMS })).ok, false);
   assert.deepEqual(await session.start({ opponent: 'metamon', format: 'gen9ou', teams: TEAMS, engine: 'local' }), { ok: true });
   assert.equal(requested(), 1);
-  assert.deepEqual(engines, ['cloud']);
-  assert.equal(session.status().engine, 'cloud');
+  assert.deepEqual(engines, ['local']);
+  assert.equal(session.status().engine, 'local');
   assert.equal(workers[0].level, 'trained');
   assert.equal(session.useEngine('local').ok, false);
   sim.socket.send('|pm| Player| Metamon|/challenge gen9ou|gen9ou|||');

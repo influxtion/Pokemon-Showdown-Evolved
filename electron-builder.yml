@@ -19,6 +19,7 @@ electronFuses:
 # Python reads the Foul Play worker directly, so it cannot live inside app.asar.
 asarUnpack:
   - api/worker/**/*
+  - api/metamon/worker.py
 beforePack: scripts/verify-practice-package.js
 afterPack: scripts/verify-practice-package-after.js
 extraResources:
@@ -43,6 +44,16 @@ files:
   - api/server.js
   - api/lock.json
   - api/worker/foulplay_worker.py
+  # Only the optional installer, adapter and notices. Models/runtimes download on request.
+  - api/metamon/install.js
+  - api/metamon/lock.json
+  - api/metamon/requirements.txt
+  - api/metamon/bootstrap.txt
+  - api/metamon/worker.py
+  - api/metamon/CODE-LICENSE
+  - api/metamon/MODEL-LICENSE
+  - api/metamon/MODEL-CARD
+  - api/metamon/ATTRIBUTION.txt
   - vendor/showdex/LICENSE
   - vendor/showdex/SOURCE.md
   - vendor/showdex/manifest.json

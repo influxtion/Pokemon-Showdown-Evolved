@@ -72,13 +72,14 @@
         <div class="bots-page">
           <header class="bots-head">
             <div class="bots-title">
-              <h2>Practice against a bot</h2>
-              <p>Choose a format, then an opponent.</p>
+              <h2 id="bots-page-title">Practice against a bot</h2>
+              <p id="bots-page-description">Choose a format, then an opponent.</p>
             </div>
-            <div class="bots-formats" role="tablist" aria-label="Format">
+            <div class="bots-formats" role="tablist" aria-label="Bot pages">
               <button type="button" class="bots-format" role="tab" aria-selected="true" data-format="gen9randombattle">Random Battle</button>
               <button type="button" class="bots-format" role="tab" aria-selected="false" data-format="gen9ou">OU</button>
               <button type="button" class="bots-format" role="tab" aria-selected="false" data-format="gen9anythinggoes">Anything Goes</button>
+              <button type="button" class="bots-format" role="tab" aria-selected="false" data-format="downloads">Downloads</button>
             </div>
           </header>
 
@@ -109,7 +110,7 @@
             <p class="daily-error" id="daily-error" role="alert" hidden></p>
           </section>
 
-          <div class="bots-groups">
+          <div class="bots-groups" id="practice-roster">
             <section class="bots-group" id="practice-teams" hidden>
               <h3><button type="button" class="bots-group-toggle" id="bots-group-teams" aria-controls="bots-teams" aria-expanded="true"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>Teams</button></h3>
               <div class="teams-grid" id="bots-teams">
@@ -142,26 +143,49 @@
             <div class="bots-groups" id="practice-bots"></div>
           </div>
 
-          <section class="bots-local" id="practice-local" aria-labelledby="bots-local-title" hidden>
-            <div class="bots-local-text">
-              <h3 id="bots-local-title">Foul Play on this computer</h3>
-              <p class="bots-local-note" id="bots-local-note" role="status"></p>
-              <div class="bots-local-progress" id="bots-local-progress" hidden>
-                <div class="bots-local-bar" role="progressbar" aria-labelledby="bots-local-step" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="bots-local-fill"></span></div>
-                <span class="bots-local-step" id="bots-local-step"></span>
+          <section class="bots-downloads" id="practice-downloads" aria-label="Bot downloads" hidden>
+            <article class="bot-card bot-download" id="download-foulplay" aria-labelledby="bots-local-title">
+              <div class="bot-card-body">
+                <div class="bot-card-name"><h3 id="bots-local-title">Foul Play</h3></div>
+                <p class="bot-card-text">All three difficulty levels. Gen 9 Random Battle, OU and Anything Goes. Download once to use them on this computer.</p>
+                <p class="bots-local-note" id="bots-local-note" role="status"></p>
+                <div class="bots-local-progress" id="bots-local-progress" hidden>
+                  <div class="bots-local-bar" role="progressbar" aria-labelledby="bots-local-step" aria-valuemin="0" aria-valuemax="100"><span id="bots-local-fill"></span></div>
+                  <span class="bots-local-step" id="bots-local-step"></span>
+                </div>
+                <div class="bots-local-where" id="bots-local-where" role="radiogroup" aria-label="Where Foul Play runs" hidden>
+                  <button type="button" role="radio" data-engine="cloud" aria-checked="true">Cloud server</button>
+                  <button type="button" role="radio" data-engine="local" aria-checked="false">This computer</button>
+                </div>
               </div>
-            </div>
-            <div class="bots-local-actions">
-              <div class="bots-local-where" id="bots-local-where" role="radiogroup" aria-label="Where Foul Play runs" hidden>
-                <button type="button" role="radio" data-engine="cloud" aria-checked="true">Cloud server</button>
-                <button type="button" role="radio" data-engine="local" aria-checked="false">This computer</button>
+              <div class="bot-card-foot bots-local-actions">
+                <button type="button" class="btn btn-primary" id="bots-local-download">Download</button>
+                <button type="button" class="btn" id="bots-local-cancel" hidden>Cancel</button>
+                <button type="button" class="btn" id="bots-local-remove" hidden>Remove</button>
               </div>
-              <button type="button" class="btn" id="bots-local-download">Download</button>
-              <button type="button" class="btn" id="bots-local-cancel" hidden>Cancel</button>
-              <button type="button" class="btn" id="bots-local-remove" hidden>Remove</button>
-            </div>
+            </article>
+            <article class="bot-card bot-download" id="download-metamon" aria-labelledby="metamon-title">
+              <div class="bot-card-body">
+                <div class="bot-card-name"><h3 id="metamon-title">Metamon</h3></div>
+                <p class="bot-card-text">Kakuna for Gen 9 OU. Runs on your CPU. Includes a 572 MB model plus its runtime; allow 3 GB of disk space.</p>
+                <p class="bots-local-note" id="metamon-note" role="status"></p>
+                <div class="bots-local-progress" id="metamon-progress" hidden>
+                  <div class="bots-local-bar" role="progressbar" aria-labelledby="metamon-step" aria-valuemin="0" aria-valuemax="100"><span id="metamon-fill"></span></div>
+                  <span class="bots-local-step" id="metamon-step"></span>
+                </div>
+                <div class="bots-local-where" id="metamon-where" role="radiogroup" aria-label="Where Metamon runs" hidden>
+                  <button type="button" role="radio" data-engine="cloud" aria-checked="true">Cloud server</button>
+                  <button type="button" role="radio" data-engine="local" aria-checked="false">This computer</button>
+                </div>
+              </div>
+              <div class="bot-card-foot bots-local-actions">
+                <button type="button" class="btn btn-primary" id="metamon-download">Download</button>
+                <button type="button" class="btn" id="metamon-cancel" hidden>Cancel</button>
+                <button type="button" class="btn" id="metamon-remove" hidden>Remove</button>
+              </div>
+            </article>
           </section>
-          <p class="bots-credit"><a href="https://github.com/UT-Austin-RPL/metamon">Metamon</a> by Jake Grigsby and contributors</p>
+          <p class="bots-credit"><a href="https://github.com/UT-Austin-RPL/metamon">Metamon</a> by Jake Grigsby, UT Austin RPL, and contributors</p>
           <p class="bots-credit"><a href="https://github.com/pmariglia/foul-play">Foul Play</a> by pmariglia and contributors</p>
         </div>
       </section>

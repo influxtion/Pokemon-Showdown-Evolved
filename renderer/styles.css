@@ -989,7 +989,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .bots-head { display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--border); }
 .bots-title h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.2; }
 .bots-title p { margin: 4px 0 0; color: var(--text-2); font-size: var(--fs-md); }
-.bots-formats { display: flex; gap: 24px; margin-bottom: -1px; }
+.bots-formats { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: -1px; }
 .bots-format {
   height: 38px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: none;
   color: var(--text-2); font: inherit; font-size: var(--fs-md); cursor: pointer;
@@ -2088,3 +2088,12 @@ kbd {
 .showdex-welcome-body p + p { color: var(--text-2); }
 .showdex-welcome-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .showdex-welcome-status { padding-left: 10px; border-left: 3px solid var(--accent); }
+
+/* Downloads are a flat catalog, independent of battle difficulty groups. */
+.bots-downloads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.bot-download .bot-card-name h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.bot-download .bot-card-body { display: flex; flex-direction: column; gap: 12px; }
+.bot-download .bots-local-where { align-self: flex-start; margin-top: auto; }
+.bot-download .bots-local-step { white-space: normal; overflow-wrap: anywhere; }
+.bot-download .bots-local-note { font-size: var(--fs-sm); }
+@media (max-width: 760px) { .bots-downloads { grid-template-columns: 1fr; } }

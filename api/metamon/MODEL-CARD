@@ -1,0 +1,27 @@
+---
+datasets:
+- jakegrigsby/metamon-parsed-replays
+license: apache-2.0
+pipeline_tag: reinforcement-learning
+library_name: amago
+tags:
+- pokemon
+- game-ai
+- offline-rl
+---
+
+<div align="center">
+    <img src="https://cdn-uploads.huggingface.co/production/uploads/6671b3decda5ebe22f2f058e/Vcq4b5M0YCUNQr_tWRPrj.png" alt="Metamon Banner" width="720">
+</div>
+
+Metamon training checkpoints for policies that play Pokémon Showdown at a human level.
+
+**Paper:** [Human-Level Competitive Pokémon via Scalable Offline Reinforcement Learning with Transformers](https://huggingface.co/papers/2504.04395)
+
+**Project Website:** https://metamon.tech
+
+**Code:** [GitHub Repository](https://github.com/UT-Austin-RPL/metamon/tree/main)
+
+
+
+The metamon README provides detailed instructions for loading, evaluating, and finetuning pretrained policies.

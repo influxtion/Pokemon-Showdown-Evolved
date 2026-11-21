@@ -69,11 +69,14 @@ class CloudEngine {
 // Foul Play on this computer. Nothing downloads until install(); remove() deletes it. target()
 // starts a private 127.0.0.1 server on first use, with a per-process key and below-normal priority.
 class LocalEngine extends EventEmitter {
-  constructor({ dir, install = installer.install, remove = installer.remove, inspect = installer.inspect,
+  constructor({ dir, bot = 'foulplay', name = 'Foul Play', install = installer.install, remove = installer.remove, inspect = installer.inspect,
     worker = unpacked(installer.WORKER), createServer = createApiServer,
     threads = Math.max(1, Math.min(8, os.availableParallelism?.() || os.cpus().length || 1)) } = {}) {
     super();
     this.dir = dir;
+    this.bot = bot;
+    this.name = name;
+    this.removing = false;
     this.installFn = install;
     this.removeFn = remove;
     this.inspectFn = inspect;
@@ -94,7 +97,7 @@ class LocalEngine extends EventEmitter {
   status() {
     const runtime = this.inspect();
     return { supported: this.supported, installed: runtime.installed, current: runtime.current,
-      formats: runtime.formats, installing: Boolean(this.installing), progress: this.progress, error: this.error,
+      formats: runtime.formats, removing: this.removing, installing: Boolean(this.installing), progress: this.progress, error: this.error,
       log: this.log.slice(-4), revision: runtime.revision ? runtime.revision.slice(0, 7) : null, threads: this.threads };
   }
 
@@ -102,8 +105,9 @@ class LocalEngine extends EventEmitter {
 
   // Downloads and builds Foul Play, or updates an old copy. Progress comes as 'change' events and status().
   install() {
+    if (this.removing) return Promise.resolve({ ok: false, error: `${this.name} is being removed.` });
     if (this.installing) return this.installing;
-    if (!this.supported) return Promise.resolve({ ok: false, error: "Foul Play can't run on this computer's system yet." });
+    if (!this.supported) return Promise.resolve({ ok: false, error: `${this.name} can't run on this computer's system yet.` });
     const controller = new AbortController();
     this.controller = controller;
     this.error = '';
@@ -125,7 +129,7 @@ class LocalEngine extends EventEmitter {
       } catch (error) {
         this.progress = null;
         if (controller.signal.aborted) return { ok: false, cancelled: true };
-        this.error = error.message || 'Foul Play could not be downloaded.';
+        this.error = error.message || `${this.name} could not be downloaded.`;
         return { ok: false, error: this.error };
       } finally {
         this.installing = null;
@@ -145,20 +149,25 @@ class LocalEngine extends EventEmitter {
   // A battle using the local server is the caller's to stop first (see main.js).
   async remove() {
     if (this.installing) return { ok: false, error: 'Wait for the download to finish, or cancel it first.' };
-    await this.closeServer();
-    await this.removeFn(this.dir);
-    this.error = '';
+    if (this.removing) return { ok: false, error: 'Removal is already in progress.' };
+    this.removing = true;
     this.changed();
-    return { ok: true };
+    try {
+      await this.closeServer();
+      await this.removeFn(this.dir);
+      this.error = '';
+      return { ok: true };
+    } finally { this.removing = false; this.changed(); }
   }
 
   async target() {
-    if (this.installing) throw new Error('Foul Play is still downloading onto this computer.');
+    if (this.installing || this.removing) throw new Error(`${this.name} is being updated on this computer.`);
     const runtime = this.inspect();
-    if (!runtime.installed) throw new Error('Foul Play is not on this computer. Download it on the Bots page, or play on the cloud server.');
+    if (!runtime.installed) throw new Error(`${this.name} is not on this computer. Download it on the Bots page, or play on the cloud server.`);
     if (!this.server) {
       const key = crypto.randomBytes(32).toString('hex');
-      const api = this.createServer({ runtime: () => { const value = this.inspect(); return value.installed ? value : null; },
+      const runtime = () => { const value = this.inspect(); return value.installed ? value : null; };
+      const api = this.createServer({ ...(this.bot === 'metamon' ? { metamonRuntime: runtime } : { runtime }),
         apiKey: key, maxSessions: 2, maxSessionsPerClient: 2, sessionBurst: 100, sessionsPerHour: 3600,
         maxThreads: this.threads, lowPriority: true });
       this.server = { api, key, url: api.listen(0, '127.0.0.1') };
@@ -178,4 +187,35 @@ class LocalEngine extends EventEmitter {
   }
 }
 
-module.exports = { CloudEngine, LocalEngine, CLOUD_API_URL, unpacked };
+// Shares the private API/lifecycle with Foul Play, but keeps its download and preference separate.
+class MetamonEngine extends LocalEngine {
+  constructor({ dir, runtime = null, ...options } = {}) {
+    const { MetamonRuntime, WORKER } = require('../api/metamon/install');
+    const worker = unpacked(WORKER);
+    const model = runtime || new MetamonRuntime({ dir, worker });
+    super({ ...options, dir, bot: 'metamon', name: 'Metamon', worker,
+      inspect: () => model.inspect(),
+      install: async ({ signal, onProgress }) => {
+        const progress = () => onProgress({ label: model.progress || 'Preparing Metamon', fraction: null });
+        const cancel = () => model.cancel();
+        model.on('change', progress);
+        signal.addEventListener('abort', cancel, { once: true });
+        try {
+          signal.throwIfAborted();
+          const result = await model.install();
+          if (!result.ok) throw new Error(result.error || 'Download cancelled.');
+        } finally { model.off('change', progress); signal.removeEventListener('abort', cancel); }
+      },
+      remove: async () => { const result = await model.remove(); if (!result.ok) throw new Error(result.error); },
+    });
+    this.model = model;
+    this.supported = model.status().supported;
+  }
+
+  status() {
+    return { ...super.status(), model: 'Kakuna',
+      progress: this.installing ? { label: this.model?.progress || 'Preparing Metamon', fraction: null } : null };
+  }
+}
+
+module.exports = { CloudEngine, LocalEngine, MetamonEngine, CLOUD_API_URL, unpacked };

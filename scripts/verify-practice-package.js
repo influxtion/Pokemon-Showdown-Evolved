@@ -79,8 +79,9 @@ async function verifyPracticePackage(context) {
 // From api/, the app ships what Foul Play play needs: the client and protocol, plus, for the
 // opt-in local mode, the installer, pins, local server and worker (unpacked from app.asar for
 // Python). Foul Play itself is downloaded only on request; nothing else from api/ may ship.
-const SHIPPED_API = ['client.js', 'protocol.js', 'install.js', 'server.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
-const UNPACKED_API = ['worker', 'worker/foulplay_worker.py'];
+const METAMON_FILES = ['install.js', 'lock.json', 'requirements.txt', 'bootstrap.txt', 'worker.py', 'CODE-LICENSE', 'MODEL-LICENSE', 'MODEL-CARD', 'ATTRIBUTION.txt'];
+const SHIPPED_API = ['metamon', ...METAMON_FILES.map(name => `metamon/${name}`), 'client.js', 'protocol.js', 'install.js', 'server.js', 'lock.json', 'worker', 'worker/foulplay_worker.py'];
+const UNPACKED_API = ['worker', 'worker/foulplay_worker.py', 'metamon', 'metamon/worker.py'];
 
 function listFiles(dir, prefix = '') {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -98,11 +99,11 @@ function verifyApiFiles(resources) {
   const unexpected = api.filter(name => !SHIPPED_API.includes(name));
   if (unexpected.length) throw new Error(`The package must ship only api/${SHIPPED_API.join(', api/')}; found api/${unexpected.join(', api/')}.`);
   const missing = SHIPPED_API.filter(name => !api.includes(name));
-  if (missing.length) throw new Error(`The package is missing api/${missing.join(', api/')}, which Foul Play needs.`);
+  if (missing.length) throw new Error(`The package is missing api/${missing.join(', api/')}, which optional bot downloads need.`);
   const unpackedDir = path.join(resources, 'app.asar.unpacked', 'api');
   const unpacked = fs.existsSync(unpackedDir) ? listFiles(unpackedDir) : [];
   if (unpacked.length !== UNPACKED_API.length || UNPACKED_API.some(name => !unpacked.includes(name))) {
-    throw new Error(`Only api/worker/foulplay_worker.py may be unpacked from app.asar; found ${unpacked.join(', ') || 'nothing'}.`);
+    throw new Error(`Only the Foul Play and Metamon Python workers may be unpacked from app.asar; found ${unpacked.join(', ') || 'nothing'}.`);
   }
 }
 
@@ -122,3 +123,5 @@ async function verifyCopiedPracticePackage(context) {
 
 module.exports = verifyPracticePackage;
 module.exports.verifyCopiedPracticePackage = verifyCopiedPracticePackage;
+
+module.exports.verifyApiFiles = verifyApiFiles;

@@ -56,7 +56,7 @@ test('install reports progress, then the engine is installed', async () => {
   assert.equal(local.status().installing, true);
   await started();
   assert.equal(local.status().progress.label, 'Compiling the search engine');
-  await assert.rejects(local.target(), /still downloading/);
+  await assert.rejects(local.target(), /being updated/);
   fake.finish();
   assert.deepEqual(await done, { ok: true });
   const status = local.status();
@@ -120,4 +120,57 @@ test('remove waits for a running download', async () => {
 test('the cloud engine stays the default target and needs no download', async () => {
   const cloud = new CloudEngine({ url: 'https://example.org', Client: class { async info() { return { bots: [] }; } } });
   assert.deepEqual(await cloud.target(), { url: 'https://example.org', key: null });
+});
+
+const { EventEmitter } = require('node:events');
+const { MetamonEngine } = require('../app/practice-engines');
+function modelFixture() {
+  const model = new EventEmitter();
+  let installed = false;
+  model.progress = '';
+  model.status = () => ({ supported: true });
+  model.inspect = () => ({ installed, current: true, root: '/model/current', worker: '/model/worker.py', python: '/model/python', formats: ['gen9ou'] });
+  model.install = () => new Promise(resolve => {
+    model.progress = 'Downloading Kakuna 50%'; model.emit('change');
+    model.finish = () => { installed = true; resolve({ ok: true }); };
+    model.cancel = () => resolve({ ok: false, cancelled: true });
+  });
+  model.remove = async () => { installed = false; return { ok: true }; };
+  return model;
+}
+test('Metamon downloads only on request, cancels, and uses a separate authenticated loopback API', async () => {
+  const model = modelFixture();
+  let server;
+  const local = new MetamonEngine({ dir: '/metamon', runtime: model, threads: 2, createServer: options => {
+    server = { options, closed: false, listen: async (port, host) => `http://${host}:5432`, close: async () => { server.closed = true; } };
+    return server;
+  } });
+  assert.equal(local.status().installed, false);
+  await assert.rejects(local.target(), /not on this computer/);
+  const cancelled = local.install(); await started(); local.cancel();
+  assert.deepEqual(await cancelled, { ok: false, cancelled: true });
+  const done = local.install(); await started();
+  assert.match(local.status().progress.label, /Kakuna 50/);
+  model.finish(); assert.deepEqual(await done, { ok: true });
+  const target = await local.target();
+  assert.equal(target.url, 'http://127.0.0.1:5432');
+  assert.equal(server.options.runtime, undefined, 'no Foul Play runtime substitution');
+  assert.equal(server.options.metamonRuntime().root, '/model/current');
+  assert.equal(server.options.lowPriority, true);
+  assert.match(target.key, /^[a-f0-9]{64}$/);
+  await local.remove(); assert.equal(server.closed, true);
+  assert.equal(local.status().installed, false);
+});
+test('removal blocks new local targets and installation until it finishes', async () => {
+  const fake = fakeInstaller(); fake.disk.installed = true;
+  let finish;
+  fake.remove = () => new Promise(resolve => { finish = resolve; });
+  const local = engine(fake);
+  const removing = local.remove(); await started();
+  assert.equal(local.status().removing, true);
+  await assert.rejects(local.target(), /being updated/);
+  assert.equal((await local.install()).ok, false);
+  assert.equal((await local.remove()).ok, false);
+  finish(); await removing;
+  assert.equal(local.status().removing, false);
 });
