@@ -985,6 +985,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   display: flex; flex-direction: column; gap: 26px;
   max-width: 1120px; margin: 0 auto; padding: 32px 40px 48px;
 }
+.bots-credit { margin: 0; color: var(--text-2); font-size: var(--fs-sm); }
 .bots-head { display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--border); }
 .bots-title h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.2; }
 .bots-title p { margin: 4px 0 0; color: var(--text-2); font-size: var(--fs-md); }
