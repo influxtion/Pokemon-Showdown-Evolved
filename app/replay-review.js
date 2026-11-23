@@ -1,7 +1,7 @@
 'use strict';
 
 const { WebContentsView } = require('electron');
-const { normalizeReplayUrl } = require('./replays');
+const { normalizeReplayUrl, validReplayViewParams } = require('./replays');
 
 const PARTITION = 'replay-review';
 const LOAD_ERROR = 'Could not load the replay.';
@@ -29,15 +29,7 @@ function matchesReplayRoute(value, savedUrl) {
   if (url.href.includes('#')) return false;
 
   // The replay player changes the query in place when switching viewpoints.
-  const seen = new Set();
-  for (const [key, value] of url.searchParams) {
-    if (seen.has(key)) return false;
-    seen.add(key);
-    if (key === 'p2' && (value === '' || value === '1')) continue;
-    if ((key === 'turn' || key === 't') && /^\d{1,5}$/.test(value) && Number(value) <= 10000) continue;
-    return false;
-  }
-  return true;
+  return validReplayViewParams(url.searchParams);
 }
 
 function fitBounds(value, content) {

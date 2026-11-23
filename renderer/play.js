@@ -23,6 +23,8 @@ const resultMessage = document.getElementById('result-message');
 const resultAgain = document.getElementById('result-again');
 let resultRoom = '';
 let resultFormat = '';
+const resultReview = document.getElementById('result-review');
+const offer = new window.BattleReviewOffer('online', resultReview, resultReview);
 
 // Top bar names the room the client is showing.
 function renderRoom(session) {
@@ -62,8 +64,16 @@ function renderRoom(session) {
   roomStatus.hidden = !status;
   saveNote.hidden = !(room && room.battle);
 
-  const own = room && room.battle && room.ended && me && (room.players || []).includes(me);
+  const participant = room && room.battle && me && (room.players || []).includes(me);
+  const own = participant && room.ended;
+  const otherActive = rooms.some(other => other !== room && other.battle && !other.ended && (other.players || []).includes(me));
+  offer.update(participant ? room.id : '', room?.ended, !otherActive);
   resultBar.hidden = !own;
+  if (!own || room.id !== resultRoom) {
+    document.getElementById('result-review-status').hidden = true;
+    if (resultReview.getAttribute('aria-busy') && resultRoom) window.desktop.cancelBattleReview().catch(() => {});
+    resultRoom = '';
+  }
   if (own) {
     resultRoom = room.id;
     resultFormat = room.formatId || '';
@@ -92,6 +102,12 @@ document.addEventListener('showdown-session', (event) => {
 });
 
 connectionRetry.addEventListener('click', () => window.desktop.reloadClient());
+
+resultReview.addEventListener('click', () => {
+  const roomId = resultRoom;
+  window.requestBattleReview(resultReview, { kind: 'online', roomId }, document.getElementById('result-review-status'),
+    null, async () => (await window.desktop.getSession())?.current === roomId);
+});
 
 document.querySelectorAll('[data-action="sounds"], [data-action="options"]').forEach((button) => {
   button.addEventListener('click', () => window.desktop.showdown(button.dataset.action, {}));

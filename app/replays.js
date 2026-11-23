@@ -27,6 +27,18 @@ function normalizeReplayUrl(value) {
   return `https://replay.pokemonshowdown.com/${replayId}`;
 }
 
+function validReplayViewParams(params) {
+  const seen = new Set();
+  for (const [key, value] of params) {
+    if (seen.has(key)) return false;
+    seen.add(key);
+    if (key === 'p2' && (value === '' || value === '1')) continue;
+    if ((key === 'turn' || key === 't') && /^\d{1,5}$/.test(value) && Number(value) <= 10000) continue;
+    return false;
+  }
+  return true;
+}
+
 function validText(value, max, required = false) {
   return typeof value === 'string' && value.length <= max && (!required || !!value.trim());
 }
@@ -236,4 +248,4 @@ class Replays {
   }
 }
 
-module.exports = { Replays, normalizeReplayUrl, validateStore, serializeStore, MAX_NOTES, MAX_FILE_BYTES };
+module.exports = { Replays, normalizeReplayUrl, validReplayViewParams, validateStore, serializeStore, MAX_NOTES, MAX_FILE_BYTES };

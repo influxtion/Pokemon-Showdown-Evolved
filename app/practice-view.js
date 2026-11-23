@@ -159,6 +159,10 @@ class PracticeView {
 
   status() { return { state: this.state, error: this.error }; }
 
+  finishedBattle(roomId) {
+    return new ShowdownBridge(() => this.view?.webContents).finishedBattle(roomId);
+  }
+
   // Runs JavaScript in the open battle document, if there is one.
   run(code) {
     const contents = this.view && !this.view.webContents.isDestroyed() ? this.view.webContents : null;
