@@ -262,6 +262,7 @@
     'index.html': { title: 'Home', kind: 'home' },
     'stats.html': { title: 'Stats', kind: 'stats' },
     'replays.html': { title: 'Replays', kind: 'replays' },
+    'battle-review.html': { title: 'Battle review', kind: 'replays' },
     'practice.html': { title: 'Bots', kind: 'practice' },
     'practice-battle.html': { title: 'Bot battle', kind: 'battle' },
     'settings.html': { title: 'Settings', kind: 'settings' },

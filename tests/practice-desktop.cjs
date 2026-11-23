@@ -92,7 +92,7 @@ async function capture(contents, name) {
     try {
       const screenshot = await contents.capturePage();
       if (!screenshot.isEmpty()) {
-        fs.writeFileSync(path.join(captures, `foulplay-${name}.png`), screenshot.toPNG());
+        if (name) fs.writeFileSync(path.join(captures, `foulplay-${name}.png`), screenshot.toPNG());
         return;
       }
     } catch (error) {
@@ -408,7 +408,7 @@ async function smoke() {
       }
       for (const [surface, contents] of [['shell', renderer], ['battle', player]]) {
         // Wait for the compositor as well as computed styles before keeping a capture.
-        await contents.capturePage();
+        await capture(contents);
         await contents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
         await pause(300);
         await capture(contents, `practice-${width}-${theme}-${surface}`);
@@ -465,6 +465,16 @@ async function smoke() {
     return state.battle?.room === forfeitedRoom && state.battle.finished &&
       state.battle.result === 'loss' && state.clientState === 'finished';
   }, 'forfeit ended the battle and kept the room');
+  await until(() => run("!document.getElementById('review-offer').hidden"), 'finished battle offers review');
+  await run("document.getElementById('offer-open').click()");
+  await until(() => renderer.getURL().endsWith('/battle-review.html'), 'reviewed actual practice player log');
+  const completedReview = await call('getBattleReview');
+  assert.equal(completedReview.ok, true);
+  assert.ok(completedReview.report.players[completedReview.side]);
+  assert.ok(completedReview.report.winner);
+  await load('practice-battle.html');
+  await until(() => restarted.getVisible(), 'finished battle survived review');
+  await until(() => run("!document.getElementById('battle-review-prompt').hidden && document.getElementById('review-offer').hidden"), 'old battle keeps review action without repeating the offer');
   await until(() => run(`(() => {
     const next = document.getElementById('battle-next');
     if (next.hidden || next.disabled) return false;
