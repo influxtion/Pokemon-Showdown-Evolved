@@ -54,8 +54,6 @@ window.ReplayReviewUI = class ReplayReviewUI {
 
   updateButton() {
     this.ui.replay.disabled = this.hooks.isBusy() || !this.hooks.selectedId();
-    const analyse = document.getElementById('analyse-note');
-    analyse.disabled = this.ui.replay.disabled || analyse.getAttribute('aria-busy') === 'true';
   }
 
   browserError(message) {

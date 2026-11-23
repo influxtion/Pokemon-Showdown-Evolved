@@ -82,20 +82,13 @@
           <span id="connection-message">Connecting to Showdown…</span>
           <button class="btn" type="button" id="connection-retry" hidden>Reload client</button>
         </div>
-        <section class="postgame-review" id="review-offer" aria-label="Post-game review" aria-live="polite" hidden>
-          <div><h2>Review this battle?</h2><p>Explore your decisions, the turning points and where luck played a part.</p></div>
-          <button class="btn btn-primary" id="offer-open" type="button">See Full Review</button>
-          <button class="btn" id="offer-dismiss" type="button">Not now</button>
-        </section>
         <div class="banner banner--bar banner--result" id="result-bar" role="status" hidden>
           <span id="result-message"></span>
           <span class="spacer"></span>
-          <button class="btn" type="button" id="result-review">See Full Review</button>
           <a class="btn" href="replays.html?draft=1">Save replay note</a>
           <button class="btn" type="button" id="result-close">Close battle</button>
           <button class="btn btn-primary" type="button" id="result-again">Battle again</button>
         </div>
-        <div class="banner banner--bar" role="status" id="result-review-status" hidden></div>
         <div class="client-view">
           Loading Pokémon Showdown…
         </div>
@@ -105,7 +98,6 @@
 </div>
 <script src="home-appearance-options.js"></script>
 <script src="home-appearance.js"></script>
-<script src="battle-review-request.js"></script>
 <script src="play.js"></script>
 <script src="nav.js"></script>
 <script src="integrations.js"></script>

@@ -652,7 +652,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .split-detail-body { overflow: auto; flex: 1; padding: var(--space-5); }
 .split-detail-foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
@@ -661,7 +660,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .split-detail-foot .spacer { flex: 1; }
 .split-detail-foot #note-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.split-detail-foot #note-status:not(:empty) { white-space: normal; }
 
 .form { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
 .form-row { display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: var(--space-3); }
@@ -1163,14 +1161,6 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .banner--result { border-left-color: var(--primary); gap: var(--space-2); }
 .banner--result .btn { margin-left: 0; }
 .banner--result .spacer { margin-left: auto; }
-.postgame-review {
-  display: flex; align-items: center; gap: var(--space-2); flex: none;
-  padding: var(--space-3) var(--space-4); background: var(--bg-selected);
-  border-bottom: 1px solid var(--border); border-left: 3px solid var(--accent);
-}
-.postgame-review > div { margin-right: auto; }
-.postgame-review h2 { margin: 0; font-size: var(--fs-lg); }
-.postgame-review p { margin: 3px 0 0; color: var(--text-2); }
 
 /* ---------- Challenges and private messages ----------
    Challenge bars sit under the top bar on every page (inserted by nav.js), so .main has a row for them. */

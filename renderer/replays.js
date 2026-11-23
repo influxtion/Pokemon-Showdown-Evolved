@@ -392,11 +392,6 @@
   ui.form.addEventListener('submit', save);
   ui.delete.addEventListener('click', remove);
   ui.open.addEventListener('click', openReplay);
-  document.getElementById('analyse-note').addEventListener('click', event => {
-    const id = selectedId;
-    if (id && !pending) window.requestBattleReview(event.currentTarget, { kind: 'note', id }, ui.status,
-      null, () => selectedId === id).finally(() => review.updateButton());
-  });
   document.addEventListener('keydown', (event) => {
     if (document.getElementById('import-dialog').open) return;
     if (event.isComposing || event.altKey) return;

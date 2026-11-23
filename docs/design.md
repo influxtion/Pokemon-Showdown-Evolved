@@ -28,7 +28,7 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - Overhaul of the Showdown **UI** and **navigation**
 - Pinned Showdex **damage calculator**
 - **Replay notes**, with in-app replay review and backup/restore
-- **Battle review** gives a local summary, evidence-based stars and turn explanations for finished games and imported replays.
+- Planned: game **analysis** against an engine's expected best play (not implemented)
 - **Practice** battles against **Foul Play**, a top ladder engine, and three simple offline bots
 
 ### Showdown client
@@ -57,19 +57,26 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - **Review:** the official replay page opens beside the note, locked to that one replay. Showdown's player does all playback.
 - **Backup:** **Export** to versioned JSON; **Import** previews new / unchanged / conflict notes (existing kept by default) and applies in one atomic write. **Undo import** works for the current session only.
 
-### Battle review
+### Analysis (planned, not implemented)
+Reviews a finished game turn by turn and shows where the player's choices differed from an engine's.
 
-A finished online or practice player battle offers **See Full Review** and **Not now**. Dismissing the offer leaves a review button on the result. Previously finished rooms keep that button, and spectator rooms do not raise the offer. Saved replay notes also provide **See Full Review**. In **Replays**, **Import replay…** accepts an official link, a downloaded Showdown HTML or JSON replay, or a text protocol log. Choosing a file or viewing the prompt starts no analysis. **See Full Review** runs the local reviewer and opens a tab with the result, player selector, overall stars when there is enough evidence, key moments and a turn-by-turn breakdown. Selecting another player uses the same report. A report opened from a saved note links back to its replay player.
+- **Input:** a just-finished practice or online battle, or a saved replay note. The analysis reads the battle's protocol log, never a live battle.
+- **Scope:** Gen 9 Random Battle only, the format the bots play.
+- **Fair view:** each decision is judged only on what the player could see at that point. The engine fills in hidden information the same way the bots do (determinization), so it never uses the opponent's revealed team.
+- **Per decision:** the engine's top choices with their search share, the player's actual choice, and a verdict:
 
-**Feasibility and design review.** The earlier plan proposed rebuilding each turn for Foul Play and comparing its preferred choice to the player's. The ordinary replay lacks the battle requests that tell a player which moves and switches were legal, and it does not record intentions, hidden sets or counterfactual outcomes. Foul Play's search visit shares depend on its assumptions and budget. Converting those shares to chess-style mistakes or claiming a probability of winning would imply more evidence than the replay supplies. The current practice API offers move selection for its own sessions. A replay analysis endpoint would require a separate service, data contract and evaluation.
+| Verdict | Rule |
+| --- | --- |
+| Best | Player's choice is the engine's top pick |
+| Good | Within 75% of the top pick's share |
+| Inaccuracy | 25–75% of the top pick's share |
+| Mistake | Under 25%, or not considered |
 
-**Revised model.** A bounded local worker reads public events chronologically. It snapshots the battle at the start of each turn, assesses the visible move or switch against that position, and then describes the outcome separately. The rubric looks for previous damage or immunity in the same matchup, useful coverage, an answer to a revealed attack, recovery, hazards and other documented board conditions. A switch read can have a reasonable target if the opponent stays and a different result if they switch. Unknown sets, intentions and unseen choices remain unknown. The report can identify critical hits, misses and interrupted moves from messages the simulator actually sent.
-
-Stars grade the visible tactical line on eligible turns in recognized standard Gen 9 singles formats, including OU, Anything Goes and Random Battle. One or two stars identify a visible obstacle or a line that relies on an opposing switch. Three marks a playable trade, and four or five indicate more concrete support for the line. The overall rating averages eligible turn grades with equal weight, requires three rated turns and rounds to the nearest half star. Coverage appears next to every overall score. A win, knockout or lucky break adds no points. Unrated choices can still have recorded effects and coaching. Games outside the supported formats show their result and coverage limit. The evaluator does not attempt a full damage calculation, an exhaustive move ranking, a player skill rating or a prediction of the result. The small table of fixed Gen 9 move and species type facts comes from the [pinned Showdown simulator](../vendor/practice/SOURCE.md). Its [MIT notice](../vendor/practice/LICENSE-SHOWDOWN-SERVER) accompanies the source and practice runtime.
-
-**Sources and lifetime.** Online and practice capture require the current finished player's room, including a terminal win or tie in its player-side log. Reading a downloaded replay extracts the inert log text. A URL fetch requests the official HTTPS replay log and preserves a private link's access suffix. It omits credentials, rejects redirects and applies a deadline and streaming byte limit. Private team/request data, public chat and account metadata are excluded. The importer caps the input at 4 MiB and the retained battle log at 2 MiB, 30,000 lines and 1,000 turns. Rendering uses text nodes. The latest successful report stays in memory while the app is open. Cancellation, load failures and ordinary navigation preserve it. Reset, sign-out and closing the window clear it. Replay-note drafts and the official replay player keep their existing behavior.
-
-The source format and exact HTML export are documented upstream. [Showdown simulator protocol](https://github.com/smogon/pokemon-showdown/blob/master/sim/SIM-PROTOCOL.md), [official replay API](https://github.com/smogon/pokemon-showdown-client/blob/master/WEB-API.md), [pinned replay exporter](https://github.com/smogon/pokemon-showdown-client/blob/49b54209ebee54ceb8fff62a5eb5bedf7efcf6dc/play.pokemonshowdown.com/src/battle-log.ts#L1811-L1845).
+- **Summary:** agreement rate, a count of each verdict, and the biggest mistakes linked to their turns. Thresholds are starting values to tune.
+- **Viewer:** the replay player beside a turn list. Selecting a turn jumps playback there and shows its verdict.
+- **Engine:** Foul Play, through the practice API's planned analysis endpoint (below).
+- **Results** are cached with the replay note so a game is analysed once.
+- **Privacy:** only the battle log is sent to the practice API, with no account details. Analysing an online game never acts on the account.
 
 ### Practice API (`api/`)
 - **One interface for inference.** The battle always runs on the player's computer, on its own simulator. Only the bot's moves come from the practice API (`api/server.js`): on the cloud server by default, or, for a player who opts in, a copy the app runs on 127.0.0.1. The bot is Foul Play at three levels (Hard, Medium, Casual); Hard also plays OU.
@@ -78,7 +85,7 @@ The source format and exact HTML export are documented upstream. [Showdown simul
 - **Not bundled.** Foul Play (GPL-3.0) is installed only on the server (`api/install.js`, hash-checked against `api/lock.json`) and never shipped in the app.
 - **Limits.** Anonymous access with per-network rate limits, a server-wide session cap and a thread cap; an optional API key ([api/README.md](../api/README.md)).
 - **Hosting.** The default cloud server is one Google Cloud VM at `https://34-174-209-142.sslip.io` (`CLOUD_API_URL`). The API runs as a systemd service on `127.0.0.1:8787` behind Caddy, which provides HTTPS; only ports 80 and 443 are open. It serves 8 battles at once with 2 search threads each, so **Full** runs with 2 threads in the cloud. Step-by-step hosting: [api/README.md](../api/README.md#host-it-on-a-server).
-- Battle review runs on the desktop. It does not call this API or occupy a Foul Play or Metamon slot.
+- **Analysis endpoint (planned):** `POST /v1/analyze` with the battle log up to a decision, the player's side and the engine; it returns ranked choices and search shares. It is stateless and needs no simulator session.
 - Protocol, limits and deployment: [api/README.md](../api/README.md) and [bots.md](bots.md).
 
 ### Practice
@@ -198,7 +205,7 @@ Verification: daily state tests cover streaks, three attempts, ties, missed days
 - **Search and shortcuts:** search matches titles, formats and note text. **Ctrl+F** focuses search, **Escape** clears it, **Ctrl+S** saves.
 - **Drafts:** unsaved drafts survive navigation. Closing the app with a draft asks before discarding it. Deleting a note never touches the hosted replay.
 
-**Replay playback.** **Watch replay** opens the official replay page beside the same note editor. **See Full Review** runs the local battle reviewer described above. Showdown's player provides playback.
+**Replay review.** **Review replay** opens the official replay page beside the same note editor. Showdown's player provides all playback; the app reconstructs nothing.
 - **Controls:** **Hide notes** widens the player. **Reload replay** reloads only the replay. **Back to notes** closes the player and stops audio. **Open in browser** is explicit.
 - **Locked to one replay:** main resolves the note ID to its validated URL; the renderer never supplies a URL. Navigation is limited to that exact replay path plus upstream playback parameters. If the page moves to a different replay, the view stops.
 - **Failures and limits:** network, HTTP and renderer failures show an error with an explicit reload. Playback position is not kept.
@@ -277,14 +284,6 @@ Bot-internal decisions (thread pools, rejected-choice handling, pooling) are rec
 - **Explicit destructive actions.** Sign out, reset, discarding drafts and undoing imports all confirm first.
 
 ## 7. Testing
-
-### November 23 battle reviewer
-
-The bug audit exercised two-target HP changes, off-field healing, known ability immunities, forced actions, cancellation and note drafts. The implementation review compared advice against the public position on both sides. The resulting corrections handle both recipients of Pain Split, keep a Revival Blessing heal on the bench, identify a previously revealed Water Absorb across different attacks, account for a Ghost blocking Rapid Spin, and withhold prior-hit projections for variable-power attacks such as Eruption. The model also discounts a switch threatened by entry hazards and a recovery exposed to previously seen lethal damage. Rerunning the original examples verified the repairs.
-
-Six completed public OU and Random Battle games, ranging from 14 to 203 turns, produced overall ratings for 11 of the 12 player perspectives. Across those games the model rated between 1 and 48 choices per player. A team-preview forfeit and a one-turn finish remained unrated. This small sample measures coverage. The heuristic tends to recognize direct tactical benefits more easily than subtle planning. These stars have no calibration against player strength or winning chances. The short Random Battle in the desktop suite uses anonymized player names and rounded visible HP. [14-turn Random Battle](https://replay.pokemonshowdown.com/gen9randombattle-2718460432), [68-turn OU](https://replay.pokemonshowdown.com/gen9ou-2718456637), [203-turn OU](https://replay.pokemonshowdown.com/gen9ou-2718458081).
-
-Windows verification passed syntax checks, 314 unit tests with zero skips, all 14 isolated desktop suites and the practice source packaging check. It covered the worker inside an Electron ASAR, actual official replay reads, and a real practice player's postgame offer, review, return to battle and rematch using a loopback Foul Play service. The isolated Electron suite exercises the online bridge against a finished-room fixture, private link handling, inert HTML import, explicit starts, dismissal, errors, cancellation, side and turn selection, note drafts, and both themes at 1366×768 and 1024×640. A signed-in public battle, an installer and a cloud deployment were outside this verification.
 
 ### November 20 security, reliability and performance audit
 

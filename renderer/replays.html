@@ -63,7 +63,6 @@
     <header class="topbar">
       <h1>Replay notes</h1>
       <div class="topbar-actions">
-        <a class="btn" id="import-battle-review" href="battle-review.html?import=1">Import replay…</a>
         <a class="btn" id="review-back" href="replays.html" hidden>Back to notes</a>
         <button class="btn" id="undo-import" type="button" hidden title="Undo the last import before editing notes or restarting the app.">Undo import…</button>
         <button class="btn" id="import-replays" type="button" disabled>Import notes…</button>
@@ -141,8 +140,7 @@
             <button class="btn btn-danger" id="delete-note" type="button">Delete…</button>
             <span class="spacer"></span>
             <span class="faint" id="note-status" role="status" aria-live="polite"></span>
-            <button class="btn" id="analyse-note" type="button" disabled>See Full Review</button>
-            <button class="btn" id="review-replay" type="button" disabled>Watch replay</button>
+            <button class="btn" id="review-replay" type="button" disabled>Review replay</button>
             <button class="btn" id="open-replay" type="button">Open replay</button>
             <button class="btn btn-primary" id="save-note" type="submit" form="replay-form" title="Save (Ctrl+S)" aria-keyshortcuts="Control+s Meta+s">Save</button>
           </div>
@@ -207,7 +205,6 @@
 <script src="nav.js"></script>
 <script src="replay-import-ui.js"></script>
 <script src="replay-review-ui.js"></script>
-<script src="battle-review-request.js"></script>
 <script src="replays.js"></script>
 </body>
 </html>

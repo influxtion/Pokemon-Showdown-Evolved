@@ -7,7 +7,6 @@
 const { net } = require('electron');
 const { boundedJson } = require('./bounded-json');
 const { installShowdexDock } = require('./showdex-dock');
-const { visibleProtocol, ROOM_ID: REVIEW_ROOM, MAX_LINES, MAX_LINE_LENGTH, MAX_LOG_BYTES } = require('./battle-review-input');
 
 const SHOWDOWN = 'https://play.pokemonshowdown.com/';
 const ID = /^[a-z0-9]{1,80}$/;
@@ -1294,20 +1293,6 @@ function readShowdex() {
 }
 /* eslint-enable no-undef */
 
-// Reads only the selected, completed player battle in the current client document.
-function readFinishedBattle(roomId, maxLines, maxLength, maxChars) {
-  const client = window.app;
-  const room = client?.rooms?.[roomId];
-  const battle = room?.battle;
-  if (!battle || client.curRoom?.id !== roomId || !(battle.ended || room.battleEnded) || !client.user?.get('named')) return null;
-  const toId = value => typeof value === 'string' ? value.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-  const me = toId(client.user.get('userid')) || toId(client.user.get('name'));
-  const side = me && ['p1', 'p2'].find(id => toId(battle[id]?.name) === me);
-  if (!side || !Array.isArray(battle.stepQueue)) return null;
-  const result = visibleProtocol(battle.stepQueue, maxLines, maxLength, maxChars);
-  return result.log ? { log: result.log, side } : result;
-}
-
 function call(fn, ...args) {
   return `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(', ')})`;
 }
@@ -1536,21 +1521,6 @@ class ShowdownBridge {
     this.friendsCache = new Map();
     this.friendsInFlight = new Map();
     this.friendsRequest = null;
-  }
-
-  async finishedBattle(roomId) {
-    if (typeof roomId !== 'string' || roomId.length > 120 || !REVIEW_ROOM.test(roomId)) return null;
-    const contents = this.getContents();
-    if (!contents || contents.isDestroyed?.() || contents.isLoading()) return null;
-    try {
-      const raw = await contents.executeJavaScript(callWith([visibleProtocol], readFinishedBattle, roomId,
-        MAX_LINES, MAX_LINE_LENGTH, MAX_LOG_BYTES));
-      if (this.getContents() !== contents || contents.isDestroyed?.() || contents.isLoading()) return null;
-      if (raw?.code === 'review-limit') return { code: 'review-limit' };
-      if (!['p1', 'p2'].includes(raw?.side) || typeof raw.log !== 'string' ||
-          raw.log.length > MAX_LOG_BYTES || Buffer.byteLength(raw.log) > MAX_LOG_BYTES) return null;
-      return { log: raw.log, side: raw.side };
-    } catch { return null; }
   }
 
   // Internal integration entry points; never accept arbitrary script URLs via IPC.

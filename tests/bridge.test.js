@@ -44,40 +44,6 @@ function fakeContents(result = true) {
   };
 }
 
-test('finished-battle capture reads only the current participant log after the battle ends', async () => {
-  const roomId = 'battle-gen9randombattle-123';
-  let named = true, name = 'Alice!';
-  const room = { id: roomId, battle: { ended: true, p1: { name: 'Bob' }, p2: { name: 'Alice!' }, stepQueue: [
-    '|player|p1|Bob|1|1610', '|player|p2|Alice!|2|1500', '|start', '|turn|1', '|request|{"secret":"team"}',
-    '|c|Alice!|private chat', '|-damage|p2a: Flareon|93/329', '|win|Alice!',
-  ] } };
-  const app = { curRoom: room, rooms: { [roomId]: room }, user: { get: key => key === 'named' ? named : name } };
-  const contents = fakeContents(code => vm.runInNewContext(code, { window: { app } }));
-  const bridge = new ShowdownBridge(() => contents);
-  assert.equal(contents.codes.length, 0);
-  const log = await bridge.finishedBattle(roomId);
-  assert.equal(log.side, 'p2');
-  assert.match(log.log, /29\/100/);
-  assert.doesNotMatch(log.log, /secret|private|1610|93\/329|request/);
-  name = 'Spectator';
-  assert.equal(await bridge.finishedBattle(roomId), null);
-  name = 'Alice!';
-  named = false;
-  assert.equal(await bridge.finishedBattle(roomId), null);
-  named = true;
-  room.battle.ended = false;
-  assert.equal(await bridge.finishedBattle(roomId), null);
-  room.battle.ended = true;
-  app.curRoom = { id: 'other' };
-  assert.equal(await bridge.finishedBattle(roomId), null);
-  app.curRoom = room;
-  room.battle.stepQueue.pop();
-  assert.equal(await bridge.finishedBattle(roomId), null);
-  const before = contents.codes.length;
-  assert.equal(await bridge.finishedBattle('not-a-battle'), null);
-  assert.equal(contents.codes.length, before);
-});
-
 test('snapshot bounds untrusted client data and rejects malformed fields', async () => {
   const raw = {
     ready: true,
