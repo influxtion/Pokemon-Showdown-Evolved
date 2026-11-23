@@ -18,6 +18,9 @@
   const queueActions = $('battle-queue-actions');
   const useLocal = $('battle-use-local');
   const leaveQueue = $('battle-leave-queue');
+  const review = $('battle-review-open');
+  const offer = new window.BattleReviewOffer('practice', $('battle-review-prompt'), review);
+  let reviewRoom = '';
   const ordinal = n => `${n}${(n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
   let NAME = 'the bot';
   let daily = false;
@@ -50,6 +53,13 @@
       const running = value.state === 'ready';
       const starting = value.state === 'starting';
       const finished = Boolean(running && value.battle?.finished);
+      const endedRoom = finished ? value.battle.room : '';
+      if (endedRoom !== reviewRoom) {
+        $('battle-review-status').hidden = true;
+        if (review.getAttribute('aria-busy')) window.desktop.cancelBattleReview().catch(() => {});
+      }
+      reviewRoom = endedRoom;
+      offer.update(running ? value.battle?.room : '', finished);
       const clientUp = running && ['battle', 'finished'].includes(value.clientState) && !value.clientError;
       const recovery = Boolean(value.battle && (value.battle.searchFallbacks || value.battle.rejectedChoices || value.battle.defaultChoices));
 
@@ -120,6 +130,11 @@
   }
 
   next.addEventListener('click', () => act(() => daily ? window.desktop.startDailyChallenge() : window.desktop.nextPracticeBattle()));
+  review.addEventListener('click', () => {
+    const roomId = reviewRoom;
+    window.requestBattleReview(review, { kind: 'practice', roomId }, $('battle-review-status'),
+      null, async () => (await window.desktop.getPractice())?.battle?.room === roomId);
+  });
   forfeit.addEventListener('click', () => act(() => window.desktop.forfeitPractice()));
   // End practice closes this tab, like its close button; while queued, that leaves the queue.
   end.addEventListener('click', () => window.showdownNav?.closePracticeBattle());

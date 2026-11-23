@@ -13,6 +13,8 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
+The finished-battle **See Full Review** button uses the player client's visible battle log. Its local review worker is independent of the bot that played the game. Reviewing a battle uses no practice API session, search threads or model download. The review rubric, import formats and evidence limits are documented in [Battle review](design.md#battle-review).
+
 The Bots page offers seven opponents on a private simulator. **Foul Play**, **Foul Play Medium**, and **Foul Play Casual** support Gen 9 Random Battle, OU, and Anything Goes. **Metamon (Kakuna)** supports Gen 9 OU through the cloud API or an optional local download. **Heuristic**, **Greedy**, and **Random** are simple local Gen 9 Random Battle bots. OU and Anything Goes require both teams from the Teambuilder or pasted exports. All teams are checked with the simulator's validator for the selected format.
 
 Foul Play and Metamon default to the cloud. The Downloads tab offers one card per engine, without difficulty groups, with download, cancel, remove and independent Cloud server / This computer choices. Large models and runtimes are downloaded only on request and are not bundled in the app installer. Cloud cards check the host's advertised per-bot formats; older hosts cannot start newly supported combinations. Metamon stays unavailable until its separate server runtime is configured.

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; connect-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https://play.pokemonshowdown.com">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Battle review · Pokemon Showdown Evolved</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="home-appearance.css">
+  <link rel="stylesheet" href="app-appearance.css">
+  <link rel="stylesheet" href="battle-review.css">
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Main">
+    <div class="rail-brand" aria-label="Pokemon Showdown Evolved">
+      <img class="rail-logo" src="assets/logo.png" alt="" width="64" height="64">
+      <span class="rail-brand-text"><strong>Showdown</strong><span>Evolved</span></span>
+    </div>
+    <div class="rail-nav">
+      <a class="nav-item" href="index.html" title="Home">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/></svg>
+        <span class="nav-text">Home</span>
+      </a>
+      <a class="nav-item" href="play.html" data-nav="teambuilder" title="Teambuilder">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 13l.5-3L10.5 3l2.5 2.5L6 12.5z"/></svg>
+        <span class="nav-text">Teambuilder</span>
+      </a>
+      <a class="nav-item" href="play.html" data-nav="community" title="Community">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2.5"/><path d="M1.5 13c0-2.2 2-3.5 4.5-3.5s4.5 1.3 4.5 3.5M10.5 3.8a2.5 2.5 0 0 1 0 4.4M12.5 9.9c1.2.6 2 1.6 2 3.1"/></svg>
+        <span class="nav-text">Community</span>
+      </a>
+      <a class="nav-item" href="practice.html" title="Bots">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M6 9v.5M10 9v.5"/></svg>
+        <span class="nav-text">Bots</span>
+      </a>
+      <a class="nav-item" href="stats.html" title="Stats">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 13V9M8 13V3M13 13V6"/></svg>
+        <span class="nav-text">Stats</span>
+      </a>
+      <a class="nav-item" href="replays.html" aria-current="page" title="Replay notes">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+        <span class="nav-text">Replays</span>
+      </a>
+      <a class="nav-item nav-item--end" href="settings.html" title="Settings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h3M8.5 4.5h5M2.5 11.5h7M12.5 11.5h1"/><circle cx="7" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/></svg>
+        <span class="nav-text">Settings</span>
+      </a>
+    </div>
+    <div class="rail-foot">
+      <div class="rail-user" data-nav="account" hidden>
+        <span class="rail-avatar" data-nav="avatar" aria-hidden="true"></span>
+        <span class="rail-user-text"><strong data-nav="me"></strong><span>v0.2.0-dev</span></span>
+        <a href="play.html" data-nav="sign-in" title="Sign in" hidden>Sign in</a>
+      </div>
+      <span class="rail-version">v0.2.0-dev</span>
+    </div>
+  </nav>
+
+  <div class="main">
+    <nav class="tabstrip" aria-label="Open rooms">
+      <div class="rail-rooms" data-nav="rooms"></div>
+    </nav>
+    <header class="topbar">
+      <h1>Battle review</h1>
+      <div class="topbar-actions">
+        <a class="btn btn-quiet" href="replays.html">Replay notes</a>
+        <a class="btn" id="watch-review-source" hidden>Watch replay</a>
+        <button class="btn" id="review-another" type="button" hidden>Import another replay…</button>
+      </div>
+    </header>
+    <main class="content analysis-content">
+      <section id="source-panel" class="panel analysis-import" aria-labelledby="source-heading" hidden>
+        <div class="panel-head"><h2 id="source-heading">Import a battle replay</h2></div>
+        <form id="source-form" class="panel-body" novalidate>
+          <p>Review a finished battle from Pokémon Showdown. The review runs on this computer.</p>
+          <fieldset class="source-choices"><legend>Replay source</legend>
+            <label><input type="radio" name="source" value="url" checked> Showdown link</label>
+            <label><input type="radio" name="source" value="file"> Local file</label>
+          </fieldset>
+          <div class="field" id="url-fields">
+            <label class="field-label" for="review-url">Replay link</label>
+            <input id="review-url" class="input mono" type="url" maxlength="300" autocomplete="off" spellcheck="false" placeholder="https://replay.pokemonshowdown.com/…" aria-describedby="url-help">
+            <span class="field-hint" id="url-help">Use the complete link, including the access code for a private replay.</span>
+          </div>
+          <div class="field" id="file-fields" hidden>
+            <div class="analysis-file"><button class="btn" id="choose-file" type="button">Choose file…</button><span id="file-name">No file selected</span></div>
+            <span class="field-hint">Showdown replay HTML, replay JSON or a text battle log. Up to 2 MiB of battle log.</span>
+          </div>
+          <div class="source-actions">
+            <button class="btn btn-primary" id="run-review" type="submit">See Full Review</button>
+            <button class="btn" id="cancel-review" type="button" hidden>Cancel</button>
+            <button class="btn btn-quiet" id="return-review" type="button" hidden>Back to this review</button>
+          </div>
+        </form>
+      </section>
+      <p class="analysis-feedback" id="analysis-status" role="status" aria-live="polite"></p>
+      <article id="report" aria-labelledby="matchup" hidden>
+        <header class="analysis-match">
+          <div><p id="match-meta"></p><h2 id="matchup" tabindex="-1"></h2></div>
+          <label class="analysis-perspective">Reviewing player <select id="perspective" class="select"></select></label>
+        </header>
+        <section class="analysis-overview panel" aria-label="Game summary">
+          <div class="analysis-rating"><h3>Rated decisions</h3><strong id="game-score"></strong><span id="game-stars" aria-hidden="true"></span><p id="coverage"></p></div>
+          <div class="analysis-summary"><h3>Game summary</h3><p id="game-summary"></p><p id="review-takeaway" hidden></p><details id="scoring"><summary>How stars work</summary><p id="scoring-method"></p></details></div>
+        </section>
+        <section id="highlights" class="analysis-highlights" aria-labelledby="moments-heading" hidden>
+          <h3 id="moments-heading">Key moments</h3><div id="moments"></div>
+        </section>
+        <section id="turn-panel" class="panel analysis-turns" aria-labelledby="turns-heading">
+          <header class="panel-head analysis-turnbar"><h3 id="turns-heading">Turn review</h3>
+            <label>Show <select class="select" id="turn-filter"><option value="all">All decisions</option><option value="rated">Rated decisions</option><option value="luck">Luck involved</option></select></label>
+          </header>
+          <div class="analysis-workbench">
+            <nav aria-label="Battle decisions" class="analysis-turnlist" id="turn-list"></nav>
+            <section id="turn-detail" class="analysis-detail" aria-live="polite"></section>
+          </div>
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+<script src="home-appearance-options.js"></script>
+<script src="home-appearance.js"></script>
+<script src="nav.js"></script>
+<script src="battle-review-request.js"></script>
+<script src="battle-review.js"></script>
+</body>
+</html>

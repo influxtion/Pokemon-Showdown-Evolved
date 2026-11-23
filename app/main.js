@@ -15,6 +15,7 @@ const { ShowdownBridge } = require('./showdown');
 const { Replays } = require('./replays');
 const { ReplayImports } = require('./replay-imports');
 const { ReplayReview } = require('./replay-review');
+const { BattleReviewInput, FILE_TYPES: REVIEW_FILE_TYPES } = require('./battle-review-input');
 const { DailyStore, DailyChallenge } = require('./daily-challenge');
 const { PracticeSession } = require('./practice-session');
 const { CloudEngine, LocalEngine, MetamonEngine } = require('./practice-engines');
@@ -118,6 +119,19 @@ let preparingPractice = 0;
 let logger = null;
 let windowState = null;
 const bridge = new ShowdownBridge(() => (client ? client.webContents : null));
+const battleReview = new BattleReviewInput({
+  getNoteUrl: id => replays?.get(id)?.url,
+  capture: async (kind, roomId) => {
+    if (kind === 'online') {
+      if (!client || !isShowdownUrl(client.webContents.getURL())) return null;
+      return bridge.finishedBattle(roomId);
+    }
+    const current = practice?.battle;
+    if (!current?.finished || current.room !== roomId || !practiceView) return null;
+    const result = await practiceView.finishedBattle(roomId);
+    return practice?.battle === current ? result : null;
+  },
+});
 const messageAlerts = new MessageAlerts();
 // Held so click handlers survive garbage collection until the notification closes.
 const shownAlerts = new Set();
@@ -378,6 +392,7 @@ function createWindow() {
   // Every launcher page change hides the client; play.html shows it again with fresh bounds.
   contents.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) {
+      battleReview.leave();
       hideClient();
       replayReview?.close();
       practiceView?.hide();
@@ -426,6 +441,7 @@ function createWindow() {
     else win.show();
   });
   win.on('closed', () => {
+    battleReview.clear();
     clearTimeout(windowSaveTimer);
     if (client && !client.webContents.isDestroyed()) client.webContents.close();
     replayReview?.close();
@@ -444,13 +460,46 @@ function createWindow() {
 }
 
 // Practice is set up on practice.html and played on practice-battle.html, its own tab.
-function isPracticeFrame(event, pages = ['/practice.html', '/practice-battle.html']) {
+function isPageFrame(event, pages) {
   if (!isLauncherFrame(event)) return false;
   const sender = parseUrl(event.senderFrame.url)?.pathname || '';
   const shown = parseUrl(win.webContents.getURL())?.pathname || '';
   return pages.some(page => sender.endsWith(page) && shown.endsWith(page));
 }
+const isPracticeFrame = (event, pages = ['/practice.html', '/practice-battle.html']) => isPageFrame(event, pages);
 const isBattleFrame = event => isPracticeFrame(event, ['/practice-battle.html']);
+
+const reviewSources = Object.freeze({
+  online: { page: '/play.html', key: 'roomId' },
+  practice: { page: '/practice-battle.html', key: 'roomId' },
+  note: { page: '/replays.html', key: 'id' },
+  file: { page: '/battle-review.html', key: 'token' },
+  url: { page: '/battle-review.html', key: 'url' },
+});
+
+ipcMain.handle('battle-review:run', (event, source) => {
+  if (!source || typeof source.kind !== 'string' || !Object.hasOwn(reviewSources, source.kind)) return { ok: false, error: 'Choose a replay to review.' };
+  const { page, key } = reviewSources[source.kind];
+  if (maintenance || !isPageFrame(event, [page]) || Object.keys(source).length !== 2 || typeof source[key] !== 'string') {
+    return { ok: false, error: 'This review source is unavailable.' };
+  }
+  return battleReview.review(source);
+});
+ipcMain.handle('battle-review:choose-file', event => {
+  if (maintenance || !isPageFrame(event, ['/battle-review.html'])) return { ok: false, error: 'Access denied.' };
+  return battleReview.choose(async () => {
+    const result = await dialog.showOpenDialog(win, { title: 'Choose a Showdown replay', properties: ['openFile'],
+      filters: [{ name: 'Showdown replays', extensions: REVIEW_FILE_TYPES }] });
+    return result.canceled ? null : result.filePaths[0];
+  });
+});
+ipcMain.handle('battle-review:status', event =>
+  isPageFrame(event, ['/battle-review.html']) ? battleReview.status() : { ok: false });
+ipcMain.handle('battle-review:cancel', event => {
+  if (!isPageFrame(event, ['/play.html', '/practice-battle.html', '/replays.html', '/battle-review.html'])) return { ok: false };
+  battleReview.cancel();
+  return { ok: true };
+});
 
 ipcMain.handle('practice:status', async event => {
   if (!isLauncherFrame(event)) return null;
@@ -949,6 +998,7 @@ ipcMain.handle('settings:sign-out', async (event) => {
     });
     if (response !== 1) return { ok: true, cancelled: true };
     const old = ensureClient();
+    battleReview.clear();
     const clientSession = old.webContents.session;
     const bounds = old.getBounds();
     const visible = old.getVisible();
@@ -993,6 +1043,7 @@ ipcMain.handle('settings:reset', async (event) => {
     });
     if (response !== 1) return { ok: true, cancelled: true };
     // Remove only the launcher's two data files, never the Showdown partition.
+    battleReview.clear();
     settings.reset();
     appearanceStyles.refresh();
     refreshBackgrounds();
