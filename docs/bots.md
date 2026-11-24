@@ -180,8 +180,8 @@ The sandboxed practice renderer can optionally load installed Showdex. Each fres
 
 Foul Play calls the Rust function, `monte_carlo_tree_search(state, duration_ms, threads)`, on a fully specified battle state. It runs **decoupled UCT** for simultaneous moves:
 
-1. **Select.** At each node, each side independently picks the option with the highest UCB1 score. The pair identifies a child group; one child is drawn in proportion to its probability (damage rolls, crits, accuracy and secondary effects are separate weighted branches) and its instructions are applied.
-2. **Expand.** At the first unseen pair, `generate_instructions_from_move_pair` produces every chance outcome. Damage-roll branching is enabled only at the root and its children, to keep the tree small. One outcome is sampled.
+1. **Select.** At each node, each side independently picks the option with the highest UCB1 score. The pair identifies a group of child states. The engine samples a child according to its weight and applies its instructions.
+2. **Expand.** At the first unseen pair, `generate_instructions_from_move_pair` generates the engine's modeled outcomes. Chance branches can distinguish accuracy, critical hits, damage and secondary effects. Damage rolls are grouped or approximated. Damage-roll branching is enabled only at the root and its children.
 3. **Evaluate.** No random playout. The leaf is scored with the engine's hand-written `evaluate(state)` (HP, boosts, status, hazards, side conditions and so on) relative to the root, through a sigmoid. A finished battle scores 1 or 0.
 4. **Back-propagate.** The score is added to side one's chosen option, and its complement to side two's, at every node on the path.
 
@@ -193,6 +193,12 @@ $$
 $$
 
 Q is an option's total score, n its visits and N the parent's visits; unvisited options score infinity. The 0.0125 scale puts a 200-point evaluation lead close to 1.0. When time runs out, the engine returns each root option's visits and total score for both sides. With `threads > 1`, workers grow the tree in parallel. Foul Play builds poke-engine from source with Gen 9 Terastallization.
+
+### Review engine experiment
+
+The installed poke-engine 0.0.48 Python binding can take two specified actions with `generate_instructions(state, our_action, their_action)` and apply each weighted outcome to produce a successor. In a constructed level-100 Garchomp and Heatran versus Galarian Slowking and Corviknight position, 25 non-Tera action pairs produced 56 successors. Generating the matrix, applying all branches and reading HP took a median 3.54 ms over 15 warm runs on the development PC. A full review would also require reconstruction, set sampling, more worlds and continuing each line. Some mechanics are approximated. For example, an ordinary two-to-five-hit move uses a fixed hit count, and a branch can represent several damage rolls. [Pinned joint-action binding](https://github.com/pmariglia/poke-engine/blob/bcf13823abc162a608e187b26bbf683f759f385e/poke-engine-py/src/lib.rs#L1045-L1073), [damage and multi-hit handling](https://github.com/pmariglia/poke-engine/blob/bcf13823abc162a608e187b26bbf683f759f385e/src/genx/generate_instructions.rs#L2338-L2436).
+
+The same fully specified position produced a different most-visited move at different budgets. Earthquake led all five one-thread 1,000-visit runs. Swords Dance led all five at 8,000 and all five at 32,000. The native root searches included available Tera actions. The Python search binding obtains both full option lists and offers no forced-first-action parameter. Restarting a search from each successor also changes the reference point of its nonterminal evaluation. Comparing those child-relative scores would discard the immediate positional change. Use a common baseline and a shared opponent policy for future lookahead comparisons. A hidden-set sampler also needs to flag when its strict constraints find no matching world. The bot's Random Battle fallback can relax constraints on the inferred set. [Pinned search binding](https://github.com/pmariglia/poke-engine/blob/bcf13823abc162a608e187b26bbf683f759f385e/poke-engine-py/src/lib.rs#L930-L947), [root-relative evaluation](https://github.com/pmariglia/poke-engine/blob/bcf13823abc162a608e187b26bbf683f759f385e/src/mcts.rs#L190-L201), [Random Battle set fallback](https://github.com/pmariglia/foul-play/blob/8f541f80f91f960603673796559f796b10ccf0fb/fp/data/sets/randbats.py#L95-L122).
 
 ## 5. Foul Play
 
