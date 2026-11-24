@@ -113,8 +113,11 @@ app.whenReady().then(async () => {
   assert.deepEqual(requests, []);
   await change('perspective', 'p2');
   assert.ok(await run("document.getElementById('game-summary').textContent.length > 20"));
+  assert.equal(await run("document.getElementById('game-score').textContent"), 'Unavailable');
+  assert.match(await run("document.getElementById('coverage').textContent"), /No supported move comparisons/);
   await change('turn-filter', 'rated');
-  assert.ok(await run("document.querySelectorAll('.analysis-turn').length > 0"));
+  assert.equal(await run("document.querySelectorAll('.analysis-turn').length"), 0);
+  assert.match(await run("document.getElementById('turn-detail').textContent"), /No attacks met/);
   await change('turn-filter', 'luck');
   assert.ok(await run("document.getElementById('turn-detail').textContent.length > 0"));
   await change('perspective', 'p1');
@@ -208,6 +211,25 @@ app.whenReady().then(async () => {
   assert.equal(requests.length, 4, 'online review never uploads or looks up a replay');
   assert.equal(client.webContents.id, clientId);
   assert.equal(await run("JSON.parse(sessionStorage.getItem('replayNote.editorDraft')).notes"), 'In-progress note');
+  const paired = ['|gametype|singles', '|player|p1|Sage', '|player|p2|Rowan', '|gen|9', '|tier|[Gen 9] OU', '|start',
+    '|switch|p1a: Corviknight|Corviknight|100/100', '|switch|p2a: Avalugg|Avalugg|100/100',
+    '|-item|p1a: Corviknight|Air Balloon', '|turn|1', '|move|p1a: Corviknight|Peck|p2a: Avalugg',
+    '|turn|2', '|move|p1a: Corviknight|Drill Peck|p2a: Avalugg', '|win|Sage'].join('\n');
+  fs.writeFileSync(downloaded, '<script type="text/plain" class="battle-log-data">' + paired + '</script>');
+  await load('battle-review.html', { import: '1' });
+  await until(() => visible('source-panel'), 'comparison import form');
+  await run("document.querySelector('input[value=file]').click()");
+  await click('choose-file');
+  await until(() => run("document.getElementById('file-name').textContent === 'Saved battle.html'"), 'paired example selected');
+  await click('run-review');
+  await until(() => run("document.getElementById('coverage').textContent.includes('1 of 2')"), 'positive comparison coverage');
+  await change('turn-filter', 'rated');
+  assert.equal(await run("document.querySelectorAll('.analysis-turn').length"), 1);
+  assert.match(await run("document.getElementById('turn-detail').textContent"), /Peck on turn 1/);
+  assert.equal(await run("document.querySelector('.analysis-row-stars').getAttribute('aria-label')"), '4 out of 5 stars');
+  await run("document.getElementById('turn-panel').scrollIntoView({block:'start'})");
+  await pause(370);
+  await capture('compared-1024-light');
   console.log('PASS battle review: explicit starts, file/link/note/own battle, real worker, both sides, filters, errors, cancellation, drafts, both themes and sizes');
   app.exit(0);
 }).catch(error => { console.error(error); app.exit(1); });

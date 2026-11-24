@@ -27,8 +27,6 @@
 .analysis-rating { background: var(--bg-selected); border-right: 1px solid var(--border); }
 .analysis-rating h3 { font-size: var(--fs-md); }
 .analysis-rating strong { display: block; font-size: 24px; line-height: 1.25; }
-#game-stars { display: inline-block; font-family: "Segoe UI Symbol", sans-serif; font-size: 17px; line-height: 1.1; position: relative; color: var(--accent); }
-#game-stars::before { content: '★★★★★'; position: absolute; inset: 0 auto 0 0; width: var(--star-fill); overflow: hidden; white-space: nowrap; }
 .analysis-rating #coverage { margin-top: 5px; }
 .analysis-summary > p { line-height: 1.5; margin-top: 5px; }
 .analysis-summary details { color: var(--text-2); margin-top: 7px; font-size: var(--fs-sm); }

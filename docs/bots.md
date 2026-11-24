@@ -13,7 +13,7 @@ This is the single reference for how the bots work.
 
 ## 1. Overview
 
-The finished-battle **See Full Review** button uses the player client's visible battle log. Its local review worker is independent of the bot that played the game. Reviewing a battle uses no practice API session, search threads or model download. The review rubric, import formats and evidence limits are documented in [Battle review](design.md#battle-review).
+The finished-battle **See Full Review** button uses the player client's visible battle log. Its local review worker is independent of the bot that played the game. Reviewing a battle uses no practice API session, search threads or model download. The report gives factual turn coaching and can compare two previously evidenced attack lines under narrow conditions. The game-wide play rating is unavailable. [Review method and evidence](design.md#battle-review).
 
 The Bots page offers seven opponents on a private simulator. **Foul Play**, **Foul Play Medium**, and **Foul Play Casual** support Gen 9 Random Battle, OU, and Anything Goes. **Metamon (Kakuna)** supports Gen 9 OU through the cloud API or an optional local download. **Heuristic**, **Greedy**, and **Random** are simple local Gen 9 Random Battle bots. OU and Anything Goes require both teams from the Teambuilder or pasted exports. All teams are checked with the simulator's validator for the selected format.
 

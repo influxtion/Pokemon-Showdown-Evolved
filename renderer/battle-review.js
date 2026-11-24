@@ -38,7 +38,7 @@
     const panel = $('turn-detail');
     panel.replaceChildren();
     if (!row) {
-      panel.append(node('p', 'No decisions match this filter.', 'analysis-no-turns'));
+      panel.append(node('p', $('turn-filter').value === 'rated' ? 'No attacks met the comparison criteria.' : 'No turns match this filter.', 'analysis-no-turns'));
       return;
     }
     const heading = node('header', undefined, 'analysis-decision-head');
@@ -112,13 +112,10 @@
 
   function renderSide() {
     const review = report.sides[side];
-    $('game-score').textContent = review.stars == null ? 'Unrated' : review.stars + ' / 5';
-    $('game-stars').hidden = review.stars == null;
-    $('game-stars').textContent = '☆☆☆☆☆';
-    $('game-stars').style.setProperty('--star-fill', (review.stars || 0) * 20 + '%');
-    $('coverage').textContent = report.supported
-      ? review.rated + ' of ' + review.decisions + ' decisions rated' + (review.stars == null ? ' · 3 needed' : '')
-      : 'Outside rating scope';
+    $('coverage').textContent = review.rated
+      ? review.rated + ' of ' + review.decisions + ' visible choices compared. Four stars on ' +
+        review.fourStars + ', two stars on ' + review.twoStars + '.'
+      : report.supported ? 'No supported move comparisons for this player. ' + review.decisions + ' visible choices.' : 'Outside comparison scope';
     $('game-summary').textContent = review.summary;
     const revisit = review.turns.find(row => row.stars != null && row.stars <= 2);
     $('review-takeaway').hidden = !revisit;
@@ -129,7 +126,7 @@
       $('review-takeaway').replaceChildren(link, ' ' + revisit.lesson);
     }
     $('scoring-method').textContent = report.scope.replace(/[.]$/, '') + (report.supported
-      ? '. One or two stars flag a visible obstacle or a line that depends on a switch. Three marks a plausible trade. Four or five mark a line supported by the matchup or an earlier exchange. The overall rating averages at least three rated turns and rounds to the nearest half star. A win, knockout or critical hit earns no points.' : '');
+      ? '. Four stars mark an open damage route against an immunity, or the higher base power of two otherwise matched attacks. Two mark the other side of either comparison. Rounding and knockouts can make both attacks deal the same damage. Both moves must be available and the target must stay as shown. The replay cannot establish which choice best served the whole game.' : '');
     $('turn-panel').hidden = !review.turns.length;
     const moments = $('moments');
     moments.replaceChildren();

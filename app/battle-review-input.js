@@ -41,11 +41,12 @@ function visibleProtocol(lines, maxLines, maxLength, maxChars) {
   const permitted = /^(?:\|$|\|(?:gametype|gen|tier|player|teamsize|start|turn|move|switch|replace|detailschange|drag|faint|cant|upkeep|win|tie|poke|teampreview|-[-a-z0-9]+)(?:\||$))/;
   const textOnly = /^\|-(?:message|hint|anim|animcustom)\|/;
   const hpEvent = /^\|(?:switch|drag|replace|detailschange|-damage|-heal|-sethp)\|/;
+  let gen9 = false;
   const normalizeHP = field => {
     const match = /^(\d{1,6})\/(\d{1,6})( [a-z]{3})?$/.exec(field);
     if (!match) return field;
     const hp = Number(match[1]), max = Number(match[2]);
-    if (!max || hp > max || max === 48 || max === 100) return field;
+    if (!max || hp > max || (!gen9 && max === 48) || max === 100) return field;
     // Gen 7+ displays percentages, rounded up except for an injured Pokémon near full HP.
     const percent = hp === max ? 100 : Math.min(99, Math.ceil(100 * hp / max));
     return percent + '/100' + (match[3] || '');
@@ -62,9 +63,14 @@ function visibleProtocol(lines, maxLines, maxLength, maxChars) {
       line = lines[i];
       if (typeof line !== 'string' || line.startsWith('|split|')) return { code: 'invalid-replay' };
     }
+    // Showdown can retain the ordinary tier name for custom rules. Keep only the boolean announcement.
+    if (/^\|raw\|<div class="infobox"><details class="readmore"(?: open)?><summary><strong>\d+ custom rules?:/i.test(line)) {
+      line = '|-reviewcustomrules|';
+    }
     if (!permitted.test(line) || textOnly.test(line)) continue;
     if (line.length > maxLength) return { code: 'review-limit' };
     if (/[\r\n\0]/.test(line)) return { code: 'invalid-replay' };
+    if (line === '|gen|9') gen9 = true;
     if (line.startsWith('|player|')) line = line.split('|', 4).join('|');
     if (hpEvent.test(line)) line = line.split('|').map(normalizeHP).join('|');
     length += line.length + 1;
