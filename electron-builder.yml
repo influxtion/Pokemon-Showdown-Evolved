@@ -77,7 +77,7 @@ nsis:
   perMachine: false
   createDesktopShortcut: false
   createStartMenuShortcut: true
-  artifactName: Pokemon.Showdown.Evolved.Setup.${version}-${arch}.${ext}
+  artifactName: Pokemon Showdown Evolved Windows Installer ${version} ${arch}.${ext}
 mac:
   icon: renderer/assets/logo.png
   category: public.app-category.games

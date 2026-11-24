@@ -25,7 +25,7 @@ const WITH_PRACTICE = process.argv.includes('--practice');
 const PRACTICE_OPPONENT = process.argv.includes('--simple-practice') ? 'heuristic' : 'foulplay';
 const OUTPUT = path.join(ROOT, 'out', 'packaging-smoke');
 const VERSION = require('../package.json').version;
-const INSTALLER = path.join(ROOT, 'out', 'windows', `Pokemon Showdown Evolved Setup ${VERSION}-x64.exe`);
+const INSTALLER = path.join(ROOT, 'out', 'windows', `Pokemon Showdown Evolved Windows Installer ${VERSION} x64.exe`);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function port() {

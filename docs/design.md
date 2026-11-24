@@ -1097,14 +1097,25 @@ that test. This does not establish AppImage mounting or desktop integration
 on every Linux distribution.
 
 [Actions run 45459432686](https://github.com/influxtion/Pokemon-Showdown-Evolved/actions/runs/45459432686)
-succeeded and produced these six candidate assets:
+succeeded. After the owner's Windows naming correction, the six local
+candidate assets are:
 
-- `Pokemon.Showdown.Evolved.Setup.0.4.0-x64.exe`
-- `Pokemon.Showdown.Evolved.Setup.0.4.0-x64.exe.blockmap`
+- `Pokemon Showdown Evolved Windows Installer 0.4.0 x64.exe`
+- `Pokemon Showdown Evolved Windows Installer 0.4.0 x64.exe.blockmap`
 - `latest.yml`
 - `Pokemon.Showdown.Evolved.0.4.0.Linux-x86_64.AppImage`
 - `Pokemon.Showdown.Evolved.0.4.0.Linux-x64.tar.gz`
 - `latest-linux.yml`
+
+The Windows installer and blockmap were renamed without changing their bytes.
+The build configuration uses this naming format for future versions. GitHub
+asset URLs replace spaces with hyphens, following electron-builder's naming
+rule, so `latest.yml` now references
+`Pokemon-Showdown-Evolved-Windows-Installer-0.4.0-x64.exe`. On eventual approved
+publication, upload the installer and its blockmap with those hyphenated asset
+names. Local checksums and the build report reflect the renamed files; the
+original Actions ZIP is retained only as build provenance and has the earlier
+names. No release assets were uploaded or edited for this rename.
 
 Local copies, SHA-256 sums, verification records and logs are under ignored
 `out/release-0.4.0/`. Both downloaded artifact ZIP digests match GitHub's
