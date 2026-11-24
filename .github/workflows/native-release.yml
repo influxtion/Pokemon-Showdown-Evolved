@@ -2,21 +2,49 @@ name: Release candidate builds
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/automatic-updates]
+    inputs:
+      version:
+        description: Release version for the main-source packages
+        required: true
+        type: string
+        default: '0.4.0'
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-candidate-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-candidate-main
+  cancel-in-progress: false
 
 jobs:
   showdex:
     runs-on: windows-2025
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      version: ${{ steps.source.outputs.version }}
     steps:
+      # The workflow's own branch must never select the application source.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Pin and verify main source
+        id: source
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $sourceSha = (git rev-parse HEAD).Trim()
+          $mainSha = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($LASTEXITCODE -ne 0 -or $sourceSha -ne $mainSha) { throw 'Release source must be main.' }
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a numeric release version.' }
+          "sha=$sourceSha" >> $env:GITHUB_OUTPUT
+          "version=$env:RELEASE_VERSION" >> $env:GITHUB_OUTPUT
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          @{ sourceRef = 'main'; sourceCommit = $sourceSha; version = $env:RELEASE_VERSION; workflowCommit = '${{ github.sha }}' } |
+            ConvertTo-Json | Set-Content out/main-source-provenance.json
+          Get-Content out/main-source-provenance.json
+          "Application source: main at $sourceSha" >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
@@ -28,6 +56,11 @@ jobs:
           name: pinned-showdex
           path: vendor/showdex/dist/
           retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: main-source-provenance
+          path: out/main-source-provenance.json
+          retention-days: 14
   package:
     needs: showdex
     strategy:
@@ -38,14 +71,6 @@ jobs:
             platform: win
             arch: x64
             id: Windows-x64
-          - runner: macos-15
-            platform: mac
-            arch: arm64
-            id: macOS-arm64
-          - runner: macos-15-intel
-            platform: mac
-            arch: x64
-            id: macOS-x64
           - runner: ubuntu-24.04
             platform: linux
             arch: x64
@@ -54,8 +79,18 @@ jobs:
     timeout-minutes: 45
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      RELEASE_VERSION: ${{ needs.showdex.outputs.version }}
+      MAIN_SOURCE_SHA: ${{ needs.showdex.outputs.source_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.showdex.outputs.source_sha }}
+          persist-credentials: false
+      - name: Verify pinned main checkout
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne $env:MAIN_SOURCE_SHA) { throw 'Checkout differs from the verified main source.' }
+          Write-Output "Building main source $env:MAIN_SOURCE_SHA as version $env:RELEASE_VERSION"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
@@ -65,17 +100,41 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64
+          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64 xvfb
       - run: npm run check
-      - run: npm test
       - run: npm run build:practice
+      - run: npm test
+        env:
+          PRACTICE_TEST_SERVER_ROOT: ${{ github.workspace }}/vendor/practice/dist/server
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: pinned-showdex
           path: vendor/showdex/dist/
-      - name: Build native packages
-        run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
-      - name: Save packages for review
+      - name: Build Windows installer from main
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npx --no-install electron-builder --win nsis --x64 --publish never "--config.extraMetadata.version=$env:RELEASE_VERSION" "--config.nsis.artifactName=Pokemon Showdown Evolved Windows Installer $env:RELEASE_VERSION x64.exe"
+      - name: Build Linux AppImage from main
+        if: runner.os == 'Linux'
+        shell: pwsh
+        run: |
+          npx --no-install electron-builder --linux AppImage --x64 --publish never "--config.extraMetadata.version=$env:RELEASE_VERSION" --config.directories.output=out/linux
+      - name: Confirm source was not modified for packaging
+        shell: pwsh
+        run: |
+          if (git status --porcelain --untracked-files=no) { throw 'Tracked source changed during packaging.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:MAIN_SOURCE_SHA) { throw 'Source commit changed during packaging.' }
+      - name: Smoke test packaged Windows app
+        if: runner.os == 'Windows'
+        run: npm run smoke:packaged -- --practice --simple-practice
+      - name: Smoke test packaged Linux app
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root out/linux/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 out/linux/linux-unpacked/chrome-sandbox
+          xvfb-run -a npm run smoke:packaged -- --practice --simple-practice
+      - name: Save packages for review only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: packages-${{ matrix.id }}
@@ -83,10 +142,7 @@ jobs:
             out/windows/*.exe
             out/windows/*.blockmap
             out/windows/latest.yml
-            out/macos/*.dmg
-            out/macos/*.zip
             out/linux/*.AppImage
-            out/linux/*.tar.gz
             out/linux/latest-linux.yml
           compression-level: 0
           retention-days: 14
