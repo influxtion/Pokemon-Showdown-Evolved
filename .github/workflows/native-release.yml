@@ -2,8 +2,11 @@ name: Release candidate builds
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/automatic-updates]
+    inputs:
+      include_macos:
+        description: Also build macOS packages
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,33 +26,33 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:showdex
+      - name: Select package platforms
+        id: platforms
+        shell: pwsh
+        env:
+          INCLUDE_MACOS: ${{ inputs.include_macos }}
+        run: |
+          $platforms = @(
+            @{ runner = 'windows-2025'; platform = 'win'; arch = 'x64'; id = 'Windows-x64' }
+            @{ runner = 'ubuntu-24.04'; platform = 'linux'; arch = 'x64'; id = 'Linux-x64' }
+          )
+          if ($env:INCLUDE_MACOS -eq 'true') {
+            $platforms += @{ runner = 'macos-15'; platform = 'mac'; arch = 'arm64'; id = 'macOS-arm64' }
+            $platforms += @{ runner = 'macos-15-intel'; platform = 'mac'; arch = 'x64'; id = 'macOS-x64' }
+          }
+          "matrix=$(@{ include = $platforms } | ConvertTo-Json -Depth 4 -Compress)" >> $env:GITHUB_OUTPUT
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pinned-showdex
           path: vendor/showdex/dist/
           retention-days: 14
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
   package:
     needs: showdex
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2025
-            platform: win
-            arch: x64
-            id: Windows-x64
-          - runner: macos-15
-            platform: mac
-            arch: arm64
-            id: macOS-arm64
-          - runner: macos-15-intel
-            platform: mac
-            arch: x64
-            id: macOS-x64
-          - runner: ubuntu-24.04
-            platform: linux
-            arch: x64
-            id: Linux-x64
+      matrix: ${{ fromJSON(needs.showdex.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
@@ -65,16 +68,27 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64
+          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64 xvfb
       - run: npm run check
-      - run: npm test
       - run: npm run build:practice
+      - run: npm test
+        env:
+          PRACTICE_TEST_SERVER_ROOT: ${{ github.workspace }}/vendor/practice/dist/server
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: pinned-showdex
           path: vendor/showdex/dist/
       - name: Build native packages
         run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
+      - name: Smoke test packaged Windows app
+        if: runner.os == 'Windows'
+        run: npm run smoke:packaged -- --practice --simple-practice
+      - name: Smoke test packaged Linux app
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root out/linux/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 out/linux/linux-unpacked/chrome-sandbox
+          xvfb-run -a npm run smoke:packaged -- --practice --simple-practice
       - name: Save packages for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

@@ -1,6 +1,6 @@
 {
   "name": "showdown-desktop",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Pokemon Showdown Evolved: a desktop workspace for battles, Showdex and replay notes.",
   "license": "AGPL-3.0-or-later",
