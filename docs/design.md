@@ -976,3 +976,54 @@ Verified: syntax checks, 283 unit tests with zero skips, all 13 desktop suites a
 The shared bot queue now admits the earliest eligible player, skipping blocked Metamon tickets while preserving their place and both total/model session caps. Eligible queued players retain priority over newcomers. Hosted admission adds CPU and RAM reservations, live memory headroom checks and capacity retention until terminated workers exit. Defaults reserve at least 25% CPU (whole-thread rounding, minimum one usable thread) and max(1 GiB, 25%) RAM. Foul Play reserves 512 MiB and Metamon 2 GiB per session. These estimates can be raised; aggregate budgets can be tightened. Implementation, configuration, regression and real-battle evidence, and host-sizing limits are in docs/bots.md. Source is ready for the friend's host; no remote deployment or installer/release work occurred.
 
 Verified syntax, 292 unit tests with zero skips (including package allowlist checks), standalone API startup with effective resource reporting, two real Metamon OU battles and two Medium Random Battles under explicit resource budgets. No renderer changes or desktop-suite rerun for this server-only change. Windows loopback verification does not establish capacity or cgroup behavior on the Linux host.
+
+## Main-only v0.4.0 release candidates - November 24, 2026
+
+The owner requires every installer to use fetched main as its application
+source. Feature-branch application code must never enter a release before
+explicitly approved integration into main. The earlier reviewer-branch
+candidates from `09ad110` were incorrect and have been withdrawn: their
+unpublished draft was deleted, their two Actions package artifacts were
+removed, and local files were quarantined under
+`out/quarantined/release-0.4.0-reviewer-09ad110/`. They must not be distributed.
+No release was published and main was never modified during this work.
+
+The corrected [Actions run 45468244791](https://github.com/influxtion/Pokemon-Showdown-Evolved/actions/runs/45468244791)
+builds application source `5ff1476b026295511cf81740dd6b3cccc53d15d5`, the
+unchanged main tip. Workflow commit `1f4fc0c` on `fix/main-release-builds` is
+only the build definition: its first checkout explicitly selects main and
+passes that exact SHA to both native package jobs. Each job verifies the
+checkout and refuses tracked source changes. Version 0.4.0 and the Windows
+installer filename are supplied as electron-builder packaging options, not
+application edits. The workflow is manual, has read-only contents permission,
+uses `--publish never`, and builds Windows x64 NSIS plus Linux x64 AppImage.
+The guard remains on its own branch pending owner approval to integrate it.
+
+The corrected candidates are under ignored `out/release-0.4.0/`:
+
+- `windows/Pokemon Showdown Evolved Windows Installer 0.4.0 x64.exe`
+- The installer's `.blockmap` and `windows/latest.yml`
+- `linux/Pokemon.Showdown.Evolved.0.4.0.Linux-x86_64.AppImage`
+- `linux/latest-linux.yml`
+
+GitHub asset names replace Windows filename spaces with hyphens, as recorded
+in latest.yml. Only those five files are planned release assets. Reports,
+checksums, source provenance and ZIPs remain local/Actions evidence. The
+replacement unpublished draft targets main and describes only expanded bot
+practice, Metamon, optional local downloads and the Casual daily challenge.
+It has no uploaded assets. Publication still requires owner approval.
+
+Verified: 292 tests with zero skips on each native platform, 13 local desktop
+suites, live guest shell, native packaged practice smoke tests, and a smoke
+test of the exact downloaded/extracted Windows installer. Transparent test
+windows initially hit capture and theme-event failures; disposable test-only
+wrappers kept windows painted and retried failed captures without changing
+assertions or application code. The live guest check passed on retry.
+
+Both downloaded artifact ZIPs match their Actions SHA-256 digests. Extracted
+installer/AppImage contents match 90 packaged main source files, 57 pinned
+Showdex assets and 2,288 simulator manifest files each. Explicit checks reject
+Battle Review files, capture code and controls. Updater names, version, sizes
+and SHA-512 hashes match. Windows remains unsigned; clean-machine installation,
+an installed 0.3.0-to-0.4.0 upgrade and direct Linux AppImage GUI launch were
+not tested. No Mac build or cloud deployment occurred.
