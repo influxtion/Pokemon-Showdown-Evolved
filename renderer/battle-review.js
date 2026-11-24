@@ -34,6 +34,77 @@
     }
   }
 
+  function disclosure(title, body) {
+    const element = node('details', undefined, 'analysis-disclosure');
+    element.append(node('summary', title), body);
+    return element;
+  }
+
+  function table(caption, columns, records) {
+    const element = node('table', undefined, 'analysis-table');
+    element.append(node('caption', caption));
+    const head = element.createTHead().insertRow();
+    for (const text of columns) {
+      const cell = node('th', text);
+      cell.scope = 'col';
+      head.append(cell);
+    }
+    const body = element.createTBody();
+    for (const fields of records) {
+      const row = body.insertRow();
+      for (const [i, value] of fields.entries()) {
+        const cell = node(i === 0 ? 'th' : 'td', value);
+        if (i === 0) cell.scope = 'row';
+        row.append(cell);
+      }
+    }
+    return element;
+  }
+
+  function requestDetail(menu) {
+    const section = node('section', undefined, 'analysis-request');
+    section.append(node('h4', menu.kind + ' · ' + menu.played));
+    const inventory = node('dl', undefined, 'analysis-evidence');
+    for (const [label, value] of [
+      ['Moves', menu.moves.join(', ')], ['Terastallization', menu.tera], ['Bench options', menu.switches.join(', ')],
+      ['Availability', menu.uncertain ? 'The request flagged a possible hidden restriction.' : ''],
+    ]) {
+      if (value) inventory.append(node('dt', label), node('dd', value));
+    }
+    section.append(disclosure('Menu at the decision', inventory));
+    const matchup = menu.matchup;
+    if (matchup) {
+      const frame = node('div');
+      const caption = 'If ' + matchup.opponent + ' repeats ' + matchup.move + ' as a ' + matchup.type + '-type attack';
+      frame.append(table(caption, ['Position', 'Typing', 'Chart factor', 'Selected modifiers to check'],
+        matchup.defenders.map(item => [item.action, item.types, item.factor + '×', item.modifiers || '—'])),
+        node('p', 'The move was shown on turn ' + matchup.turn + '. These chart factors use the typing at the request or on the proposed switch or Tera. A move can change typing. Damage and switch-in safety also depend on abilities, items, field effects, HP and the opponent’s actual choice.'));
+      section.append(disclosure('Type matchups against ' + matchup.move, frame));
+    }
+    const tactics = menu.tactics;
+    if (!tactics) {
+      section.append(node('p', menu.reason, 'analysis-skip'));
+      return section;
+    }
+    section.append(node('p', tactics.label, 'analysis-tactic-label'), node('p', tactics.summary),
+      node('p', 'One turn of HP exchange · ' + tactics.worlds + ' hypothetical opposing teams · ' +
+        tactics.seedsPerReply + ' check rolls per reply', 'analysis-skip'));
+    const actionRows = tactics.candidates.map(action => [action.name + (action.played ? ' (played)' : ''),
+      action.score.toFixed(1), action.foeHP.toFixed(1), action.ownHP.toFixed(1), action.foeKO.toFixed(2), action.ownKO.toFixed(2)]);
+    const metrics = table('Scenario means at the end of the turn', ['Action', 'Net HP¹', 'Foe HP lost', 'Your HP lost', 'Foe faints', 'Your faints'], actionRows);
+    const measures = node('div');
+    measures.append(metrics, node('p', '¹ Net HP is opposing team HP lost minus your team HP lost. 100 points equals one full health bar. Negative HP lost means healing. The means cover ' + tactics.seedsPerReply + ' chance rolls per reply on each of ' + tactics.worlds + ' example teams. Rare outcomes can be missed.'));
+    section.append(disclosure('Compare ' + actionRows.length + ' actions', measures));
+    const replies = tactics.replies.map(r => [r.worldLabel ? r.worldLabel + ' · ' + r.reply : 'Set ' + r.world + ' · ' + r.reply,
+      r.playedScore.toFixed(1), r.alternativeScore.toFixed(1)]);
+    section.append(disclosure('Compare opponent replies', table('HP exchange by opposing set and reply',
+      ['Opponent scenario', tactics.played, tactics.alternative], replies)));
+    const assumptions = node('ul');
+    for (const fact of [tactics.objective, ...tactics.assumptions]) assumptions.append(node('li', fact));
+    section.append(disclosure('Simulation assumptions', assumptions));
+    return section;
+  }
+
   function detail(row) {
     const panel = $('turn-detail');
     panel.replaceChildren();
@@ -43,17 +114,18 @@
     }
     const heading = node('header', undefined, 'analysis-decision-head');
     heading.append(node('span', 'Turn ' + row.turn, 'analysis-turn-number'), node('h4', row.action));
-    const label = node('p', row.label, 'analysis-verdict');
-    if (Number.isFinite(row.stars)) {
+    const label = node('p', row.requests?.length ? 'Player menu recorded' : row.label, 'analysis-verdict');
+    if (Number.isFinite(row.stars) && !row.requests?.length) {
       const rating = node('span', stars(row.stars), 'analysis-row-stars');
       rating.setAttribute('aria-label', row.stars + ' out of 5 stars');
       label.append(' ', rating);
     }
     heading.append(label);
     panel.append(heading);
+    for (const menu of row.requests || []) panel.append(requestDetail(menu));
     const evidence = node('dl', undefined, 'analysis-evidence');
     for (const [title, value] of [['Before the choice', row.before], ['What happened', row.outcome],
-      ['Chance', row.luck], ['What to consider', row.lesson]]) {
+      ['Chance', row.luck], ['What to consider', row.requests?.length && row.comparison ? '' : row.lesson]]) {
       if (value) evidence.append(node('dt', title), node('dd', value));
     }
     panel.append(evidence);
@@ -69,7 +141,9 @@
       const button = node('button', undefined, 'analysis-turn');
       button.type = 'button';
       button.append(node('span', String(row.turn), 'analysis-index'), node('span', row.action, 'analysis-action'));
-      if (row.stars != null) {
+      if (row.requests?.some(menu => menu.tactics)) {
+        button.append(node('span', 'Simulated', 'analysis-mini-score'));
+      } else if (row.stars != null && !row.requests?.length) {
         const rated = node('span', row.stars + ' ★', 'analysis-mini-score');
         rated.setAttribute('aria-label', row.stars + ' out of 5 stars');
         button.append(rated);
@@ -106,26 +180,44 @@
   });
   function filterRows(turn) {
     const filter = $('turn-filter').value;
-    rows = report.sides[side].turns.filter(row => filter === 'all' || (filter === 'rated' ? row.stars != null : row.luck));
+    rows = report.sides[side].turns.filter(row => filter === 'all' ||
+      (filter === 'rated' && row.stars != null && !row.requests?.length) ||
+      (filter === 'tactics' && row.requests?.some(menu => menu.tactics)) ||
+      (filter === 'menus' && row.requests?.length) || (filter === 'luck' && row.luck));
     select(turn === undefined ? 0 : Math.max(0, rows.findIndex(row => row.turn === turn)), turn !== undefined);
   }
 
   function renderSide() {
     const review = report.sides[side];
-    $('coverage').textContent = review.rated
+    const practice = review.practice;
+    $('coverage-title').textContent = practice ? 'Practice decisions' : 'Overall play rating';
+    $('game-score').textContent = practice ? practice.compared + ' simulated' : 'Unavailable';
+    $('tactics-filter').hidden = $('menus-filter').hidden = !practice;
+    $('coverage').textContent = practice
+      ? practice.captured + ' confirmed choices recorded. Simulation covers eligible choices on turns 1–4.' +
+        (practice.matchups ? ' ' + practice.matchups + ' choices have defensive type matchups.' : '') +
+        (practice.unconfirmed ? ' ' + practice.unconfirmed + ' unconfirmed requests omitted.' : '') +
+        (practice.truncated ? ' The capture reached its limit.' : '') : review.rated
       ? review.rated + ' of ' + review.decisions + ' visible choices compared. Four stars on ' +
         review.fourStars + ', two stars on ' + review.twoStars + '.'
       : report.supported ? 'No supported move comparisons for this player. ' + review.decisions + ' visible choices.' : 'Outside comparison scope';
     $('game-summary').textContent = review.summary;
-    const revisit = review.turns.find(row => row.stars != null && row.stars <= 2);
+    const simulated = review.turns.flatMap(row => (row.requests || []).filter(menu => menu.tactics)
+      .map(menu => ({ turn: row.turn, ...menu.tactics })));
+    const example = simulated.find(item => item.label === 'Opportunity to study') ||
+      simulated.find(item => item.label === 'Prediction-dependent') || simulated[0];
+    const revisit = example || review.turns.find(row => row.stars != null && row.stars <= 2 && !row.requests?.length);
     $('review-takeaway').hidden = !revisit;
     if (revisit) {
       const link = node('button', 'Revisit turn ' + revisit.turn, 'analysis-inline-link');
       link.type = 'button';
       link.addEventListener('click', () => { $('turn-filter').value = 'all'; filterRows(revisit.turn); });
-      $('review-takeaway').replaceChildren(link, ' ' + revisit.lesson);
+      $('review-takeaway').replaceChildren(link, ' ' + (example ? example.summary : revisit.lesson));
     }
-    $('scoring-method').textContent = report.scope.replace(/[.]$/, '') + (report.supported
+    $('method-title').textContent = practice ? 'How choices are compared' : 'How stars work';
+    $('scoring-method').textContent = practice
+      ? 'On turns 1–4, the simulator looks for two example teams that reproduce your menu and the preceding events. It compares one turn of HP changes and faints across the same replies and chance rolls. Later choices can show defensive type matchups against a previously seen attack. Overall strategic play is ungraded.'
+      : report.scope.replace(/[.]$/, '') + (report.supported
       ? '. Four stars mark an open damage route against an immunity, or the higher base power of two otherwise matched attacks. Two mark the other side of either comparison. Rounding and knockouts can make both attacks deal the same damage. Both moves must be available and the target must stay as shown. The replay cannot establish which choice best served the whole game.' : '');
     $('turn-panel').hidden = !review.turns.length;
     const moments = $('moments');

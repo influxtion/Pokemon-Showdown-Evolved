@@ -787,4 +787,6 @@ function analyzeBattle(log) {
   return summarize(report);
 }
 
-module.exports = { analyzeBattle };
+function speciesTyping(name) { return speciesTypes.get(id(name)); }
+
+module.exports = { analyzeBattle, speciesTyping };

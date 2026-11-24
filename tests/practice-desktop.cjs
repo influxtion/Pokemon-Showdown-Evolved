@@ -443,6 +443,24 @@ async function smoke() {
   const forfeitedRoom = (await status()).battle.room;
   assert.notEqual(restartedPlayer.id, playerId);
   assert.equal(children.length, 4);
+  // The first game above drives visible move/switch buttons. Submit three decisions through
+  // the same upstream sendDecision entry point here, independently of its animation controls.
+  for (let i = 0; i < 3; i++) {
+    const rqid = await until(() => battleEval(restartedPlayer, `
+      const request = room.request;
+      if (!request?.rqid || request.wait) return null;
+      const forced = request.forceSwitch?.[0];
+      const slot = forced ? request.side.pokemon.findIndex(mon => !mon.active && !mon.reviving &&
+        (mon.condition === '0 fnt') === Boolean(request.side.pokemon[0].reviving)) :
+        request.active?.[0]?.moves.findIndex(move => !move.disabled && move.pp !== 0);
+      if (!(slot >= 0)) return null;
+      room.sendDecision([(forced ? 'switch ' : 'move ') + (slot + 1)]);
+      return request.rqid;
+    `), 'submitted real decision ' + (i + 1) + ' for review');
+    await until(() => battleEval(restartedPlayer, `
+      return room.request.rqid > ${rqid} && !room.request.wait;
+    `), 'new request after the confirmed practice choice', 20000);
+  }
   await until(() => run(`(() => {
     const forfeit = document.getElementById('battle-forfeit');
     if (forfeit.hidden || forfeit.disabled) return false;
@@ -467,11 +485,37 @@ async function smoke() {
   }, 'forfeit ended the battle and kept the room');
   await until(() => run("!document.getElementById('review-offer').hidden"), 'finished battle offers review');
   await run("document.getElementById('offer-open').click()");
-  await until(() => renderer.getURL().endsWith('/battle-review.html'), 'reviewed actual practice player log');
+  await until(() => renderer.getURL().endsWith('/battle-review.html'), 'reviewed actual practice player log', 48000);
   const completedReview = await call('getBattleReview');
   assert.equal(completedReview.ok, true);
   assert.ok(completedReview.report.players[completedReview.side]);
   assert.ok(completedReview.report.winner);
+  const seatReview = completedReview.report.sides[completedReview.side];
+  assert.ok(seatReview.practice.captured >= 3, JSON.stringify(seatReview.practice));
+  const opening = seatReview.turns[0].requests[0];
+  assert.ok(opening.moves.some(move => move.includes('PP')));
+  assert.ok(opening.switches.length);
+  assert.equal(completedReview.report.sides[completedReview.side === 'p1' ? 'p2' : 'p1'].practice, undefined);
+  assert.ok(opening.tactics || /[Mm]enu|hypothetical|consistently/.test(opening.reason), opening.reason);
+  console.log('Practice decision review', JSON.stringify({ turns: completedReview.report.turnCount,
+    ...seatReview.practice, opening: opening.tactics?.label || opening.reason }));
+  if (opening.tactics) {
+    await until(() => run("document.getElementById('coverage-title').textContent === 'Practice decisions'"), 'practice report rendered');
+    await run("const pick = document.getElementById('turn-filter'); pick.value = 'tactics'; pick.dispatchEvent(new Event('change'))");
+    assert.equal(await run("document.querySelectorAll('.analysis-request').length > 0"), true);
+    await run("[...document.querySelectorAll('.analysis-disclosure')].find(el => el.querySelector('summary').textContent.endsWith('actions')).open = true");
+    assert.equal(await run("document.querySelector('.analysis-disclosure[open] tbody').rows.length"), opening.tactics.candidates.length);
+    for (const [width, height] of [[1366, 768], [1024, 640]]) {
+      win.setSize(width, height);
+      for (const theme of ['light', 'dark']) {
+        await call('setTheme', theme);
+        await run("document.getElementById('turn-panel').scrollIntoView({block:'start'})");
+        await pause(350);
+        assert.ok(await run("document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth"));
+        await capture(renderer, 'review-' + width + '-' + theme);
+      }
+    }
+  }
   await load('practice-battle.html');
   await until(() => restarted.getVisible(), 'finished battle survived review');
   await until(() => run("!document.getElementById('battle-review-prompt').hidden && document.getElementById('review-offer').hidden"), 'old battle keeps review action without repeating the offer');

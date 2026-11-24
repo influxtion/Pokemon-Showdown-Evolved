@@ -92,6 +92,7 @@ function stageClient(target) {
   for (const entry of ['practice-client.html', 'client-bootstrap.js', 'practice-client.css']) {
     copy(path.join(vendor, entry), path.join(output, entry));
   }
+  copy(path.join(workspace, 'app/battle-review-capture.js'), path.join(output, 'battle-review-capture.js'));
 
   const appFile = path.join(output, 'js/oldclient/client.js');
   let app = fs.readFileSync(appFile, 'utf8');

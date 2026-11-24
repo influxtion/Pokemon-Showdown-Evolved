@@ -51,6 +51,11 @@
       Storage.prefs('theme', 'system');
       Storage.prefs('mute', true);
       const client = new App();
+      // Socket events are delivered in a later task. Install before the first
+      // login/challenge can reach the server, including on a fast loopback.
+      if (!hosted && location.protocol === 'file:' && format === 'gen9randombattle') {
+        try { window.battleReviewCapture().install(window, human); } catch { /* Practice stays playable. */ }
+      }
       const login = client.user;
       const usedRooms = new Set();
       let battle;

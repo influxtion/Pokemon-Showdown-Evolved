@@ -84,6 +84,7 @@ class PracticeView {
     view.setVisible(false);
     this.window.contentView.addChildView(view);
     const contents = view.webContents;
+    this.capturePractice = !connection.clientUrl && connection.format === 'gen9randombattle';
     this.onContents(contents);
     contents.session.setPermissionCheckHandler(() => false);
     contents.session.setPermissionRequestHandler((_contents, _permission, respond) => respond(false));
@@ -160,7 +161,7 @@ class PracticeView {
   status() { return { state: this.state, error: this.error }; }
 
   finishedBattle(roomId) {
-    return new ShowdownBridge(() => this.view?.webContents).finishedBattle(roomId);
+    return new ShowdownBridge(() => this.view?.webContents).finishedBattle(roomId, this.capturePractice === true);
   }
 
   // Runs JavaScript in the open battle document, if there is one.
@@ -199,6 +200,7 @@ class PracticeView {
     clearTimeout(this.healthTimer);
     this.healthTimer = null;
     this.state = 'idle';
+    this.capturePractice = false;
     this.error = '';
     if (!this.view) return;
     const view = this.view;

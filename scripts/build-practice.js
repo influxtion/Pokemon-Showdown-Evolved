@@ -54,6 +54,7 @@ function preserveSources(pending) {
     ['showdown-client-data', path.join(ROOT, 'out/practice-client-source/caches/pokemon-showdown')],
   ]) run('git', ['-C', source, 'archive', '--format=tar', '--output', path.join(sourceDir, `${name}.tar`), 'HEAD']);
   fs.copyFileSync(__filename, path.join(sourceDir, 'build-practice.js'));
+  fs.copyFileSync(path.join(ROOT, 'app/battle-review-capture.js'), path.join(sourceDir, 'battle-review-capture.js'));
   const adapter = path.join(sourceDir, 'desktop-adapter');
   fs.mkdirSync(adapter);
   for (const name of ADAPTER_SOURCES) fs.copyFileSync(path.join(ROOT, 'scripts/practice', name), path.join(adapter, name));

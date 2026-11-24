@@ -36,7 +36,7 @@ function replayLogUrl(value) {
 
 // This function also runs inside the battle client, before data crosses into the launcher.
 // The upstream client can include chat, server HTML and private request messages in its queue.
-function visibleProtocol(lines, maxLines, maxLength, maxChars) {
+function visibleProtocol(lines, maxLines, maxLength, maxChars, boundaries) {
   if (!Array.isArray(lines) || lines.length > maxLines) return { code: 'review-limit' };
   const permitted = /^(?:\|$|\|(?:gametype|gen|tier|player|teamsize|start|turn|move|switch|replace|detailschange|drag|faint|cant|upkeep|win|tie|poke|teampreview|-[-a-z0-9]+)(?:\||$))/;
   const textOnly = /^\|-(?:message|hint|anim|animcustom)\|/;
@@ -54,6 +54,7 @@ function visibleProtocol(lines, maxLines, maxLength, maxChars) {
   const kept = [];
   let length = 0;
   for (let i = 0; i < lines.length; i++) {
+    if (boundaries?.has(i)) boundaries.set(i, kept.length);
     let line = lines[i];
     if (typeof line !== 'string') return { code: 'invalid-replay' };
     if (line.startsWith('|split|')) {
@@ -170,11 +171,11 @@ async function fetchReplay(rawUrl, signal, fetchImpl = globalThis.fetch) {
   }
 }
 
-function runReviewWorker(text, type, signal) {
+function runReviewWorker(text, type, signal, practice) {
   const { Worker } = require('node:worker_threads');
   signal.throwIfAborted();
   const worker = new Worker(path.join(__dirname, 'battle-review-worker.js'), {
-    workerData: { text, type }, resourceLimits: { maxOldGenerationSizeMb: 96 },
+    workerData: { text, type, practice }, resourceLimits: { maxOldGenerationSizeMb: practice ? 224 : 96 },
   });
   return new Promise((resolve, reject) => {
     const abort = () => { worker.terminate().catch(() => {}); reject(signal.reason); };
@@ -199,11 +200,12 @@ function waitForCapture(promise, signal) {
 }
 
 class BattleReviewInput {
-  constructor({ getNoteUrl, capture, analyze = runReviewWorker, fetchImpl, timeoutMs = 20000 }) {
+  constructor({ getNoteUrl, capture, analyze = runReviewWorker, fetchImpl, simulatorRoot, timeoutMs }) {
     this.getNoteUrl = getNoteUrl;
     this.capture = capture;
     this.analyze = analyze;
     this.fetchImpl = fetchImpl;
+    this.simulatorRoot = simulatorRoot;
     this.timeoutMs = timeoutMs;
     this.epoch = 0;
     this.clear();
@@ -237,9 +239,11 @@ class BattleReviewInput {
     this.cancel();
     const job = new AbortController();
     this.job = job;
-    const signal = AbortSignal.any([job.signal, AbortSignal.timeout(this.timeoutMs)]);
+    const practiceRandom = source.kind === 'practice' && typeof source.roomId === 'string' &&
+      /^battle-gen9randombattle-/.test(source.roomId);
+    const signal = AbortSignal.any([job.signal, AbortSignal.timeout(this.timeoutMs ?? (practiceRandom ? 45000 : 20000))]);
     try {
-      let text, type = 'log', side = 'p1';
+      let text, practice, type = 'log', side = 'p1';
       if (source.kind === 'online' || source.kind === 'practice') {
         if (typeof source.roomId !== 'string' || source.roomId.length > 120 || !ROOM_ID.test(source.roomId)) throw problem('review-room');
         const captured = await waitForCapture(Promise.resolve(this.capture(source.kind, source.roomId)), signal);
@@ -248,6 +252,7 @@ class BattleReviewInput {
             captured.log.length > MAX_LOG_BYTES || Buffer.byteLength(captured.log) > MAX_LOG_BYTES) throw problem('review-room');
         text = captured.log;
         side = captured.side;
+        if (practiceRandom) practice = { side, capture: captured.capture, simulatorRoot: this.simulatorRoot };
       } else if (source.kind === 'file') {
         if (!this.selected || source.token !== this.selected.token) throw problem('review-file');
         type = this.selected.type;
@@ -262,7 +267,7 @@ class BattleReviewInput {
         text = await fetchReplay(url, signal, this.fetchImpl);
       } else throw problem('invalid-replay');
       signal.throwIfAborted();
-      const report = await this.analyze(text, type, signal);
+      const report = await this.analyze(text, type, signal, practice);
       signal.throwIfAborted();
       this.report = report;
       this.side = side;

@@ -230,6 +230,37 @@ app.whenReady().then(async () => {
   await run("document.getElementById('turn-panel').scrollIntoView({block:'start'})");
   await pause(370);
   await capture('compared-1024-light');
+  const { practiceGame, simulatorRoot } = require('./fixtures/practice-review.cjs');
+  if (fs.existsSync(path.join(simulatorRoot, 'dist/sim/battle.js'))) {
+    // Deterministic whole-game fixture for the later-turn chart. The live practice suite
+    // separately exercises capture, the end-of-battle button, real IPC and the simulator.
+    const generated = practiceGame(2);
+    const service = new BattleReviewInput({ simulatorRoot, capture: () => generated });
+    assert.deepEqual(await service.review({ kind: 'practice', roomId: room }), { ok: true });
+    const state = service.status();
+    const later = state.report.sides.p1.turns.find(row => row.turn > 4 && row.requests?.some(menu => menu.matchup));
+    assert.ok(later);
+    ipcMain.removeHandler('battle-review:status');
+    ipcMain.handle('battle-review:status', () => state);
+    await load('battle-review.html');
+    await until(() => run("document.getElementById('coverage-title').textContent === 'Practice decisions'"), 'captured practice report');
+    await change('turn-filter', 'menus');
+    await run('[...document.querySelectorAll(".analysis-turn")].find(button => button.querySelector(".analysis-index").textContent === ' + JSON.stringify(String(later.turn)) + ').click()');
+    await run("[...document.querySelectorAll('.analysis-disclosure')].find(el => el.querySelector('summary').textContent.startsWith('Type matchups')).open = true");
+    assert.match(await run("document.querySelector('.analysis-disclosure[open]').textContent"), /move was shown on turn/);
+    assert.ok(await run("document.querySelector('.analysis-disclosure[open] tbody').rows.length") > 1);
+    for (const [w, theme] of [[1024, 'dark'], [1366, 'light']]) {
+      win.setSize(w, w === 1024 ? 640 : 768);
+      await call('setTheme', theme);
+      await run("document.getElementById('turn-panel').scrollIntoView({block:'start'})");
+      await pause(370);
+      assert.ok(await run("document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth"));
+      await capture('defensive-' + w + '-' + theme);
+    }
+    await change('perspective', 'p2');
+    assert.equal(await run("document.getElementById('menus-filter').hidden"), true);
+    assert.equal(await run("document.querySelector('.analysis-request')"), null);
+  }
   console.log('PASS battle review: explicit starts, file/link/note/own battle, real worker, both sides, filters, errors, cancellation, drafts, both themes and sizes');
   app.exit(0);
 }).catch(error => { console.error(error); app.exit(1); });

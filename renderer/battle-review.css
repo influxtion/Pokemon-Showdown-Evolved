@@ -63,6 +63,19 @@
 .analysis-evidence dd { margin: 3px 0 10px; color: var(--text-2); line-height: 1.45; overflow-wrap: anywhere; }
 .analysis-evidence dd:last-child { margin-bottom: 0; }
 .analysis-no-turns { color: var(--text-2); }
+.analysis-request { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+.analysis-request p { margin-top: 6px; line-height: 1.45; }
+.analysis-tactic-label { color: var(--accent); font-weight: 600; }
+.analysis-skip, .analysis-disclosure { color: var(--text-2); font-size: var(--fs-sm); }
+.analysis-disclosure { margin-top: 7px; }
+.analysis-disclosure summary { color: var(--accent); cursor: pointer; width: fit-content; }
+.analysis-disclosure ul { padding-left: 1.4em; }
+.analysis-disclosure li { margin: 4px 0; }
+.analysis-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+.analysis-table caption { text-align: left; color: var(--text); margin-bottom: 3px; }
+.analysis-table th, .analysis-table td { padding: 4px; border-bottom: 1px solid var(--border); text-align: right; overflow-wrap: anywhere; }
+.analysis-table th:first-child { text-align: left; }
+.analysis-table tbody th { font-weight: 400; }
 @media (max-width: 1100px) {
   .analysis-overview { grid-template-columns: 160px minmax(0, 1fr); }
   .analysis-rating, .analysis-summary, .analysis-detail { padding: 12px 14px; }

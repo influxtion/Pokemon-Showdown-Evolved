@@ -11,7 +11,10 @@ const ADAPTER = path.join(__dirname, 'practice');
 // Releases carry only the simulator entry point; the build scripts are checked as sources.
 const ADAPTER_FILES = ['server.cjs'];
 const BUILD_FILES = ['build-server.cjs', 'build-client.cjs'];
-const CLIENT_FILES = ['practice-client.html', 'practice-client.css', 'client-bootstrap.js'];
+const CLIENT_SOURCES = [
+  ...['practice-client.html', 'practice-client.css', 'client-bootstrap.js'].map(name => path.join(VENDOR, name)),
+  path.join(ROOT, 'app/battle-review-capture.js'),
+];
 
 function sha(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
 function fileSha(file) { return sha(fs.readFileSync(file)); }
@@ -47,8 +50,9 @@ function verifySource(manifest) {
       throw new Error(`Practice adapter ${name} changed after the runtime build. Rebuild before packaging.`);
     }
   }
-  for (const name of CLIENT_FILES) {
-    const expected = fileSha(path.join(VENDOR, name));
+  for (const source of CLIENT_SOURCES) {
+    const name = path.basename(source);
+    const expected = fileSha(source);
     if (manifest.files[`sources/${name}`]?.sha256 !== expected || manifest.files[`client/${name}`]?.sha256 !== expected) {
       throw new Error(`Practice client ${name} changed after the runtime build. Rebuild before packaging.`);
     }

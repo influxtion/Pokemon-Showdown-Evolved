@@ -112,4 +112,6 @@ function compareAttacks(side, action, scene) {
   return comparisons[0];
 }
 
-module.exports = { compareAttacks, ordinaryFactor, abilities, abilityImmunities };
+function ordinaryAttackType(moveId) { return attacks.get(moveId)?.type; }
+
+module.exports = { compareAttacks, ordinaryFactor, ordinaryAttackType, abilities, abilityImmunities };

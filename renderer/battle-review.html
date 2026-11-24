@@ -101,15 +101,15 @@
           <label class="analysis-perspective">Reviewing player <select id="perspective" class="select"></select></label>
         </header>
         <section class="analysis-overview panel" aria-label="Game summary">
-          <div class="analysis-rating"><h3>Overall play rating</h3><strong id="game-score">Unavailable</strong><p id="coverage"></p></div>
-          <div class="analysis-summary"><h3>Game summary</h3><p id="game-summary"></p><p id="review-takeaway" hidden></p><details id="scoring"><summary>How stars work</summary><p id="scoring-method"></p></details></div>
+          <div class="analysis-rating"><h3 id="coverage-title">Overall play rating</h3><strong id="game-score">Unavailable</strong><p id="coverage"></p></div>
+          <div class="analysis-summary"><h3>Game summary</h3><p id="game-summary"></p><p id="review-takeaway" hidden></p><details id="scoring"><summary id="method-title">How stars work</summary><p id="scoring-method"></p></details></div>
         </section>
         <section id="highlights" class="analysis-highlights" aria-labelledby="moments-heading" hidden>
           <h3 id="moments-heading">Key moments</h3><div id="moments"></div>
         </section>
         <section id="turn-panel" class="panel analysis-turns" aria-labelledby="turns-heading">
           <header class="panel-head analysis-turnbar"><h3 id="turns-heading">Turn review</h3>
-            <label>Show <select class="select" id="turn-filter"><option value="all">All turns</option><option value="rated">Compared attacks</option><option value="luck">Chance events</option></select></label>
+            <label>Show <select class="select" id="turn-filter"><option value="all">All turns</option><option id="tactics-filter" value="tactics" hidden>Simulated choices</option><option id="menus-filter" value="menus" hidden>Recorded choices</option><option value="rated">Compared attacks</option><option value="luck">Chance events</option></select></label>
           </header>
           <div class="analysis-workbench">
             <nav aria-label="Battle decisions" class="analysis-turnlist" id="turn-list"></nav>

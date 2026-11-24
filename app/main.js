@@ -119,7 +119,10 @@ let preparingPractice = 0;
 let logger = null;
 let windowState = null;
 const bridge = new ShowdownBridge(() => (client ? client.webContents : null));
+const practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
+  : path.join(__dirname, '..', 'vendor', 'practice', 'dist');
 const battleReview = new BattleReviewInput({
+  simulatorRoot: path.join(practiceRoot, 'server'),
   getNoteUrl: id => replays?.get(id)?.url,
   capture: async (kind, roomId) => {
     if (kind === 'online') {
@@ -332,8 +335,6 @@ function createWindow() {
   win.on('focus', () => { if (!currentWindow.isDestroyed()) currentWindow.flashFrame(false); });
   if (process.env.SHOWDOWN_DESKTOP_BACKGROUND === '1') win.setIgnoreMouseEvents(true);
   replayReview = new ReplayReview({ window: win, css: REPLAY_CSS, background: background(), onContents: contents => appearanceStyles.watch(contents) });
-  const practiceRoot = app.isPackaged ? path.join(process.resourcesPath, 'practice')
-    : path.join(__dirname, '..', 'vendor', 'practice', 'dist');
   const practiceScripts = app.isPackaged ? path.join(process.resourcesPath, 'practice-adapter')
     : path.join(__dirname, '..', 'scripts', 'practice');
   // The simulator runs here; only Foul Play's moves come from the cloud or the local engine.
