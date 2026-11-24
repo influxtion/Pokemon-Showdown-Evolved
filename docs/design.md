@@ -1079,3 +1079,46 @@ Verified: syntax checks, 283 unit tests with zero skips, all 13 desktop suites a
 The shared bot queue now admits the earliest eligible player, skipping blocked Metamon tickets while preserving their place and both total/model session caps. Eligible queued players retain priority over newcomers. Hosted admission adds CPU and RAM reservations, live memory headroom checks and capacity retention until terminated workers exit. Defaults reserve at least 25% CPU (whole-thread rounding, minimum one usable thread) and max(1 GiB, 25%) RAM. Foul Play reserves 512 MiB and Metamon 2 GiB per session. These estimates can be raised; aggregate budgets can be tightened. Implementation, configuration, regression and real-battle evidence, and host-sizing limits are in docs/bots.md. Source is ready for the friend's host; no remote deployment or installer/release work occurred.
 
 Verified syntax, 292 unit tests with zero skips (including package allowlist checks), standalone API startup with effective resource reporting, two real Metamon OU battles and two Medium Random Battles under explicit resource budgets. No renderer changes or desktop-suite rerun for this server-only change. Windows loopback verification does not establish capacity or cgroup behavior on the Linux host.
+
+## v0.4.0 Windows and Linux candidates - November 24, 2026
+
+At the owner's request, build commit `09ad1107b24dca9e7d80d16f11e6c6582cfa981a`
+on `feat/release-0.4.0` prepares the latest reviewer branch as version 0.4.0.
+The feature remains separate from main. No tag, public release, release asset
+upload or hosted deployment was created. Mac packages were not built.
+
+The manually dispatched native-release workflow now defaults to Windows x64
+and Linux x64; Mac requires its explicit `include_macos` input. It retains
+read-only repository contents permission and `--publish never`. The simulator
+is built before tests so simulator-dependent tests run, and both native jobs
+smoke-test their unpacked app with a temporary profile and a simple local
+practice battle. Linux CI sets up the unpacked Chromium sandbox helper for
+that test. This does not establish AppImage mounting or desktop integration
+on every Linux distribution.
+
+[Actions run 45459432686](https://github.com/influxtion/Pokemon-Showdown-Evolved/actions/runs/45459432686)
+succeeded and produced these six candidate assets:
+
+- `Pokemon.Showdown.Evolved.Setup.0.4.0-x64.exe`
+- `Pokemon.Showdown.Evolved.Setup.0.4.0-x64.exe.blockmap`
+- `latest.yml`
+- `Pokemon.Showdown.Evolved.0.4.0.Linux-x86_64.AppImage`
+- `Pokemon.Showdown.Evolved.0.4.0.Linux-x64.tar.gz`
+- `latest-linux.yml`
+
+Local copies, SHA-256 sums, verification records and logs are under ignored
+`out/release-0.4.0/`. Both downloaded artifact ZIP digests match GitHub's
+records; generated updater versions, filenames, sizes and SHA-512 hashes
+match the binaries. Extracted Windows installer and Linux archive contents
+match 104 packaged source files, 57 pinned Showdex assets and all 2,290
+simulator manifest files on each platform. The packaged API allowlist and
+GitHub updater configuration also passed verification.
+
+Verification: syntax and 368 unit tests with zero skips on Windows and Linux;
+all 14 local desktop suites; live guest shell check; native Windows/Linux
+packaged startup, replay persistence, real simple-bot move, navigation,
+forfeit/rematch and child cleanup. The exact downloaded Windows installer
+was additionally extracted and passed the local packaged smoke test.
+Windows remains unsigned. Clean-machine installation, an actual installed
+0.3.0-to-0.4.0 update, and Linux AppImage launch were not exercised. Publication
+and integration into main still require the owner's explicit approval.
