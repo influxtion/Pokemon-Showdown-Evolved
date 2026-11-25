@@ -1132,10 +1132,9 @@ function installTeamEditor() {
         active.name !== room.curChartName) room.chartFocus({ currentTarget: active });
     const isSearch = searching(room);
     if (isSearch && room.curChartName && room.$chart && !room.$chart[0].childElementCount) room.updateChart(true);
-    for (const result of frame.querySelectorAll('.result > a:has(> .statcol)')) {
-      const stats = el('span', 'sd-te-result-stats');
-      stats.append(...result.querySelectorAll(':scope > .statcol, :scope > .bstcol'));
-      result.append(stats);
+    // Keep the native one-row column order. Truncated text remains available on hover.
+    for (const column of frame.querySelectorAll('.result > a > :is(.namecol, .pokemonnamecol, .shortpokemonnamecol, .movenamecol, .shortmovenamecol, .itemdesccol, .abilitydesccol, .movedesccol):not([title])')) {
+      column.title = column.textContent;
     }
     frame.classList.toggle('sd-te-picker-idle', !isSearch);
     const move = /^move(\d)$/.exec(room.curChartName || '');

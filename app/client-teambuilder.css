@@ -1898,21 +1898,24 @@ html.sd-launcher-shell #room-teambuilder {
   .sd-te-picker-idle .sd-te-picker-empty { display: block !important; }
   .sd-te-picker-idle .teambuilder-results, .sd-te-picker-idle .sd-te-picker-search { display: none !important; }
   .sd-te-picker-idle h2 { margin-bottom: 0 !important; }
-  /* Taller rows keep native incremental loading ahead of the viewport. Auto height
-     removes the client's estimated 33px-per-result spacer; every row stays reachable. */
+  /* Native utilichart column widths and 33px row pitch keep the original scan order
+     and incremental scrolling. Descriptions use the space left in the pane. */
   .sd-te-picker .utilichart { min-width: 0 !important; height: auto !important; }
-  .sd-te-picker .utilichart .result { height: auto !important; min-height: 33px !important; contain: none !important; }
-  .sd-te-picker .result > a { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 4px !important; height: auto !important; min-height: 32px !important; margin: 0 !important; padding: 8px 12px !important; border-bottom: 1px solid var(--sd-border) !important; }
-  .sd-te-picker .result .col { float: none !important; padding: 0 !important; height: auto !important; min-height: 0 !important; }
-  .sd-te-picker .result .numcol { display: none !important; }
-  .sd-te-picker .result .pokemonnamecol, .sd-te-picker .result .shortpokemonnamecol { flex: 1 !important; min-width: 100px !important; white-space: normal !important; }
-  .sd-te-picker .result .abilitycol, .sd-te-picker .result .twoabilitycol { flex: 1 1 40% !important; text-align: left !important; }
-  .sd-te-picker .result .statcol, .sd-te-picker .result .bstcol { flex: 1 1 10% !important; text-align: left !important; }
-  .sd-te-picker .sd-te-result-stats { display: grid !important; grid-template-columns: repeat(7, minmax(0, 1fr)) !important; flex: 0 0 100% !important; gap: 4px !important; }
-  .sd-te-picker .result .movenamecol, .sd-te-picker .result .shortmovenamecol { flex: 1 !important; min-width: 130px !important; }
-  .sd-te-picker .result .itemdesccol, .sd-te-picker .result .abilitydesccol, .sd-te-picker .result .movedesccol { flex: 1 1 100% !important; width: auto !important; white-space: normal !important; line-height: 1.5 !important; }
-  .sd-te-picker .result .sortrow { display: flex !important; flex-wrap: wrap !important; padding: 4px 8px !important; }
-  .sd-te-picker .sortrow button { width: auto !important; flex: 1 !important; min-width: 32px !important; padding: 4px !important; font-size: 11px !important; }
+  /* Pokémon keep all native ability/stat columns; narrow panes can pan sideways. */
+  .sd-te-picker .utilichart:has(.pnamesortcol),
+  .sd-te-picker .utilichart:has(a[data-entry^="pokemon|"] .statcol) { min-width: 624px !important; }
+  .sd-te-picker .utilichart .result { box-sizing: border-box !important; height: 33px !important; min-height: 0 !important; padding: 0 !important; contain: none !important; }
+  .sd-te-picker .result > a { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; box-sizing: border-box !important; gap: 0 !important; height: 32px !important; min-height: 0 !important; margin: 0 4px 1px !important; padding: 0 4px !important; border: 1px solid transparent !important; border-radius: 2px !important; }
+  .sd-te-picker .result .col { flex: 0 0 auto !important; float: none !important; padding-top: 0 !important; height: auto !important; min-height: 0 !important; line-height: 14px !important; }
+  .sd-te-picker .result .namecol,
+  .sd-te-picker .result .pokemonnamecol, .sd-te-picker .result .shortpokemonnamecol,
+  .sd-te-picker .result .movenamecol, .sd-te-picker .result .shortmovenamecol { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; font-size: 13px !important; }
+  .sd-te-picker .result .typecol { white-space: nowrap !important; }
+  .sd-te-picker .result .typecol img { vertical-align: middle !important; }
+  .sd-te-picker .result .itemdesccol, .sd-te-picker .result .abilitydesccol, .sd-te-picker .result .movedesccol { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .sd-te-picker .result h3 { box-sizing: border-box !important; height: 32px !important; padding: 6px 8px !important; line-height: 19px !important; }
+  .sd-te-picker .result .sortrow { display: flex !important; flex-wrap: nowrap !important; padding: 0 !important; }
+  .sd-te-picker .sortrow button { flex: 0 0 auto !important; min-width: 0 !important; padding: 0 !important; font-size: 11px !important; }
   .sd-te-picker .sortrow button.cur { background: var(--sd-hover) !important; color: var(--sd-text) !important; }
   .sd-te-picker .utilichart .col { color: var(--sd-text-2) !important; }
   .sd-te-picker .utilichart .namecol,

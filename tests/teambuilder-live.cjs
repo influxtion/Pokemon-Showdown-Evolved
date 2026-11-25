@@ -125,11 +125,11 @@ app.whenReady().then(async () => {
   await js("document.querySelector('.sd-te-picker input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',keyCode:27,bubbles:true,cancelable:true})); 0");
   await until(() => js('document.querySelector(".sd-te-picker input").value === ""'), 'Escape clears search');
   // Reach the end using the real pane's scroll listener, including incremental rows.
-  for (let i = 0; i < 30; i++) {
-    if (await js('tb.search.renderingDone')) break;
+  await until(async () => {
+    if (await js('tb.search.renderingDone')) return true;
     await js(`(() => {const results=document.querySelector('.teambuilder-results');results.scrollTop=results.scrollHeight;results.dispatchEvent(new Event('scroll'));})()`);
-    await pause(30);
-  }
+    return false;
+  }, 'full compact Pokémon roster', 20000);
   assert.equal(await js('tb.search.renderingDone'), true, 'full Pokémon roster reachable');
   assert.equal(await js('tb.search.renderedIndex'), await js('tb.search.resultSet.length'), 'no results omitted');
   await js('document.querySelector(".teamchart input[name=pokemon]").value="Garchomp"; 0');
@@ -204,8 +204,40 @@ app.whenReady().then(async () => {
         fs.writeFileSync(path.join(output, `tools-expanded-${theme}.png`), (await client.capturePage()).toPNG());
         await js(`document.querySelector('${detailsExtra} > summary').click(); document.querySelector('${statsExtra} > summary').click(); document.querySelector('.teamchartbox.individual').scrollTop=0; 0`);
       }
+      for (const field of ['pokemon', 'item', 'ability', 'move1']) {
+        await focusField(field);
+        await until(() => js(`document.querySelector('.sd-te-picker input')?.dataset.for === ${JSON.stringify(field)}`), field + ' compact roster');
+        const rows = await js(`(() => {
+          const results=document.querySelector('.sd-te-picker .teambuilder-results');
+          return {scroll:results.scrollWidth,client:results.clientWidth,rows:[...results.querySelectorAll('.result > a[data-entry]')].slice(0,20).map(a=>{
+            const r=a.getBoundingClientRect();
+            return {height:r.height,columns:[...a.querySelectorAll(':scope > .col')].map(c=>{const q=c.getBoundingClientRect();return {top:q.top-r.top,bottom:q.bottom-r.top};}),description:[...a.querySelectorAll('.itemdesccol,.abilitydesccol,.movedesccol')].every(c=>c.title===c.textContent)};
+          })};
+        })()`);
+        assert.ok(rows.rows.length > 0, field + ' has options');
+        for (const row of rows.rows) {
+          assert.ok(row.height <= 33, field + ' uses compact native-height options');
+          assert.ok(row.columns.every(c => c.top >= -1 && c.bottom <= row.height + 1), field + ' columns share one row');
+          assert.equal(row.description, true, 'full description available on hover');
+        }
+        if (field !== 'pokemon') assert.ok(rows.scroll <= rows.client + 1, field + ' roster fits without horizontal scrolling');
+        else {
+          await js('document.querySelector(".teambuilder-results").scrollLeft=9999; 0');
+          assert.equal(await js(`(() => {const p=document.querySelector('.teambuilder-results'),s=p.querySelector('.bstcol');return !s || s.getBoundingClientRect().right<=p.getBoundingClientRect().right;})()`), true, 'all Pokémon stat columns reachable');
+          await js('document.querySelector(".teambuilder-results").scrollLeft=0; 0');
+        }
+        await client.capturePage();
+        await pause(100);
+        fs.writeFileSync(path.join(output, `roster-${field}-${width}-${theme}.png`), (await client.capturePage()).toPNG());
+      }
     }
   }
+  // Compact column headings still invoke the client's native sorting.
+  await focusField('move1');
+  await until(() => js('!!document.querySelector(".sd-te-picker [data-sort=power]")'), 'move sort heading');
+  await js('document.querySelector(".sd-te-picker [data-sort=power]").click(); 0');
+  await until(() => js('tb.search.sortCol === "power"'), 'move power sorting');
+  assert.equal(await js('tb.curSet.moves[0]'), 'Earthquake', 'sorting does not select a move');
   for (const field of ['pokemon', 'item', 'ability']) {
     await focusField(field);
     await until(() => js(`document.querySelector('.sd-te-picker input')?.dataset.for === ${JSON.stringify(field)}`), field + ' browse');
@@ -262,7 +294,7 @@ app.whenReady().then(async () => {
   assert.match(await js(`Storage.exportTeam(Storage.unpackTeam(Storage.teams[${teamIndex}].team))`), /Happiness: 123/);
   assert.equal(await js('app.user.get("named")'), false);
   assert.deepEqual(clientErrors, [], 'no uncaught client errors');
-  console.log('PASS teambuilder workspace: six slots, selections/keyboard/full roster scroll, inline details/EVs/IVs/nature, expandable details/spread tools, EV sliders, compact geometry, native caps, delete/undo, set/team text import, Gen 1/7/8/9 and Lets Go, reload persistence, both themes at three sizes.');
+  console.log('PASS teambuilder workspace: six slots, selections/keyboard/full roster scroll, compact option rows/columns/sorting, inline details/EVs/IVs/nature, expandable details/spread tools, EV sliders, compact geometry, native caps, delete/undo, set/team text import, Gen 1/7/8/9 and Lets Go, reload persistence, both themes at three sizes.');
   win.destroy(); app.exit(0);
 }).catch(async error => {
   console.error(error);
