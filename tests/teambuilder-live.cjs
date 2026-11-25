@@ -143,6 +143,29 @@ app.whenReady().then(async () => {
   await js('document.querySelector(".sd-te-slot:nth-of-type(1)").click(); 0');
   await focusField('move1');
   await until(() => js('document.querySelector(".sd-te-picker input")?.dataset.for === "move1"'), 'move roster');
+  // Disclosures expose native controls without interrupting the selection pane.
+  const detailsExtra = '.sd-te-form[data-form=details] .sd-te-extra';
+  const statsExtra = '.sd-te-form[data-form=stats] .sd-te-extra';
+  assert.equal(await js(`document.querySelector('${detailsExtra}').open`), false);
+  await js(`document.querySelector('${detailsExtra} > summary').click(); document.querySelector('.sd-te-form [name=gender][value=M]').click(); document.querySelector('.sd-te-form [name=shiny][value=yes]').click(); 0`);
+  await until(() => js('tb.curSet.gender === "M" && tb.curSet.shiny === true'), 'expanded detail edits');
+  await choose('item', 'Leftovers', 'item|Leftovers');
+  assert.equal(await js(`document.querySelector('${detailsExtra}').open`), true, 'details stay expanded after native refresh');
+  await js(`document.querySelector('.sd-te-form [name=gender][value=N]').click(); document.querySelector('.sd-te-form [name=shiny][value=no]').click(); document.querySelector('${detailsExtra} > summary').click(); 0`);
+  await js(`document.querySelector('${statsExtra} > summary').click(); 0`);
+  await change('.sd-te-form [name=ivspread]', '31/0/31/31/31/0');
+  assert.equal(await js('tb.curSet.ivs.spe'), 0, 'expanded IV presets use native handler');
+  assert.equal(await js(`document.querySelector('${statsExtra}').open`), true, 'spread tools stay expanded after native refresh');
+  await change('.sd-te-form [name=iv-atk]', '31', 'input');
+  await change('.sd-te-form [name=iv-spe]', '31', 'input');
+  await change('.sd-te-form [name=iv-spa]', '0', 'input');
+  await change('.sd-te-form [name=evslider-hp]', '4', 'input');
+  await change('.sd-te-form [name=evslider-hp]', '4', 'change');
+  assert.equal(await js('tb.curSet.evs.hp'), 4, 'compact slider still edits EVs');
+  await change('.sd-te-form [name=evslider-hp]', '0', 'input');
+  await change('.sd-te-form [name=evslider-hp]', '0', 'change');
+  await js(`document.querySelector('${statsExtra} > summary').click(); document.querySelector('.teamchartbox.individual').scrollTop=0; 0`);
+  await focusField('move1');
   for (const theme of ['light', 'dark']) {
     await page(`window.desktop.setTheme(${JSON.stringify(theme)})`);
     for (const [width, height] of [[1600,900], [1366,768], [1024,640]]) {
@@ -151,8 +174,8 @@ app.whenReady().then(async () => {
       await client.capturePage();
       await pause(250);
       const layout = await js(`(() => {
-        const rect = selector => {const n=document.querySelector(selector),r=n.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,scroll:n.scrollWidth,client:n.clientWidth};};
-        return {viewport:innerWidth, roster:rect('.sd-te-roster'),editor:rect('.teamchartbox.individual'),picker:rect('.sd-te-picker'),results:rect('.teambuilder-results'),root:rect('#room-teambuilder'),dialogs:document.querySelectorAll('[aria-modal=true]').length};
+        const rect = selector => {const n=document.querySelector(selector),r=n.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,scroll:n.scrollWidth,client:n.clientWidth,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight};};
+        return {viewport:innerWidth, roster:rect('.sd-te-roster'),editor:rect('.teamchartbox.individual'),picker:rect('.sd-te-picker'),results:rect('.teambuilder-results'),root:rect('#room-teambuilder'),stats:rect('.sd-te-stat-table'),nature:rect('.sd-te-form [name=nature]'),dialogs:document.querySelectorAll('[aria-modal=true]').length};
       })()`);
       fs.writeFileSync(path.join(output, `layout-${width}-${theme}.json`), JSON.stringify(layout, null, 2));
       assert.equal(layout.dialogs, 0, 'no picker modal');
@@ -161,11 +184,26 @@ app.whenReady().then(async () => {
       assert.ok(layout.root.scroll <= layout.root.client + 1, 'no page overflow');
       assert.ok(layout.results.scroll <= layout.results.client + 1, 'results fit');
       assert.ok(layout.editor.scroll <= layout.editor.client + 1, 'editor fits');
+      assert.ok(layout.nature.y >= layout.stats.bottom - 1, 'nature sits below the full-width stat table');
+      if (width >= 1366) {
+        assert.ok(layout.nature.bottom <= layout.editor.bottom + 1, 'all main controls visible without scrolling');
+        assert.ok(layout.editor.scrollHeight <= layout.editor.clientHeight + 1, 'default editor fits without vertical scrolling');
+      } else assert.ok(layout.editor.scrollHeight - layout.editor.clientHeight < 160, 'compact editor needs only a short scroll at minimum size');
       fs.writeFileSync(path.join(output, `workspace-${width}-${theme}.png`), (await client.capturePage()).toPNG());
       await js('document.querySelector(".teamchartbox.individual").scrollTop=9999; 0');
       await pause(100);
       fs.writeFileSync(path.join(output, `stats-${width}-${theme}.png`), (await client.capturePage()).toPNG());
       await js('document.querySelector(".teamchartbox.individual").scrollTop=0; 0');
+      if (width === 1024) {
+        await js(`document.querySelector('${detailsExtra} > summary').click(); document.querySelector('${statsExtra} > summary').click(); 0`);
+        await pause(100);
+        const expanded = await js(`(() => {const editor=document.querySelector('.teamchartbox.individual');return {scroll:editor.scrollWidth,client:editor.clientWidth};})()`);
+        assert.ok(expanded.scroll <= expanded.client + 1, 'expanded controls fit the narrow editor');
+        fs.writeFileSync(path.join(output, `details-expanded-${theme}.png`), (await client.capturePage()).toPNG());
+        await js('document.querySelector(".teamchartbox.individual").scrollTop=9999; 0');
+        fs.writeFileSync(path.join(output, `tools-expanded-${theme}.png`), (await client.capturePage()).toPNG());
+        await js(`document.querySelector('${detailsExtra} > summary').click(); document.querySelector('${statsExtra} > summary').click(); document.querySelector('.teamchartbox.individual').scrollTop=0; 0`);
+      }
     }
   }
   for (const field of ['pokemon', 'item', 'ability']) {
@@ -224,7 +262,7 @@ app.whenReady().then(async () => {
   assert.match(await js(`Storage.exportTeam(Storage.unpackTeam(Storage.teams[${teamIndex}].team))`), /Happiness: 123/);
   assert.equal(await js('app.user.get("named")'), false);
   assert.deepEqual(clientErrors, [], 'no uncaught client errors');
-  console.log('PASS teambuilder workspace: six slots, selections/keyboard/full roster scroll, inline details/EVs/IVs/nature, native caps, delete/undo, set/team text import, Gen 1/7/8/9 and Lets Go, reload persistence, both themes at three sizes.');
+  console.log('PASS teambuilder workspace: six slots, selections/keyboard/full roster scroll, inline details/EVs/IVs/nature, expandable details/spread tools, EV sliders, compact geometry, native caps, delete/undo, set/team text import, Gen 1/7/8/9 and Lets Go, reload persistence, both themes at three sizes.');
   win.destroy(); app.exit(0);
 }).catch(async error => {
   console.error(error);

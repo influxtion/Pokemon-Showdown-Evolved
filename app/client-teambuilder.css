@@ -1814,7 +1814,7 @@ html.sd-launcher-shell #room-teambuilder {
     width: auto !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 16px !important;
+    padding: 12px 16px 8px !important;
     overflow: auto !important;
     scrollbar-width: thin !important;
   }
@@ -1825,40 +1825,46 @@ html.sd-launcher-shell #room-teambuilder {
     padding: 16px !important;
   }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] {
-    grid-template-columns: 128px minmax(0, 1fr) !important;
-    grid-template-areas: "mn mn" "sp pk" "sp meta" "dt dt" "mv mv" !important;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    grid-template-areas: "sp pk" "sp meta" "dt dt" "mv mv" !important;
     column-gap: 12px !important;
-    row-gap: 10px !important;
+    row-gap: 6px !important;
     padding: 0 !important;
-    margin: 0 0 16px !important;
+    margin: 0 0 8px !important;
     border: 0 !important;
     background: transparent !important;
   }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] input.textbox { height: 32px !important; font-weight: 400 !important; border-radius: 4px !important; }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcell-sprite {
-    width: 128px !important; height: 128px !important;
-    border-radius: 4px !important; background-color: var(--sd-panel) !important;
+    width: 96px !important; height: 96px !important;
+    border: 0 !important; border-radius: 4px !important; background-color: transparent !important;
   }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcell-pokemon input.textbox {
     margin: 0 !important; padding: 0 6px !important; height: 32px !important;
     font-size: 17px !important; border-color: var(--sd-border) !important;
     background: var(--sd-input) !important;
   }
-  .teamwrapper[data-sd-mode="set"] .sd-te-meta { gap: 10px !important; }
-  .teamwrapper[data-sd-mode="set"] .sd-te-chips { flex-wrap: wrap !important; }
-  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setchart-nickname { display: block !important; width: 100% !important; }
-  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setchart-nickname input.textbox { width: 100% !important; }
+  .teamwrapper[data-sd-mode="set"] .sd-te-meta { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 4px !important; }
+  .teamwrapper[data-sd-mode="set"] .sd-te-chips { flex-wrap: wrap !important; gap: 4px !important; align-self: center !important; }
+  .teamwrapper[data-sd-mode="set"] .sd-te-type { height: 20px !important; padding: 0 6px !important; font-size: 11px !important; gap: 4px !important; }
+  .teamwrapper[data-sd-mode="set"] .sd-te-tera { display: none !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setchart-nickname { grid-column: 1 / -1 !important; display: flex !important; width: 100% !important; gap: 6px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setchart-nickname input.textbox { min-width: 0 !important; width: 100% !important; height: 28px !important; }
   .teamwrapper[data-sd-mode="set"] .sd-te-rule,
   .sd-te-inline-ready .setcell-details,
   .sd-te-inline-ready .setcol-stats { display: none !important; }
-  .teamwrapper[data-sd-mode="set"] .setcol-details { margin-top: 4px !important; }
-  .teamwrapper[data-sd-mode="set"] .setcol-moves { margin-top: 8px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-details { margin-top: 0 !important; gap: 0 !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-details > .setrow:last-child { gap: 8px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-moves { margin-top: 0 !important; padding-top: 18px !important; gap: 6px 8px !important; }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-details .setcell > label,
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-moves .setcell > label {
-    font-size: 12px !important; font-weight: 600 !important; letter-spacing: normal !important; text-transform: none !important;
+    margin-bottom: 4px !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: normal !important; text-transform: none !important;
   }
-  .teamwrapper[data-sd-mode="set"] .setmenu { justify-content: flex-end !important; }
-  .teamwrapper[data-sd-mode="set"] .setmenu button { width: 28px !important; height: 28px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-moves .setcell > label { top: -18px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcol-moves .setcell::before { top: 7px !important; left: 8px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setcell-item .itemicon { bottom: 4px !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setmenu { grid-area: auto !important; justify-content: flex-end !important; }
+  .teamwrapper[data-sd-mode="set"] .teamchart > li[value] .setmenu button { width: 26px !important; height: 26px !important; }
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] input.chartinput:focus,
   .teamwrapper[data-sd-mode="set"] .teamchart > li[value] input.chartinput[data-active="true"] { border-color: var(--sd-accent) !important; }
   .sd-te-picker {
@@ -1913,38 +1919,57 @@ html.sd-launcher-shell #room-teambuilder {
   .sd-te-picker .utilichart .pokemonnamecol,
   .sd-te-picker .utilichart .movenamecol { color: var(--sd-text) !important; }
   .sd-te-picker, .sd-te-form { font-family: "Segoe UI", system-ui, sans-serif !important; font-size: 13px !important; }
-  .sd-te-form { border: 1px solid var(--sd-border) !important; border-radius: 4px !important; margin: 0 0 16px !important; background: var(--sd-panel) !important; }
+  .sd-te-form { position: relative !important; border: 0 !important; border-top: 1px solid var(--sd-border) !important; border-radius: 0 !important; margin: 0 0 8px !important; background: transparent !important; }
   .sd-te-form .resultheader { height: auto !important; contain: none !important; padding: 0 !important; }
-  .sd-te-form h3 { margin: 0 !important; padding: 10px 12px !important; border: 0 !important; border-bottom: 1px solid var(--sd-border) !important; background: var(--sd-subtle) !important; color: var(--sd-text) !important; text-shadow: none !important; box-shadow: none !important; font-family: inherit !important; font-size: 13px !important; font-weight: 600 !important; }
-  .sd-te-form .detailsform { padding: 12px !important; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 12px 8px !important; }
+  .sd-te-form h3 { margin: 0 !important; padding: 4px 0 0 !important; border: 0 !important; background: transparent !important; color: var(--sd-text) !important; text-shadow: none !important; box-shadow: none !important; font-family: inherit !important; font-size: 12px !important; font-weight: 600 !important; }
+  .sd-te-form[data-form="details"] { border: 0 !important; }
+  .sd-te-form[data-form="stats"] { margin-bottom: 0 !important; }
+  .sd-te-form[data-form="details"] > .resultheader { display: none !important; }
+  .sd-te-form .detailsform { padding: 0 !important; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 4px 8px !important; }
   .sd-te-form .formrow { margin: 0 !important; padding: 0 !important; min-width: 0 !important; }
-  .sd-te-form .formlabel { float: none !important; display: block !important; width: auto !important; margin: 0 0 5px !important; text-align: left !important; color: var(--sd-text-2) !important; font-size: 12px !important; }
+  .sd-te-form .formlabel { float: none !important; display: block !important; width: auto !important; margin: 0 0 4px !important; text-align: left !important; color: var(--sd-text-2) !important; font-size: 12px !important; }
   .sd-te-form .formrow > div { margin: 0 !important; }
-  .sd-te-form .formrow:has(input[type="radio"]) { grid-column: 1 / -1 !important; order: 1 !important; }
   .sd-te-form .checkbox { white-space: nowrap !important; margin-right: 6px !important; font-size: 12px !important; }
   .sd-te-form select { max-width: 100% !important; height: 28px !important; color: var(--sd-text) !important; background: var(--sd-input) !important; border: 1px solid var(--sd-border-strong) !important; }
   .sd-te-form input.numform { height: 28px !important; width: 54px !important; box-sizing: border-box !important; font-size: 12px !important; }
-  .sd-te-form .statform { margin: 0 !important; padding: 12px !important; display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; gap: 0 !important; }
-  .sd-te-form .statform > p { flex: 0 0 100% !important; margin: 10px 0 0 !important; line-height: 1.5 !important; }
-  .sd-te-form .statform .suggested { order: 2 !important; }
+  .sd-te-form .statform { margin: 0 !important; padding: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; gap: 0 !important; }
+  .sd-te-form .statform > p { flex: 1 1 auto !important; margin: 4px 0 0 !important; line-height: 28px !important; }
+  .sd-te-stat-table { display: flex !important; flex: 0 0 100% !important; min-width: 0 !important; }
   .sd-te-form .statform .col { float: none !important; margin: 0 !important; padding: 0 !important; }
-  .sd-te-form .statform .col > div { height: 32px !important; line-height: 32px !important; }
+  .sd-te-form .statform .col > div { height: 26px !important; line-height: 26px !important; }
+  .sd-te-form .statform .col input.numform { height: 24px !important; padding: 0 5px !important; }
+  .sd-te-form .statform .col b, .sd-te-form .statform .col em, .sd-te-form .statform .col label { padding: 0 !important; line-height: inherit !important; }
   .sd-te-form .statform .labelcol { width: 64px !important; font-size: 12px !important; }
   .sd-te-form .statform .basestatscol { width: 34px !important; }
   .sd-te-form .statform .evcol, .sd-te-form .statform .ivcol { width: 56px !important; }
-  .sd-te-form .statform .statscol { width: 42px !important; }
+  .sd-te-form .statform .col.statscol { width: 42px !important; margin-left: auto !important; }
   .sd-te-form .statform .graphcol { display: none !important; }
   .sd-te-form .statform .evslidercol { flex: 1 !important; min-width: 30px !important; padding: 0 5px !important; }
-  .sd-te-form .evslider { width: 100% !important; }
+  .sd-te-form .evslider { appearance: none !important; width: 100% !important; height: 24px !important; padding: 0 !important; border: 0 !important; background: transparent !important; vertical-align: middle !important; }
+  .sd-te-form .evslider::-webkit-slider-runnable-track { height: 4px !important; border-radius: 2px !important; background: var(--sd-border-strong) !important; }
+  .sd-te-form .evslider::-webkit-slider-thumb { appearance: none !important; width: 14px !important; height: 14px !important; margin-top: -5px !important; border-radius: 50% !important; background: var(--sd-accent) !important; cursor: ew-resize !important; }
   .sd-te-form .statform .ivcol > div:has(select) { position: relative !important; width: 100% !important; height: auto !important; margin: 8px 0 0 !important; }
   .sd-te-form .statform select[name="ivspread"] { width: 190px !important; }
-  .sd-te-form .statform .totalev::before { content: "Left: "; font-size: 10px !important; color: var(--sd-text-2) !important; }
-  .sd-te-form .statform .totalev { display: flex !important; align-items: center !important; justify-content: center !important; gap: 3px !important; }
+  .sd-te-form .statform .totalev::before { content: "Remaining: "; font-size: 11px !important; color: var(--sd-text-2) !important; }
+  .sd-te-form .statform .col .totalev { position: absolute !important; top: 3px !important; right: 0 !important; width: auto !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 4px !important; }
   .sd-te-form .statform .totalev em, .sd-te-form .statform .totalev b { display: inline !important; padding: 0 !important; }
-  .sd-te-form .statform .sd-te-ivspread { order: 1 !important; }
   .sd-te-form .statform .col em { font-size: 11px !important; color: var(--sd-text-2) !important; }
   .sd-te-form .statform .col b { color: var(--sd-text) !important; }
   .sd-te-form .suggested button { white-space: normal !important; height: auto !important; }
+  .sd-te-extra { grid-column: 1 / -1 !important; flex: 0 0 100% !important; min-width: 0 !important; }
+  .sd-te-extra > summary { width: fit-content !important; padding: 4px 0 !important; color: var(--sd-text-2) !important; font-size: 12px !important; cursor: pointer !important; }
+  .sd-te-extra > summary:hover { color: var(--sd-text) !important; }
+  .sd-te-extra > summary:focus-visible { outline: 2px solid var(--sd-accent) !important; outline-offset: 2px !important; }
+  .sd-te-extra > .formrow { padding: 4px 0 !important; }
+  .sd-te-extra > .formrow .formlabel { display: inline-block !important; width: 88px !important; margin: 0 !important; }
+  .sd-te-extra > .formrow > div { display: inline-block !important; }
+  .sd-te-extra > p { margin: 6px 0 !important; line-height: 1.5 !important; }
+  .sd-te-form .statform > .sd-te-extra { flex: 0 0 auto !important; margin: 4px 0 0 auto !important; }
+  .sd-te-form .statform > .sd-te-extra[open] { flex-basis: 100% !important; }
+  @media (min-width: 1001px) {
+    .sd-te-form .detailsform > .formrow { display: flex !important; align-items: center !important; gap: 6px !important; }
+    .sd-te-form .detailsform > .formrow .formlabel { margin: 0 !important; }
+  }
   .teamwrapper[data-sd-mode="set"] .teambuilder-pokemon-import[style*="block"] {
     grid-column: 2 / -1 !important; grid-row: 2 !important; z-index: 2 !important;
     margin: 0 !important; padding: 16px !important; overflow: auto !important; background: var(--sd-app) !important;
@@ -1954,11 +1979,10 @@ html.sd-launcher-shell #room-teambuilder {
   .teambuilder-pokemon-import textarea { width: 100% !important; box-sizing: border-box !important; }
   @media (max-width: 1000px) {
     .teamwrapper[data-sd-mode="set"], .teamwrapper[data-sd-mode="team"] { grid-template-columns: 142px minmax(296px, 1fr) minmax(280px, 1fr) !important; }
-    .teamwrapper[data-sd-mode="set"] .teamchartbox.individual { padding: 12px !important; }
+    .teamwrapper[data-sd-mode="set"] .teamchartbox.individual { padding: 12px 12px 8px !important; }
     .sd-te-roster .sd-te-tab-text strong { font-size: 12px !important; }
     .sd-te-roster .sd-te-empty-slot .sd-te-tab-text strong { font-size: 11px !important; }
     .sd-te-roster .sd-te-tab-icon { width: 32px !important; }
-    .sd-te-form .statform { padding: 8px !important; }
     .sd-te-form .statform .evslidercol { display: none !important; }
   }
 }

@@ -1180,6 +1180,9 @@ function installTeamEditor() {
         section.dataset.form = type;
         section.setAttribute('aria-label', type === 'stats' ? 'Stats, EVs, IVs and nature' : 'Pokémon details');
         box.append(section);
+        section.addEventListener('toggle', event => {
+          if (event.target.matches('.sd-te-extra') && section.contains(event.target)) section.dataset.expanded = String(event.target.open);
+        }, true);
         // Capture native delegated events here so each handler sees the correct form.
         for (const eventName of ['input', 'keyup', 'change', 'submit', 'click']) {
           section.addEventListener(eventName, event => {
@@ -1212,7 +1215,9 @@ function installTeamEditor() {
       }
       const key = formKey(room);
       if (section.dataset.key !== key && !section.contains(document.activeElement)) {
+        const expanded = section.querySelector('.sd-te-extra')?.open ?? (section.dataset.expanded === 'true');
         inForm(room, section, type, () => type === 'stats' ? room.updateStatForm() : room.updateDetailsForm());
+        section.dataset.expanded = String(expanded);
         // Show happiness consistently. Upstream already accepts and persists this field.
         if (type === 'details' && room.curTeam.gen > 1 && !section.querySelector('[name="happiness"]')) {
           const row = el('div', 'formrow');
@@ -1234,16 +1239,47 @@ function installTeamEditor() {
         section.dataset.key = formKey(room);
       }
       if (type === 'stats') {
+        const statForm = section.querySelector('.statform');
+        if (statForm && !statForm.querySelector('.sd-te-stat-table')) {
+          const table = el('div', 'sd-te-stat-table');
+          const columns = statForm.querySelectorAll(':scope > .col');
+          if (columns.length) {
+            columns[0].before(table);
+            table.append(...columns);
+          }
+        }
         const total = section.querySelector('.statscol > div');
         if (total) setText(total, 'Stat');
         const remaining = section.querySelector('.totalev');
         if (remaining) remaining.setAttribute('aria-label', `Remaining EVs: ${remaining.textContent}`);
         const spread = section.querySelector('[name="ivspread"]');
         if (spread && !spread.closest('.sd-te-ivspread')) {
+          const previous = spread.parentElement;
           const row = el('p', 'sd-te-ivspread');
           row.append(spread);
+          previous.remove();
           section.querySelector('.statform').append(row);
         }
+      }
+      // Keep the everyday controls in view. Less-used native controls stay in their
+      // original form (and use the same handlers) behind an inline disclosure.
+      const form = section.querySelector(type === 'stats' ? '.statform' : '.detailsform');
+      if (form && !form.querySelector('.sd-te-extra')) {
+        const extra = el('details', 'sd-te-extra');
+        extra.open = section.dataset.expanded === 'true';
+        extra.append(el('summary', '', type === 'stats' ? 'Spread tools & tips' : 'More details'));
+        if (type === 'details') {
+          for (const row of form.querySelectorAll(':scope > .formrow')) {
+            if (!row.querySelector('[name="level"], [name="happiness"], [name="teratype"], [name="dynamaxlevel"]')) extra.append(row);
+          }
+          const sprite = section.querySelector(':scope > .altform');
+          if (sprite) extra.append(sprite);
+        } else {
+          for (const row of form.querySelectorAll(':scope > p')) {
+            if (!row.querySelector('[name="nature"]')) extra.append(row);
+          }
+        }
+        if (extra.children.length > 1) form.append(extra);
       }
     }
     box.classList.add('sd-te-inline-ready');
@@ -1277,6 +1313,8 @@ function installTeamEditor() {
       if (set.species) {
         const meta = el('div', 'sd-te-meta');
         meta.append(el('span', 'sd-te-chips'));
+        const menu = li.querySelector('.setmenu');
+        if (menu) meta.append(menu);
         const nickname = li.querySelector(':scope > .setchart-nickname');
         if (nickname) meta.append(nickname);
         li.append(meta, el('div', 'sd-te-rule'));
