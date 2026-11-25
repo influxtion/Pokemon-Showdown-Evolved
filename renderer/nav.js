@@ -32,6 +32,7 @@
     // Two crossed swords: blades, crossguards and grips.
     swords: svg('<path d="M2.5 2.5h2.5l6 6M11 11l2.5 2.5M9.5 12.5l3-3M13.5 2.5H11l-6 6M5 11l-2.5 2.5M3.5 9.5l3 3"/>', ' stroke-linecap="round" stroke-linejoin="round"'),
     other: svg('<rect x="3" y="3" width="10" height="10" rx="1.5"/>'),
+    profile: svg('<circle cx="8" cy="5" r="2.5"/><path d="M3 14v-1a5 5 0 0 1 10 0v1"/>', ' stroke-linecap="round"'),
     resources: svg('<path d="M3 3.5h3.5A1.5 1.5 0 0 1 8 5v8a1.5 1.5 0 0 0-1.5-1.5H3zM13 3.5H9.5A1.5 1.5 0 0 0 8 5v8a1.5 1.5 0 0 1 1.5-1.5H13z"/>', round),
     home: svg('<path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/>', round),
     stats: svg('<path d="M3 13V9M8 13V3M13 13V6"/>', ' stroke-linecap="round"'),
@@ -544,7 +545,7 @@
     const friendsPage = (r) => /^view-friends(-|$)/.test(r.id);
     const roomRow = (r) => ({
       title: r.battle ? matchup(r, me) : friendsPage(r) ? 'Friends' : r.title, sub: roomSub(r),
-      kind: r.battle ? 'battle' : friendsPage(r) ? 'community' : r.kind,
+      kind: r.battle ? 'battle' : friendsPage(r) ? 'community' : r.id === 'evolved-profile' ? 'profile' : r.kind,
       live: !!r.battle && !r.ended, unread: !!r.unread, id: r.id, closable: true,
       current: onPlay && r.id === current,
     });
@@ -597,7 +598,7 @@
       })),
       ...messages.map((m) => ({ id: `pm:${m.pm}`, client: { user: m.pm }, current: m.current, open: () => openConversation(m.pm), close: rowCloser(m) })),
     ];
-    const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named]);
+    const key = JSON.stringify([pageRows, rows, messages, !!session.ready, me, !!session.named, session.avatar]);
     renderChallenges(session);
     if (key === lastKey) return;
     lastKey = key;
@@ -617,7 +618,18 @@
       $('me').textContent = me;
       box.title = me;
       const avatar = $('avatar');
-      if (avatar) avatar.textContent = (/[a-z0-9]/i.exec(me) || ['?'])[0].toUpperCase();
+      if (avatar) {
+        avatar.textContent = (/[a-z0-9]/i.exec(me) || ['?'])[0].toUpperCase();
+        if (session.avatar) {
+          const sprite = make('img');
+          sprite.src = session.avatar;
+          sprite.alt = '';
+          sprite.addEventListener('error', () => {
+            if (avatar.firstChild === sprite) avatar.textContent = (/[a-z0-9]/i.exec(me) || ['?'])[0].toUpperCase();
+          });
+          avatar.replaceChildren(sprite);
+        }
+      }
       $('sign-in').hidden = !!session.named;
     }
   }
@@ -642,6 +654,29 @@
     $('community').addEventListener('click', (event) => {
       event.preventDefault();
       if (!(onPlay && communityShown(lastSession))) openTab('community');
+    });
+  }
+
+  if ($('profile')) {
+    $('profile').addEventListener('click', async () => {
+      const button = $('profile');
+      button.disabled = true;
+      const result = await act('profile', {});
+      button.disabled = false;
+      if (result) {
+        document.querySelector('#profile-open-status')?.remove();
+        if (onPlay) pollNow();
+        else go('play.html');
+      } else {
+        let notice = document.getElementById('profile-open-status');
+        if (!notice) {
+          notice = make('p', 'profile-open-status');
+          notice.id = 'profile-open-status';
+          notice.setAttribute('role', 'status');
+          $('account').after(notice);
+        }
+        notice.textContent = 'Profile is unavailable. Wait for Showdown to connect, then try again.';
+      }
     });
   }
 

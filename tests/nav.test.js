@@ -69,7 +69,7 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   const events = [];
   const calls = [];
   const nav = {};
-  for (const name of ['rooms', 'sign-in', 'account', 'me', 'teambuilder', 'community']) nav[name] = new Node('x');
+  for (const name of ['rooms', 'sign-in', 'account', 'me', 'teambuilder', 'community', 'profile']) nav[name] = new Node('x');
   nav['sign-in'].hidden = true;
   nav.account.hidden = true;
   let href = onPlay ? 'play.html' : page;
@@ -146,6 +146,19 @@ test('clicking the current launcher page prevents a reload', async () => {
   await h.settle();
   assert.equal(h.currentPage.click().prevented, true);
   assert.deepEqual(h.calls, []);
+});
+
+test('the account profile button opens its client room from Home and play', async () => {
+  for (const onPlay of [false, true]) {
+    const h = harness([session([chat('evolved-profile', 'Profile')], { current: 'evolved-profile' })], { onPlay });
+    await h.settle();
+    h.nav.profile.click();
+    await h.settle();
+    assert.deepEqual(h.calls, [{ action: 'profile', args: {} }]);
+    assert.equal(h.location.href, 'play.html');
+    assert.equal(h.nav.profile.disabled, false);
+    assert.equal(h.title(h.row(0)), 'Profile');
+  }
 });
 
 test('clicking the selected client tab leaves its view alone', async () => {

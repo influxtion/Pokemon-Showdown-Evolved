@@ -366,6 +366,31 @@ test('rooms are focused and left through the client, keeping its forfeit confirm
     ['popup', 'sounds'], ['popup', 'options']]);
 });
 
+test('session only exposes official trainer avatar image URLs', async () => {
+  let avatar = '/sprites/trainers/may.png';
+  const bridge = new ShowdownBridge(() => fakeContents(() => ({ rooms: [], avatar })));
+  assert.equal((await bridge.session()).avatar, 'https://play.pokemonshowdown.com/sprites/trainers/may.png');
+  for (avatar of ['https://example.com/sprites/trainers/may.png', 'javascript:alert(1)',
+    'https://user:pass@play.pokemonshowdown.com/sprites/trainers/may.png', '/sprites/trainers/may.png?tracking=1',
+    '/sprites/trainers/../../action.php', {}, null]) {
+    assert.equal((await bridge.session()).avatar, undefined);
+  }
+});
+
+test('profile fails safely before client readiness and reuses an existing room', async () => {
+  let context = { window: {} };
+  const contents = fakeContents(code => vm.runInNewContext(code, context));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('profile', {}), false);
+  const focused = [];
+  const app = { user: {}, rooms: { 'evolved-profile': {} },
+    addRoom() { throw new Error('must reuse existing room'); }, focusRoom(id) { focused.push(id); } };
+  context = { window: { app, Room: {}, OptionsPopup: {} }, app };
+  assert.equal(await bridge.act('profile', {}), true);
+  assert.deepEqual(focused, ['evolved-profile']);
+  assert.equal(await bridge.act('profile', null), false);
+});
+
 test('a close focuses its validated successor within the same client execution', async () => {
   const calls = [];
   const chain = { length: 1, removeClass() { return this; }, addClass() { return this; }, show() { return this; },

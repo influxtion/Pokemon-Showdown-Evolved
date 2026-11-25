@@ -51,6 +51,14 @@ A browser tab gives Showdown no stable home for tools, and offers no safe way to
 - Enabled in Settings, then an explicit client reload; a battle is never reloaded automatically. Failure leaves normal play intact.
 - Packaged as an inert, verified payload with license and corresponding source; installed and enabled only on explicit opt-in.
 
+### Profile and chat preferences (November 25, 2026)
+
+The bottom-left account button and **Settings > Profile & chat > Open profile** open the same persistent **Profile** tab. `app/client-profile.js` creates a local-only Showdown room through the allowlisted `profile` bridge action. It embeds a subclass of the official `OptionsPopup`, retaining native preference controls, avatar selection, status/account actions, text-formatting and sound popups. Chat includes PM/challenge blocking when provided by the server, highlights, PM display, timestamps, language and tournament preferences. Battle animation and sprite preferences remain available. App-owned theme, layout and background controls stay in Settings; the browser-client migration promotion is omitted.
+
+The adapter groups existing controls rather than reimplementing preference storage or server commands. Native user updates refresh the profile; unsent status drafts survive those updates. Closing the tab removes its user-change listener and embedded view. Returning to it reuses the same room. Account avatar updates reach the rail through a bounded, official-host-only trainer image URL in the sanitized session; unsupported or failed images fall back to the user's initial. The remote client retains its sandbox, has no launcher preload, and receives no new privileged API.
+
+`npm run test:profile:live` uses a disposable guest against the official client. It verifies both entry points, native avatar selection with server acknowledgment and rail refresh, local preferences after reload, formatting/sound popups, status draft retention, refresh on returning from another room, forwarding through native server-setting handlers (writes intercepted), repeated close/reopen listener cleanup, and light/dark layouts at 1600×900, 1366×768 and 1024×640. Syntax and 295 unit tests pass without skips. All 13 desktop suites pass with test-only painted windows; a navigation cancellation passed on retry. Screenshots and geometry evidence are under ignored `out/profile-preferences/`. Signed-in password, registration, logout and cross-device account synchronization are not exercised. No installer, release or main integration is part of this feature.
+
 ### Replay notes
 - **Notes:** a replay link plus title, format and notes. **Save replay note** on a battle prefills players and format; it never uploads.
 - **Limits:** title 120 chars, notes 5,000, 1,000 notes / 8 MiB.

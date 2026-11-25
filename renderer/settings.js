@@ -128,6 +128,16 @@ runAction('reload-client', 'reloadClient', 'Client reload requested.');
 runAction('open-logs', 'openLogs', 'Logs folder opened.');
 runAction('sign-out', 'signOutShowdown', 'Showdown data cleared.');
 runAction('reset-launcher', 'resetLauncher', 'Launcher data reset.');
+document.getElementById('open-profile').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    if (!await window.desktop.showdown('profile', {})) throw new Error('Profile is unavailable. Wait for Showdown to connect, then try again.');
+    location.href = 'play.html';
+  } catch (error) {
+    message(error.message || 'Profile could not be opened.');
+  } finally { button.disabled = false; }
+});
 load();
 
 const updateCheck = document.getElementById('update-check');
