@@ -752,8 +752,8 @@ function installTeamsView() {
 }
 
 // Lays out the team editor in the launcher's design (client-teambuilder.css): a header with the
-// team's actions and a card per set. Like installTeamsView, it only rearranges the client's
-// markup. Editor modes, read from the markup: "team", "set" (with the search pane) and "export".
+// team's actions, a vertical roster, inline native forms and a persistent selection pane.
+// Editor modes, read from the markup: "team" (overview), "set" and "export".
 function installTeamEditor() {
   if (window.__SD_TEAM_EDITOR || !document.body) return true;
   window.__SD_TEAM_EDITOR = true;
@@ -766,6 +766,8 @@ function installTeamEditor() {
   const icon = (name) => el('i', `fa ${name}`);
   const getRoom = () => window.app && app.rooms && app.rooms.teambuilder;
   const statName = (id) => (window.BattleStatNames && BattleStatNames[id]) || id;
+  const guardedRooms = new WeakSet();
+  const queries = new WeakMap();
   // Writes only on change, so the observer that called us settles instead of looping.
   const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
@@ -776,11 +778,18 @@ function installTeamEditor() {
     const back = pad.querySelector(':scope > button[name="back"]');
     if (back) {
       back.replaceChildren(icon('fa-chevron-left'));
-      back.title = mode === 'set' ? 'Back to team' : 'Back to teams';
+      back.title = mode === 'set' ? 'Team overview' : 'Back to teams';
+      if (mode === 'set') back.addEventListener('click', () => tabs.set(room.curTeam, 'full'));
       back.setAttribute('aria-label', back.title);
       head.append(back);
     }
-    const name = pad.querySelector(':scope > input.teamnameedit');
+    let name = pad.querySelector(':scope > input.teamnameedit');
+    if (!name && mode === 'set') {
+      name = el('input', 'textbox teamnameedit');
+      name.type = 'text';
+      name.value = room.curTeam.name || 'Untitled';
+      name.setAttribute('aria-label', 'Team name');
+    }
     if (name) {
       const label = el('label', 'sd-te-name');
       label.append(name, icon('fa-pencil'));
@@ -789,7 +798,15 @@ function installTeamEditor() {
       head.append(el('h1', 'sd-te-title', room.curTeam.name || 'Untitled'));
     }
     const actions = el('div', 'sd-te-actions');
-    const format = pad.querySelector('button.teambuilderformatselect');
+    let format = pad.querySelector('button.teambuilderformatselect');
+    if (!format && mode === 'set') {
+      format = el('button', 'button teambuilderformatselect');
+      format.type = 'button';
+      format.name = 'format';
+      format.value = room.curTeam.format;
+      const info = window.BattleFormats && BattleFormats[room.curTeam.format];
+      format.textContent = info ? info.name : room.curTeam.format || 'Select a format';
+    }
     const validate = pad.querySelector('button[name="validate"]');
     if (format) actions.append(format);
     if (validate) actions.append(validate);
@@ -837,15 +854,6 @@ function installTeamEditor() {
     if (paste) paste.hidden = tab !== 'full';
   }
 
-  function fullTabBody(room) {
-    const box = el('span', 'sd-te-tab-icon');
-    box.append(icon('fa-users'));
-    const text = el('span', 'sd-te-tab-text');
-    const count = room.curSetList.filter((set) => set.species).length;
-    text.append(el('strong', '', 'Full Team'), el('small', '', `${count} Pokémon`));
-    return [box, text];
-  }
-
   // The whole team as text, like a PokePaste: the client's export of each set, with species, Tera
   // type and moves coloured by type. Text nodes only, never HTML.
   function buildPaste(wrapper, room) {
@@ -871,8 +879,16 @@ function installTeamEditor() {
       const entry = el('article', 'sd-paste-set');
       entry.title = 'Edit this Pokémon';
       entry.addEventListener('click', () => {
-        tabs.set(team, index);
-        showTab(wrapper, room);
+        room.selectPokemon(index);
+      });
+      entry.tabIndex = 0;
+      entry.setAttribute('role', 'button');
+      entry.setAttribute('aria-label', `Edit ${speciesName(room, set)}`);
+      entry.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          room.selectPokemon(index);
+        }
       });
       const art = el('div', 'sd-paste-art');
       const sprite = el('span', 'sd-paste-sprite');
@@ -910,78 +926,71 @@ function installTeamEditor() {
     box.append(paste);
   }
 
-  // Team view: a tab per set above one card; the add tab is the client's addPokemon action.
-  function buildTabs(wrapper, room) {
-    const pad = wrapper.querySelector(':scope > .pad');
-    const head = pad && pad.querySelector(':scope > .sd-te-head');
-    if (!head || pad.querySelector(':scope > .sd-te-tabs')) return;
-    const strip = el('div', 'sd-te-tabs');
-    strip.setAttribute('role', 'tablist');
+  // The native teambar is rebuilt by Showdown after species changes. Keep our roster
+  // separate so search and inline edits never depend on that markup's lifetime.
+  function buildRoster(wrapper, room, mode) {
+    let roster = wrapper.querySelector(':scope > .sd-te-roster');
+    if (!roster) {
+      roster = el('nav', 'sd-te-roster');
+      roster.setAttribute('aria-label', 'Team Pokémon');
+      wrapper.append(roster);
+    }
+    const sets = room.curSetList;
+    const capacity = Math.max(6, room.curTeam.capacity || 6, sets.length);
+    const key = JSON.stringify([mode, room.curSetLoc, capacity, !!room.deletedSet,
+      sets.map(set => [set.species, set.name, set.item, set.shiny, set.gender])]);
+    if (roster.dataset.key === key) return;
+    roster.dataset.key = key;
+    const heading = el('div', 'sd-te-roster-head');
+    heading.append(el('strong', '', 'Your team'), el('span', '', `${sets.filter(set => set.species).length} / ${capacity}`));
+    roster.replaceChildren(heading);
+    for (let index = 0; index < capacity; index++) {
+      const set = sets[index];
+      const button = el('button', 'sd-te-tab sd-te-slot');
+      button.type = 'button';
+      button.dataset.slot = String(index);
+      const selected = mode === 'set' && index === room.curSetLoc;
+      button.classList.toggle('cur', selected);
+      if (selected) button.setAttribute('aria-current', 'true');
+      if (set && set.species) {
+        button.append(...tabBody(room, set, index));
+        button.setAttribute('aria-label', `Slot ${index + 1}: ${speciesName(room, set)}`);
+      } else {
+        const box = el('span', 'sd-te-tab-icon');
+        box.append(icon('fa-plus'));
+        const text = el('span', 'sd-te-tab-text');
+        text.append(el('strong', '', 'Add Pokémon'), el('small', '', `Empty slot ${index + 1}`));
+        button.append(box, text);
+        button.classList.add('sd-te-empty-slot');
+        button.setAttribute('aria-label', `Add Pokémon, empty slot ${index + 1}`);
+      }
+      button.addEventListener('click', () => {
+        commitSearch(wrapper, room);
+        if (set && set.species) room.selectPokemon(index);
+        else room.addPokemon();
+      });
+      roster.append(button);
+    }
     const full = el('button', 'sd-te-tab sd-te-full');
     full.type = 'button';
-    full.dataset.tab = 'full';
-    full.setAttribute('role', 'tab');
-    full.append(...fullTabBody(room));
+    full.append(icon('fa-list'), el('span', '', 'Team overview'));
+    if (mode === 'team') full.setAttribute('aria-current', 'true');
     full.addEventListener('click', () => {
+      commitSearch(wrapper, room);
       tabs.set(room.curTeam, 'full');
-      showTab(wrapper, room);
+      if (room.curSet) room.back();
     });
-    strip.append(full);
-    room.curSetList.forEach((set, index) => {
-      if (!set.species) return;
-      const button = el('button', 'sd-te-tab');
-      button.type = 'button';
-      button.dataset.tab = String(index);
-      button.setAttribute('role', 'tab');
-      button.append(...tabBody(room, set, index));
-      button.addEventListener('click', () => {
-        tabs.set(room.curTeam, index);
-        showTab(wrapper, room);
+    roster.append(full);
+    if (room.deletedSet) {
+      const undo = el('button', 'button sd-te-undo', 'Undo delete');
+      undo.type = 'button';
+      undo.addEventListener('click', () => {
+        // Native undo clears the chart name before refreshing it. A form refresh
+        // avoids its empty input selector while restoring the same native set.
+        room.curChartType = 'details';
+        room.undeleteSet();
       });
-      strip.append(button);
-    });
-    if (wrapper.querySelector('.teamchart button[name="addPokemon"]')) {
-      const add = el('button', 'sd-te-tab sd-te-add');
-      add.type = 'button';
-      add.name = 'addPokemon';
-      add.append(icon('fa-plus'), el('span', '', 'Add Pokémon'));
-      strip.append(add);
-    }
-    head.after(strip);
-  }
-
-  // Set view: the client's own Pokémon bar, given the same look and each set's item.
-  function decorateTeambar(wrapper, room) {
-    tabs.set(room.curTeam, room.curSetLoc);
-    const bar = wrapper.querySelector(':scope > .teambar');
-    if (bar && !bar.querySelector(':scope > .sd-te-full')) {
-      // Back to the team view, opened on its Full Team tab.
-      const full = el('button', 'sd-te-tab sd-te-full');
-      full.type = 'button';
-      full.dataset.sd = '1';
-      full.append(...fullTabBody(room));
-      full.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        room.back();
-        tabs.set(room.curTeam, 'full');
-      });
-      bar.prepend(full);
-    }
-    for (const button of wrapper.querySelectorAll('.teambar > button.pokemon:not([data-sd])')) {
-      button.dataset.sd = '1';
-      const picon = button.querySelector('.picon');
-      const index = picon && Number((/pokemonicon-(\d+)/.exec(picon.className) || [])[1]);
-      const set = room.curSetList[index];
-      if (!set) continue;
-      button.classList.add('sd-te-tab');
-      if (button.disabled) button.classList.add('cur');
-      button.replaceChildren(...tabBody(room, set, index));
-    }
-    for (const button of wrapper.querySelectorAll('.teambar > button:not(.pokemon):not([data-sd])')) {
-      button.dataset.sd = '1';
-      button.classList.add('sd-te-tab', 'sd-te-add');
-      button.append(el('span', '', 'Add Pokémon'));
+      roster.append(undo);
     }
   }
 
@@ -1035,105 +1044,213 @@ function installTeamEditor() {
     box.append(aside);
   }
 
-  // Set view: the client's results pane shown as a centered modal. Its search box mirrors the
-  // client's field and passes keys through, so choosing a result still advances to the next field.
-  // Closing returns to the team view.
-  const MODAL_TITLES = {
-    pokemon: 'Choose a Pokémon', item: 'Choose an item', ability: 'Choose an ability',
-    stats: 'EVs, IVs and nature', details: 'Details',
-  };
+  const PICKER_TITLES = { pokemon: 'Choose a Pokémon', item: 'Choose an item', ability: 'Choose an ability' };
   const searching = (room) => ['pokemon', 'item', 'ability', 'move'].includes(room.curChartType);
   const chartInput = (wrapper, room) => wrapper.querySelector(`.teamchart input[name="${room.curChartName}"]`);
 
-  function closeModal(wrapper, room) {
+  function commitSearch(wrapper, room) {
+    const proxy = wrapper.querySelector('.sd-te-picker-search input');
     const real = searching(room) && chartInput(wrapper, room);
-    if (real) {
-      try { room.chartChange({ currentTarget: real }); } catch (e) {}
+    if (real && proxy && proxy.dataset.for === room.curChartName) {
+      real.value = proxy.value;
+      room.chartChange({ currentTarget: real });
     }
-    room.back();
+    if (room.curSet) queries.delete(room.curSet);
   }
 
-  function buildModal(wrapper, room) {
-    let frame = wrapper.querySelector(':scope > .sd-te-modal');
+  function buildPicker(wrapper, room) {
+    let frame = wrapper.querySelector(':scope > .sd-te-picker');
     if (!frame) {
-      const backdrop = el('div', 'sd-te-backdrop');
-      backdrop.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        closeModal(wrapper, room);
-      });
-      frame = el('div', 'sd-te-modal');
-      frame.setAttribute('role', 'dialog');
-      frame.setAttribute('aria-modal', 'true');
-      const head = el('div', 'sd-te-modal-head');
+      frame = el('section', 'sd-te-picker');
+      frame.setAttribute('aria-label', 'Selection');
+      const head = el('div', 'sd-te-picker-head');
       const title = el('h2');
-      const close = el('button', 'sd-te-modal-close');
-      close.type = 'button';
-      close.setAttribute('aria-label', 'Close');
-      close.title = 'Close';
-      close.addEventListener('click', () => closeModal(wrapper, room));
-      const search = el('label', 'sd-te-modal-search');
-      const proxy = el('input');
-      proxy.type = 'text';
+      title.id = 'sd-te-picker-title';
+      const search = el('label', 'sd-te-picker-search');
+      const proxy = el('input', 'textbox');
+      proxy.type = 'search';
       proxy.autocomplete = 'off';
       proxy.spellcheck = false;
+      proxy.setAttribute('aria-labelledby', title.id);
       proxy.addEventListener('input', () => {
         const real = chartInput(wrapper, room);
         if (!real) return;
         real.value = proxy.value;
+        queries.set(room.curSet, { name: room.curChartName, format: room.curTeam.format,
+          value: proxy.value, focused: document.activeElement === proxy, caret: proxy.selectionStart });
         room.updateChart();
+        // updateChart initializes a new field with its default roster; an explicit
+        // query must also be applied when this is the first input after a rebuild.
+        if (room.search.find(proxy.value) && room.search.q) room.$chart.find('a').first().addClass('hover');
       });
-      proxy.addEventListener('keydown', (event) => {
+      proxy.addEventListener('keydown', event => {
+        const real = chartInput(wrapper, room);
+        if (!real) return;
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
-          closeModal(wrapper, room);
+          proxy.value = real.value = '';
+          queries.set(room.curSet, { name: room.curChartName, format: room.curTeam.format, value: '' });
+          room.updateChart();
           return;
         }
-        const real = chartInput(wrapper, room);
-        if (!real) return;
         real.value = proxy.value;
         room.chartKeydown({
           keyCode: event.keyCode, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey,
           altKey: event.altKey, metaKey: event.metaKey, currentTarget: real,
           preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation(),
         });
-        if (proxy.value !== real.value) proxy.value = real.value;
+        if (real.isConnected && proxy.dataset.for === real.name) proxy.value = real.value;
       });
       search.append(proxy);
-      head.append(title, close, search);
-      frame.append(head);
-      wrapper.append(backdrop, frame);
+      head.append(title, search);
+      frame.append(head, el('p', 'sd-te-picker-empty', 'Select a Pokémon, item, ability or move to browse the available choices.'));
+      const results = wrapper.querySelector(':scope > .teambuilder-results');
+      if (results) frame.append(results);
+      wrapper.append(frame);
+      // Tier-resource responses rebuild the native view asynchronously. Preserve
+      // an in-progress query for this set/field across that rebuild.
+      const query = queries.get(room.curSet);
+      if (query && query.name === room.curChartName && query.format === room.curTeam.format) {
+        const real = chartInput(wrapper, room);
+        if (real) {
+          real.value = query.value;
+          room.updateChart(true);
+          if (room.search.find(query.value) && room.search.q) room.$chart.find('a').first().addClass('hover');
+          if (query.focused) {
+            proxy.value = query.value;
+            proxy.focus({ preventScroll: true });
+            proxy.setSelectionRange(query.caret ?? query.value.length, query.caret ?? query.value.length);
+          }
+        }
+      }
     }
-    // After a choice the client focuses the next field; follow it even without a focus event.
+    // The native client focuses the next field after a choice. Follow that field without
+    // replacing the BattleSearch result element, whose scroll listener loads more rows.
     const active = document.activeElement;
     if (active && active.classList.contains('chartinput') && wrapper.contains(active) &&
-        active.name !== room.curChartName) {
-      room.chartFocus({ currentTarget: active });
-    }
-    const importing = wrapper.querySelector('.teambuilder-pokemon-import[style*="block"]');
-    const open = Boolean(room.curChartType) && !importing;
-    wrapper.classList.toggle('sd-te-modal-open', open);
-    if (!open) return;
+        active.name !== room.curChartName) room.chartFocus({ currentTarget: active });
     const isSearch = searching(room);
-    wrapper.classList.toggle('sd-te-modal-form', !isSearch);
+    if (isSearch && room.curChartName && room.$chart && !room.$chart[0].childElementCount) room.updateChart(true);
+    for (const result of frame.querySelectorAll('.result > a:has(> .statcol)')) {
+      const stats = el('span', 'sd-te-result-stats');
+      stats.append(...result.querySelectorAll(':scope > .statcol, :scope > .bstcol'));
+      result.append(stats);
+    }
+    frame.classList.toggle('sd-te-picker-idle', !isSearch);
     const move = /^move(\d)$/.exec(room.curChartName || '');
-    const title = move ? `Choose move ${move[1]}` : MODAL_TITLES[room.curChartType] || 'Edit';
-    const species = room.curSet && room.curSet.species;
-    setText(frame.querySelector('h2'), species ? `${title} · ${species}` : title);
+    setText(frame.querySelector('h2'), move ? `Choose move ${move[1]}` : PICKER_TITLES[room.curChartType] || 'Selection');
     const proxy = frame.querySelector('input');
     const real = isSearch && chartInput(wrapper, room);
+    for (const input of wrapper.querySelectorAll('.chartinput')) {
+      const selected = input === real;
+      if (input.dataset.active !== String(selected)) input.dataset.active = String(selected);
+      input.setAttribute('aria-label', /^move\d$/.test(input.name) ? `Move ${input.name.slice(4)}` : input.name === 'pokemon' ? 'Pokémon' : input.name);
+    }
     if (!real) return;
-    if (proxy.dataset.for !== room.curChartName) {
+    if (proxy.dataset.for !== room.curChartName || document.activeElement === real) {
       proxy.dataset.for = room.curChartName;
       proxy.value = real.value;
-      proxy.placeholder = `Search ${room.curChartType === 'pokemon' ? 'Pokémon' : `${room.curChartType}s`}`;
+      proxy.placeholder = `Search ${room.curChartType === 'pokemon' ? 'Pokémon' : room.curChartType === 'ability' ? 'abilities' : `${room.curChartType}s`}`;
     }
-    // The client focuses its own field (on open, and after each choice); take the focus.
-    if (document.activeElement === real) {
-      proxy.value = real.value;
-      proxy.focus();
-      proxy.select();
+  }
+
+  // Native form handlers read and update this.$chart. Redirect it only for the synchronous
+  // inline operation, restoring search state even if upstream throws.
+  function inForm(room, node, type, action) {
+    const chart = room.$chart, chartType = room.curChartType, chartName = room.curChartName;
+    try {
+      room.$chart = room.$(node);
+      room.curChartType = room.curChartName = type;
+      return action();
+    } finally {
+      room.$chart = chart;
+      room.curChartType = chartType;
+      room.curChartName = chartName;
     }
+  }
+
+  function buildForms(wrapper, room) {
+    const box = wrapper.querySelector('.teamchartbox.individual');
+    if (!box || !room.curSet || !room.curSet.species) return;
+    for (const type of ['details', 'stats']) {
+      let section = box.querySelector(`.sd-te-form[data-form="${type}"]`);
+      if (!section) {
+        section = el('section', 'sd-te-form');
+        section.dataset.form = type;
+        section.setAttribute('aria-label', type === 'stats' ? 'Stats, EVs, IVs and nature' : 'Pokémon details');
+        box.append(section);
+        // Capture native delegated events here so each handler sees the correct form.
+        for (const eventName of ['input', 'keyup', 'change', 'submit', 'click']) {
+          section.addEventListener(eventName, event => {
+            const target = event.target;
+            let method;
+            if (type === 'details' && ((eventName === 'change' && target.matches('input, select')) || eventName === 'submit')) method = 'detailsChange';
+            if (type === 'stats') {
+              if ((eventName === 'keyup' || eventName === 'input' || eventName === 'change') && target.matches('input.numform')) method = 'statChange';
+              if (target.matches('.evslider') && eventName === 'input') method = 'statSlide';
+              if (target.matches('.evslider') && eventName === 'change') method = 'statSlided';
+              if (eventName === 'change' && target.name === 'nature') method = 'natureChange';
+              if (eventName === 'change' && target.name === 'ivspread') method = 'ivSpreadChange';
+              const button = eventName === 'click' && target.closest('button[name]');
+              if (button && ['setStatFormGuesses', 'setStatFormOptimization'].includes(button.name)) method = button.name;
+            }
+            if (!method || typeof room[method] !== 'function') return;
+            event.stopPropagation();
+            if (eventName === 'click' || eventName === 'submit') event.preventDefault();
+            inForm(room, section, type, () => room[method]({ currentTarget: target, target,
+              preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }));
+            section.dataset.key = formKey(room);
+          }, true);
+        }
+      }
+      // Move a native form opened by automatic keyboard progression into its inline home.
+      const native = room.$chart && room.$chart[0];
+      if (native && native !== section && native.querySelector(type === 'stats' ? '.statform' : '.detailsform')) {
+        section.replaceChildren(...native.childNodes);
+        section.dataset.key = '';
+      }
+      const key = formKey(room);
+      if (section.dataset.key !== key && !section.contains(document.activeElement)) {
+        inForm(room, section, type, () => type === 'stats' ? room.updateStatForm() : room.updateDetailsForm());
+        // Show happiness consistently. Upstream already accepts and persists this field.
+        if (type === 'details' && room.curTeam.gen > 1 && !section.querySelector('[name="happiness"]')) {
+          const row = el('div', 'formrow');
+          const label = el('label', 'formlabel', 'Happiness:');
+          const input = el('input', 'textbox inputform numform');
+          input.type = 'number'; input.name = 'happiness'; input.min = '0'; input.max = '255';
+          input.value = String(room.curSet.happiness ?? 255);
+          label.htmlFor = input.id = 'sd-te-happiness';
+          const field = el('div'); field.append(input); row.append(label, field);
+          section.querySelector('.detailsform').append(row);
+        }
+        for (const input of section.querySelectorAll('input[name], select[name]')) {
+          if (!input.getAttribute('aria-label')) input.setAttribute('aria-label',
+            input.name.startsWith('stat-') ? `${statName(input.name.slice(5))} EVs` :
+              input.name.startsWith('iv-') ? `${statName(input.name.slice(3))} ${room.curTeam.gen <= 2 ? 'DVs' : 'IVs'}` : input.name);
+        }
+        const title = section.querySelector('h3');
+        if (title && type === 'stats') title.textContent = 'Stats & training';
+        section.dataset.key = formKey(room);
+      }
+      if (type === 'stats') {
+        const total = section.querySelector('.statscol > div');
+        if (total) setText(total, 'Stat');
+        const remaining = section.querySelector('.totalev');
+        if (remaining) remaining.setAttribute('aria-label', `Remaining EVs: ${remaining.textContent}`);
+        const spread = section.querySelector('[name="ivspread"]');
+        if (spread && !spread.closest('.sd-te-ivspread')) {
+          const row = el('p', 'sd-te-ivspread');
+          row.append(spread);
+          section.querySelector('.statform').append(row);
+        }
+      }
+    }
+    box.classList.add('sd-te-inline-ready');
+  }
+
+  function formKey(room) {
+    return JSON.stringify([room.curTeam.format, room.curSet]);
   }
 
   function natureText(set) {
@@ -1153,6 +1270,10 @@ function installTeamEditor() {
 
     if (!li.dataset.sd) {
       li.dataset.sd = '1';
+      for (const button of li.querySelectorAll('.setmenu button')) {
+        button.title = button.textContent.trim();
+        button.setAttribute('aria-label', button.title);
+      }
       if (set.species) {
         const meta = el('div', 'sd-te-meta');
         meta.append(el('span', 'sd-te-chips'));
@@ -1244,34 +1365,71 @@ function installTeamEditor() {
     const room = getRoom();
     const wrapper = root.querySelector(':scope > .teamwrapper');
     if (!room || !room.curTeam || !wrapper) return;
+    if (!guardedRooms.has(room) && typeof room.importSetButtons === 'function') {
+      const original = room.importSetButtons;
+      room.importSetButtons = function (...args) {
+        // Sample-set requests can finish after leaving the Pokémon or team.
+        if (!this.curTeam || !this.curSet || !this.el.querySelector('.teambuilder-pokemon-import')) return;
+        return original.apply(this, args);
+      };
+      guardedRooms.add(room);
+    }
     const mode = wrapper.querySelector(':scope > .teambar') ? 'set' :
       wrapper.querySelector(':scope > .teamedit') ? 'export' : 'team';
     if (wrapper.dataset.sdMode !== mode) wrapper.dataset.sdMode = mode;
     try {
       buildHead(wrapper, room, mode);
       if (mode === 'team') {
-        buildTabs(wrapper, room);
+        if (!tabs.has(room.curTeam)) {
+          if (room.curSetList.length) room.selectPokemon(0);
+          else room.addPokemon();
+          return;
+        }
+        tabs.set(room.curTeam, 'full');
         buildPaste(wrapper, room);
         buildAside(wrapper, room);
         showTab(wrapper, room);
       }
+      if (mode !== 'export') buildRoster(wrapper, room, mode);
       if (mode === 'set') {
-        decorateTeambar(wrapper, room);
-        buildModal(wrapper, room);
+        tabs.set(room.curTeam, room.curSetLoc);
+        buildPicker(wrapper, room);
+        buildForms(wrapper, room);
       }
       for (const li of wrapper.querySelectorAll('.teamchart > li[value]')) decorateSet(li, room);
     } catch (e) {} // the client's own editor stays usable if this ever fails
   };
   new MutationObserver(update).observe(document.body, { childList: true, subtree: true });
-  // Esc closes the modal; the client's own Esc handler only closes its popups.
-  window.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || (window.app && app.popups && app.popups.length)) return;
-    const wrapper = document.querySelector('#room-teambuilder > .teamwrapper.sd-te-modal-open');
+  // Focusing the same native chart again need not mutate its DOM. Input values are
+  // properties too, so keep the roster/forms in sync after those delegated events.
+  for (const eventName of ['focusin', 'input', 'change']) {
+    document.addEventListener(eventName, event => {
+      if (!event.target.closest('#room-teambuilder')) return;
+      const room = getRoom();
+      if (eventName === 'focusin' && room && room.curSet && !event.target.matches('.chartinput, .sd-te-picker-search input')) {
+        const query = queries.get(room.curSet);
+        if (query) query.focused = false;
+      }
+      if (eventName === 'input' && event.target.matches('.chartinput') && room && room.curSet) {
+        queries.set(room.curSet, { name: event.target.name, format: room.curTeam.format,
+          value: event.target.value, focused: document.activeElement === event.target, caret: event.target.selectionStart });
+        room.updateChart();
+      }
+      queueMicrotask(update);
+    });
+  }
+  document.addEventListener('click', event => {
+    const input = event.target.closest('#room-teambuilder .chartinput');
     const room = getRoom();
-    if (!wrapper || !room) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    closeModal(wrapper, room);
+    if (input && room) {
+      room.chartFocus({ currentTarget: input });
+      queueMicrotask(update);
+    }
+  }, true);
+  document.addEventListener('keydown', event => {
+    if (!['ArrowUp', 'ArrowDown'].includes(event.key) ||
+        !event.target.matches('#room-teambuilder .chartinput, #room-teambuilder .sd-te-picker-search input')) return;
+    queueMicrotask(() => document.querySelector('#room-teambuilder .sd-te-picker a.hover')?.scrollIntoView({ block: 'nearest' }));
   }, true);
   update();
   return true;

@@ -20,6 +20,7 @@
     "test": "node --test tests/*.test.js api/test/*.test.js",
     "test:desktop": "node scripts/test-desktop.js",
     "test:appearance:live": "node scripts/test-desktop.js --appearance-live",
+    "test:teambuilder:live": "node scripts/test-desktop.js --teambuilder-live",
     "test:showdex:live": "node scripts/test-desktop.js --showdex-live",
     "test:showdex:dock": "node scripts/test-desktop.js --showdex-dock-live",
     "test:replays:live": "node scripts/test-desktop.js --replay-review-live",
