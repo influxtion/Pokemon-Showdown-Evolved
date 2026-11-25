@@ -7,6 +7,7 @@
 const { net } = require('electron');
 const { boundedJson } = require('./bounded-json');
 const { installShowdexDock } = require('./showdex-dock');
+const { openProfile } = require('./client-profile');
 
 const SHOWDOWN = 'https://play.pokemonshowdown.com/';
 const ID = /^[a-z0-9]{1,80}$/;
@@ -142,6 +143,8 @@ function readSession() {
     if (has('sd-menu-pm') && !pmOpen) root.classList.toggle('sd-menu-pm', false);
     const state = {
       me,
+      avatar: typeof Dex !== 'undefined' && typeof Dex.resolveAvatar === 'function' && app.user.get('avatar')
+        ? Dex.resolveAvatar(app.user.get('avatar')) : '',
       named: Boolean(app.user.get('named')),
       menuUnread: Boolean(menu && menu.notifications),
       menuTab: pmOpen ? 'pm' : has('sd-menu-community') ? 'community' : 'battle',
@@ -1645,9 +1648,16 @@ function sanitizeSession(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.rooms)) return { ready: false, rooms: [] };
   const messages = sanitizeMessages(raw.messages);
   const pmOpen = typeof raw.pmOpen === 'string' && messages.some((m) => m.userid === raw.pmOpen) ? raw.pmOpen : '';
+  let avatar = '';
+  try {
+    const url = new URL(typeof raw.avatar === 'string' && raw.avatar.length <= 300 ? raw.avatar : '', SHOWDOWN);
+    if (url.origin === new URL(SHOWDOWN).origin && !url.username && !url.password && !url.search && !url.hash &&
+        /^\/sprites\/trainers(?:-custom)?\/[a-z0-9_-]+\.png$/i.test(url.pathname)) avatar = url.href;
+  } catch {}
   return {
     ready: true,
     me: str(raw.me, 40),
+    ...(avatar ? { avatar } : {}),
     named: Boolean(raw.named),
     menuUnread: Boolean(raw.menuUnread),
     menuTab: raw.menuTab === 'pm' && pmOpen ? 'pm' : raw.menuTab === 'community' ? 'community' : 'battle',
@@ -1945,6 +1955,9 @@ class ShowdownBridge {
         break;
       case 'options':
         code = call(openOptions);
+        break;
+      case 'profile':
+        code = call(openProfile);
         break;
       case 'cancel-search':
         code = call(cancelSearch);

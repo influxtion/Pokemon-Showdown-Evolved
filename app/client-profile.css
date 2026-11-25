@@ -1,0 +1,49 @@
+/* Profile uses Showdown's native option handlers inside a normal, persistent room. */
+html.sd-launcher-shell .sd-profile-room {
+  overflow-y: auto !important;
+  background: var(--sd-app) !important;
+  color: var(--sd-text) !important;
+  padding: 28px !important;
+  box-sizing: border-box;
+}
+.sd-profile-options {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(340px, 1.5fr);
+  align-items: start;
+  gap: 24px;
+  max-width: 1050px;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sd-profile-section {
+  padding: 22px;
+  background: var(--sd-panel);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius, 10px);
+  min-width: 0;
+}
+.sd-profile-section h2 { margin: 0 0 8px; font-size: 18px; color: var(--sd-text); }
+.sd-profile-section p { margin: 12px 0; }
+.sd-profile-note { color: var(--sd-text-2); font-size: 13px; }
+.sd-profile-chat { grid-column: 2; grid-row: 1 / span 2; }
+.sd-profile-graphics { grid-column: 1; }
+.sd-profile-section .optlabel { display: flex !important; align-items: center; justify-content: space-between; gap: 16px; }
+.sd-profile-section .checkbox { display: flex; align-items: start; gap: 9px; }
+.sd-profile-section input[type="checkbox"] { flex: none; margin: 4px 0 0; accent-color: var(--sd-accent); }
+.sd-profile-section .button { padding: 7px 11px !important; font: inherit; max-width: 100%; }
+.sd-profile-section select { min-width: 130px; }
+.sd-profile-account .trainersprite { width: 80px !important; height: 80px !important; image-rendering: pixelated; margin-right: 16px; }
+.sd-profile-account > p:has(.trainersprite) { display: flex; align-items: center; overflow-wrap: anywhere; }
+.sd-profile-account .buttonbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.sd-profile-section input[name="statustext"] { box-sizing: border-box; max-width: 100%; padding: 8px; background: var(--sd-input) !important; color: var(--sd-text) !important; border: 1px solid var(--sd-border-strong) !important; }
+.sd-profile-section :is(button, select, input):focus-visible { outline: 2px solid var(--sd-accent); outline-offset: 3px; }
+@media (max-width: 900px) {
+  html.sd-launcher-shell .sd-profile-room { padding: 20px !important; }
+  .sd-profile-options { grid-template-columns: minmax(0, 1fr); max-width: 650px; gap: 16px; }
+  .sd-profile-chat, .sd-profile-graphics { grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 480px) {
+  .sd-profile-section { padding: 16px; }
+  .sd-profile-section .optlabel { align-items: start; flex-direction: column; gap: 6px; }
+}

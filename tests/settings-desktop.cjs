@@ -83,6 +83,9 @@ app.whenReady().then(async () => {
   await load('settings.html');
   await until(() => run("document.getElementById('start-page').value === 'replays'"), 'Settings loaded');
   assert.equal(await run("document.getElementById('confirm-on-close').checked"), true);
+  await run("document.getElementById('open-profile').click(); 0");
+  await until(() => run("document.getElementById('settings-status').textContent.includes('Profile is unavailable')"), 'unavailable profile feedback');
+  assert.ok(renderer.getURL().endsWith('settings.html'), 'failed profile navigation keeps Settings visible');
   assert.equal(await run("document.getElementById('notify-messages').checked"), true);
   assert.equal(await run("document.getElementById('home-layout').value"), '', 'no layout chosen yet');
   await run("document.getElementById('home-layout').value = 'classic'; document.getElementById('home-layout').dispatchEvent(new Event('change', {bubbles:true}))");

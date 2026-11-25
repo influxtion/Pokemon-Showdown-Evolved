@@ -48,8 +48,10 @@
     </div>
     <div class="rail-foot">
       <div class="rail-user" data-nav="account" hidden>
-        <span class="rail-avatar" data-nav="avatar" aria-hidden="true"></span>
-        <span class="rail-user-text"><strong data-nav="me"></strong><span>v0.2.0-dev</span></span>
+        <button class="rail-profile" data-nav="profile" type="button" title="Your profile and chat preferences" aria-label="Your profile and chat preferences">
+          <span class="rail-avatar" data-nav="avatar" aria-hidden="true"></span>
+          <span class="rail-user-text"><strong data-nav="me"></strong><span>Profile &amp; preferences</span></span>
+        </button>
         <a href="play.html" data-nav="sign-in" title="Sign in" hidden>Sign in</a>
       </div>
       <span class="rail-version">v0.2.0-dev</span>
@@ -67,6 +69,19 @@
     <main class="content">
       <div class="page page--narrow">
         <p id="settings-status" role="status" aria-live="polite" hidden></p>
+
+        <section class="settings-section">
+          <h2>Profile &amp; chat</h2>
+          <div class="panel">
+            <div class="setting-row">
+              <div class="setting-text">
+                <div>Your Showdown profile</div>
+                <div class="setting-desc">Choose your avatar and manage chat, messages, timestamps, text formatting and battle graphics.</div>
+              </div>
+              <div class="setting-control"><button class="btn" id="open-profile" type="button">Open profile</button></div>
+            </div>
+          </div>
+        </section>
 
         <div class="banner" id="showdex-reload-banner" hidden>
           Reload the online client or start a new bot session to apply Showdex changes. Active battles are never reloaded automatically.
