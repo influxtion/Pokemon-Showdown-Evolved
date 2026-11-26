@@ -208,3 +208,14 @@ html.sd-launcher-shell.sd-menu-pm {
     outline: none !important;
   }
 }
+
+/* Home's Friends panel hosts the same conversation in a smaller native view. */
+@media (max-width: 650px) {
+  html.sd-launcher-shell.sd-menu-pm .mainmenuwrapper { overflow: hidden !important; }
+  html.sd-launcher-shell.sd-menu-pm .leftmenu,
+  html.sd-launcher-shell.sd-menu-pm .leftmenu:has(.pm-window:not(.news-embed)) { padding: 0 !important; }
+  html.sd-launcher-shell.sd-menu-pm .pm-window.sd-pm-active { height: 100vh !important; min-height: 0 !important; border: 0 !important; border-radius: 0 !important; }
+  html.sd-launcher-shell.sd-menu-pm .sd-pm-active .pm-buttonbar { display: none !important; }
+  html.sd-launcher-shell.sd-menu-pm .sd-pm-active .pm-log .inner { padding: 6px 8px !important; overflow-wrap: anywhere; }
+  html.sd-launcher-shell.sd-menu-pm .sd-pm-active .pm-log-add { padding: 6px !important; }
+}

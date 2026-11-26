@@ -165,7 +165,7 @@ html[data-home-theme] .topbar-actions > .btn, html[data-home-theme] #account { f
 
 /* Desktop spacing options keep Classic's arrangement and let Home scroll naturally. */
 html[data-home-theme] .hub--classic .hub-side { width: 100%; max-width: 620px; justify-self: end; }
-html[data-home-theme] .hub--classic .hub-news { flex: 0 1 280px; }
+html[data-home-theme] .hub--classic .hub-rooms { flex: 0 1 280px; }
 html[data-home-theme] .hub--classic .hub-lower { flex: 0 1 260px; }
 html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 40px 36px; }
 html[data-spacing="relaxed"] .hub-grid, html[data-spacing="airy"] .hub-grid { column-gap: 80px; row-gap: 64px; }
@@ -216,7 +216,7 @@ html[data-home-theme] .hub--modern .hero-links { order: 0; }
 html[data-home-theme] .hub--modern .hero-record { order: 1; }
 html[data-home-theme] .hub--modern .hero-stats { order: 2; }
 @media (max-width: 1180px) {
-  html[data-home-theme] .hub--classic .hub-news { flex-basis: 300px; }
+  html[data-home-theme] .hub--classic .hub-rooms { flex-basis: 300px; }
   html[data-spacing="relaxed"] .hub, html[data-spacing="airy"] .hub { padding: 20px 28px 28px; }
   html[data-spacing="relaxed"] .hub--classic .hub-grid, html[data-spacing="airy"] .hub--classic .hub-grid { grid-template-columns: 340px minmax(0, 1fr); column-gap: 48px; }
   html[data-spacing="relaxed"] .hub--classic .hub-lower, html[data-spacing="airy"] .hub--classic .hub-lower { gap: 40px; }

@@ -384,6 +384,7 @@ function createWindow() {
     }
   });
   contents.on('did-navigate', () => {
+    hideClient();
     // An outgoing page's ResizeObserver can enqueue bounds during navigation.
     if (!parseUrl(contents.getURL())?.pathname.endsWith('/practice-battle.html')) practiceView?.hide();
     // After Ctrl+Tab away from the client, typing must not go to the hidden view.
@@ -601,6 +602,7 @@ ipcMain.handle('practice:next', async event => {
 
 ipcMain.on('client:show', (event, value) => {
   if (!isLauncherFrame(event)) return;
+  if (!/\/(?:index|play)\.html$/.test(parseUrl(win.webContents.getURL())?.pathname || '')) return;
   if (maintenance && !client) return;
   const bounds = toBounds(value);
   if (!bounds) return;

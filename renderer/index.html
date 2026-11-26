@@ -97,6 +97,7 @@
 
 
             <section class="hero hero--menu" aria-label="Start a battle">
+              <a class="hero-info" href="resources.html" aria-label="Information and resources" title="Information and resources">i</a>
               <div class="hero-main">
               <div class="hero-top">
                 <span class="hero-kicker" id="hero-kicker">Connecting to Showdown…</span>
@@ -132,10 +133,10 @@
                   <span class="search-time num" aria-hidden="true"></span>
                 </button>
                 <button class="btn" type="button" id="cancel-search" hidden>Cancel search</button>
-                <button class="btn btn-quiet" type="button" id="challenge-toggle" disabled>Challenge a user</button>
+                <button class="btn btn-quiet" type="button" id="challenge-toggle" disabled>Search a user</button>
                 <form class="hero-challenge" id="challenge-form" hidden>
-                  <input class="input" id="challenge-user" maxlength="18" placeholder="Username" aria-label="Username to challenge" autocomplete="off">
-                  <button class="btn" type="submit">Challenge</button>
+                  <input class="input" id="challenge-user" maxlength="18" placeholder="Username" aria-label="Username to search" autocomplete="off" required>
+                  <button class="btn" type="submit">Search</button>
                   <button class="btn btn-quiet" type="button" id="challenge-cancel">Cancel</button>
                 </form>
                 <a class="btn btn-quiet hero-bots" href="practice.html" id="play-bots"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M6 9v.5M10 9v.5"/></svg>Play against bots</a>
@@ -163,17 +164,7 @@
             </nav>
 
             <div class="hub-side">
-              <section class="window hub-news" aria-labelledby="news-title">
-                <div class="window-head">
-                  <h2 id="news-title">Latest news</h2>
-                  <span class="window-space"></span>
-                  <a href="https://pokemonshowdown.com/news">All news</a>
-                </div>
-                <div class="posts window-body" id="news"><div class="empty">Loading news…</div></div>
-              </section>
-
-              <div class="hub-lower">
-                <section class="window hub-rooms" aria-labelledby="rooms-title">
+              <section class="window hub-rooms" aria-labelledby="rooms-title">
                   <div class="window-head">
                     <h2 id="rooms-title">Chat rooms</h2>
                     <span class="window-space"></span>
@@ -187,14 +178,38 @@
                   <div class="window-foot" id="rooms-all"><a href="#" data-room="rooms">All rooms</a></div>
                 </section>
 
+              <div class="hub-lower">
                 <section class="window hub-friends" aria-labelledby="friends-title">
                   <div class="window-head" id="friends-head">
                     <h2 id="friends-title">Friends</h2>
                     <span class="window-count window-count--live num" id="count-friends" hidden></span>
                     <span class="window-space"></span>
                   </div>
+                  <div id="home-conversations" class="home-conversations" hidden></div>
                   <div class="friends-body window-body" id="friends"></div>
+                  <section class="home-contact" id="home-contact" aria-label="User and conversation" hidden>
+                    <div class="home-contact-head">
+                      <button class="btn btn-icon" id="contact-back" type="button" aria-label="Back to friends" title="Back to friends">&#8592;</button>
+                      <strong id="contact-name"></strong>
+                    </div>
+                    <p id="contact-status" class="setting-desc" role="status" aria-live="polite"></p>
+                    <div class="home-contact-actions">
+                      <button class="btn btn-primary" id="contact-chat" type="button" hidden>Chat</button>
+                      <button class="btn" id="contact-challenge" type="button" hidden>Challenge</button>
+                      <button class="btn btn-quiet" id="contact-full" type="button" hidden>Open full chat</button>
+                    </div>
+                    <div id="home-chat-view" class="home-chat-view" aria-label="Showdown conversation" hidden></div>
+                  </section>
                 </section>
+
+                <section class="window hub-news" aria-labelledby="news-title">
+                <div class="window-head">
+                  <h2 id="news-title">Latest news</h2>
+                  <span class="window-space"></span>
+                  <a href="https://pokemonshowdown.com/news">All news</a>
+                </div>
+                <div class="posts window-body" id="news"><div class="empty">Loading news…</div></div>
+              </section>
               </div>
             </div>
 
@@ -223,15 +238,15 @@
                 <span class="lp-select">Format</span>
                 <span class="lp-select">Team</span>
                 <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
-                <span class="lp-group"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge a user</span></span>
+                <span class="lp-group"><span class="lp-battle">Battle!</span><span class="lp-quiet">Search a user</span></span>
               </span>
               <span class="lp-tiles"><span>Tournaments</span><span>Ladder</span><span>Spectate</span></span>
             </span>
             <span class="lp-right">
-              <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span><span class="lp-line lp-line--short"></span></span>
+              <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span><span class="lp-item">Tournaments</span></span>
               <span class="lp-pair">
-                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span><span class="lp-item">Tournaments</span></span>
-                <span class="lp-panel"><span class="lp-head">Friends</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--away">Offline</span></span>
+                <span class="lp-panel"><span class="lp-head">Friends</span><span class="lp-item lp-item--friend">Online</span><span class="lp-item lp-item--away">Offline</span></span>
+                <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span></span>
               </span>
             </span>
           </span>
@@ -254,13 +269,14 @@
                   <span class="lp-format">[Gen 9] OU</span>
                   <span class="lp-selects"><span class="lp-select">Format</span><span class="lp-select">Team</span></span>
                   <span class="lp-team"><span></span><span></span><span></span><span></span><span></span><span></span></span>
-                  <span class="lp-actions"><span class="lp-battle">Battle!</span><span class="lp-quiet">Challenge</span></span>
+                  <span class="lp-actions"><span class="lp-battle">Battle!</span><span class="lp-quiet">Search a user</span></span>
                 </span>
                 <span class="lp-links"><span>Teambuilder</span><span>Ladder</span><span>Watch</span><span>Your stats</span></span>
               </span>
-              <span class="lp-pair lp-pair--split">
-                <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span><span class="lp-line"></span></span>
-                <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby</span><span class="lp-item">Help</span></span>
+              <span class="lp-panel"><span class="lp-head">Chat rooms</span><span class="lp-item">Lobby · Help</span></span>
+              <span class="lp-pair">
+                <span class="lp-panel"><span class="lp-head">Friends</span><span class="lp-item lp-item--friend">Online</span></span>
+                <span class="lp-panel"><span class="lp-head">Latest news</span><span class="lp-line"></span><span class="lp-line lp-line--short"></span></span>
               </span>
             </span>
           </span>
@@ -268,7 +284,7 @@
       </span>
       <span class="welcome-option-kicker">New</span>
       <span class="welcome-option-title">Revamped</span>
-      <span class="welcome-option-desc">A focused, centered layout built around the Battle button, with news and your chat rooms beneath it.</span>
+      <span class="welcome-option-desc">A focused, centered layout built around the Battle button, with chat rooms, friends and news beneath it.</span>
     </button>
   </div>
 </dialog>
@@ -287,6 +303,7 @@
 <script src="home-appearance-options.js"></script>
 <script src="home-appearance.js"></script>
 <script src="home.js"></script>
+<script src="home-social.js"></script>
 <script src="showdex-onboarding.js"></script>
 <script src="daily-challenge.js"></script>
 <script src="nav.js"></script>

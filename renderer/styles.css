@@ -861,6 +861,27 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 }
 .hero-challenge .input::placeholder { color: var(--hero-muted); }
 .hero-challenge .btn { height: 34px; }
+.hero-info { position: absolute; top: 12px; right: 12px; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--hero-muted); border-radius: 50%; color: var(--hero-text); font: bold 16px Georgia, serif; }
+.hero-info:hover, .hero-info:focus-visible { color: var(--hero-text); background: var(--hero-team-bg); text-decoration: none; }
+.hero-top { padding-right: 22px; }
+.home-contact { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 10px; gap: 8px; }
+.home-contact[hidden], .home-chat-view[hidden] { display: none; }
+.home-contact-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.home-contact-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-contact p { margin: 0; }
+.home-contact-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.home-contact-actions .btn { height: 28px; padding: 0 8px; }
+.home-chat-view { min-height: 210px; flex: 1; background: var(--bg-panel); }
+.hub--classic .hub-side:has(.home-contact:not([hidden])) { contain: none; }
+.hub--classic .hub-side:has(.home-contact:not([hidden])) .hub-lower { flex-basis: 390px; }
+.hub--modern .hub-friends:has(.home-contact:not([hidden])) { height: 420px; }
+.home-conversations { padding: 8px 12px; max-height: 110px; overflow: auto; border-bottom: 1px solid var(--border); }
+.home-conversations > strong { display: block; font-size: var(--fs-xs); color: var(--text-2); }
+.home-conversation { display: block; width: 100%; padding: 5px 0; border: 0; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.home-conversation:hover { text-decoration: underline; }
+.hub-friends .friend { flex-wrap: wrap; gap: 6px; }
+.hub-friends .friend-text { flex: 1 1 90px; }
+.hub-friends .friend > .btn { height: 26px; padding: 0 7px; }
 
 .friends-note {
   display: flex;
@@ -1200,9 +1221,9 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 
 /* ---------- Hub layouts ----------
    Two Home layouts, chosen in the welcome and switched in Settings:
-   - hub--classic: Showdown's main menu, modernized. Battle panel and tiles left; news over chat
-     rooms and friends right, ending level with the tiles.
-   - hub--modern: one centered column. A wide battle panel, then news and chat rooms (70/30).
+   - hub--classic: Showdown's main menu, modernized. Battle panel and tiles left; chat rooms above
+     friends and news on the right, ending level with the tiles.
+   - hub--modern: one centered column. A wide battle panel, then chat rooms above friends and news.
    Hidden until home.js applies one, so the wrong layout never flashes. */
 
 .hub {
@@ -1246,7 +1267,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 /* Sized by the left column: contain stops the windows stretching the row, so they end level
    with the tiles. */
 .hub--classic .hub-side { grid-area: side; contain: size; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
-.hub--classic .hub-news { flex: 1 1 0; }
+.hub--classic .hub-rooms { flex: 1 1 0; }
 .hub--classic .hub-lower { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .hub--classic .hero-main,
 .hub--classic .hero-aside { display: contents; }
@@ -1289,7 +1310,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   padding: 28px 32px;
 }
 .hub--modern .hero-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.hub--modern .hero-aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.hub--modern .hero-aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-top: 24px; }
 .hub--modern .hero--menu .hero-pickers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .hub--modern .hero--menu .hero-actions { flex-direction: row; flex-wrap: wrap; align-items: stretch; }
 .hub--modern .btn-battle { flex: 1 1 160px; min-width: 160px; }
@@ -1327,14 +1348,15 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .hero-link svg { flex: none; width: 16px; height: 16px; }
 .hub--modern .hub-side {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 28px;
   min-height: 300px;
 }
 .hub--modern .hub-lower { display: contents; }
-.hub--modern .hub-friends { display: none; }
-/* The news decides the row's height; the room list scrolls inside it. */
-.hub--modern .hub-rooms { contain: size; }
+.hub--modern .hub-rooms { grid-column: 1 / -1; height: 280px; }
+.hub--modern .hub-friends, .hub--modern .hub-news { height: 340px; }
+/* Chat rooms span the top row; Friends and News sit side by side below. */
+
 
 /* Launcher: the hero as a menu column. */
 .hero--menu { flex-direction: column; gap: var(--space-4); min-height: 0; padding: var(--space-5) 20px 20px; }
@@ -1611,7 +1633,7 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .lp-item--away { color: var(--text-2); font-weight: 400; }
 .lp-item--away::before { background: none; border: 1px solid var(--text-3); width: 2px; height: 2px; }
 .lp-pair { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
-.lp-pair--split { grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); }
+.lp-pair--split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Classic: the battle panel runs down the left with the tiles under it. */
 .lp-left { flex: 0 0 37%; display: flex; flex-direction: column; gap: 4px; }

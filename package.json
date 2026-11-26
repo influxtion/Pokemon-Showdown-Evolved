@@ -22,6 +22,7 @@
     "test:appearance:live": "node scripts/test-desktop.js --appearance-live",
     "test:teambuilder:live": "node scripts/test-desktop.js --teambuilder-live",
     "test:profile:live": "node scripts/test-desktop.js --profile-live",
+    "test:home-social:live": "node scripts/test-desktop.js --home-social-live",
     "test:showdex:live": "node scripts/test-desktop.js --showdex-live",
     "test:showdex:dock": "node scripts/test-desktop.js --showdex-dock-live",
     "test:replays:live": "node scripts/test-desktop.js --replay-review-live",

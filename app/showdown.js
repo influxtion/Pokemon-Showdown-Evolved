@@ -256,6 +256,40 @@ function pmWindow(userid) {
   return $w.length ? $w : null;
 }
 
+// Read-only server lookup; each request owns and removes its response listener.
+function findUser(name) {
+  if (!window.app || !app.user || app.isDisconnected || typeof app.on !== 'function' ||
+      typeof app.off !== 'function' || typeof app.send !== 'function') return { ok: false };
+  const userid = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return new Promise(resolve => {
+    let timer;
+    const finish = result => {
+      clearTimeout(timer);
+      app.off('response:userdetails', receive);
+      resolve(result);
+    };
+    const receive = data => {
+      if (!data || data.userid !== userid) return;
+      finish({ ok: true, userid, name: data.name || name, online: data.rooms !== false,
+        status: typeof data.status === 'string' ? data.status.replace(/^!/, '') : '' });
+    };
+    app.on('response:userdetails', receive);
+    timer = setTimeout(() => finish({ ok: false }), 8000);
+    try { app.send('/cmd userdetails ' + userid); } catch { finish({ ok: false }); }
+  });
+}
+
+function startChat(name) {
+  const menu = window.app && app.rooms && app.rooms[''];
+  if (!menu || typeof menu.openPM !== 'function' || app.isDisconnected) return false;
+  if (!app.user.get('named')) {
+    app.addPopup(LoginPopup);
+    return 'needs-client';
+  }
+  menu.openPM(name, true);
+  return openPM(name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+}
+
 // Shows one conversation full size in the main menu (see client-messages.css).
 function openPM(userid) {
   const menu = app.rooms[''];
@@ -1903,6 +1937,14 @@ class ShowdownBridge {
             typeof next.user === 'string' && USER_ID.test(next.user) || next.tab === 'community'))) return false;
     let code;
     switch (action) {
+      case 'find-user':
+      case 'start-chat': {
+        if (typeof args.user !== 'string' || args.user.length > 18 || /[\u0000-\u001f]/.test(args.user) ||
+            !args.user.toLowerCase().replace(/[^a-z0-9]/g, '')) return false;
+        code = action === 'find-user' ? call(findUser, args.user.trim())
+          : callWith([pmWindow, openPM], startChat, args.user.trim());
+        break;
+      }
       case 'search': {
         const team = args.team === null ? null : args.team;
         if (!isId(args.format) || (team !== null && (!Number.isSafeInteger(team) || team < 0 || team > 9999))) return false;
@@ -1973,6 +2015,11 @@ class ShowdownBridge {
     }
     try {
       const result = await contents.executeJavaScript(code);
+      if (action === 'find-user') {
+        if (!result || result.ok !== true || result.userid !== args.user.toLowerCase().replace(/[^a-z0-9]/g, '')) return { ok: false };
+        return { ok: true, userid: result.userid, name: str(result.name, 40), online: result.online === true,
+          status: str(result.status, 140) };
+      }
       // true: done in the background. 'needs-client': show the client so the user can respond.
       return result === true || result === 'needs-client' || result === 'needs-forfeit' ? result : false;
     } catch {

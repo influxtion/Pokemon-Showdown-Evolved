@@ -336,17 +336,17 @@ app.whenReady().then(async () => {
       assert.equal(await run('document.documentElement.scrollWidth <= innerWidth'), true, `${layout} ${width} horizontal overflow`);
       assert.equal(await run("document.getElementById('hub').scrollWidth <= document.getElementById('hub').clientWidth"), true, `${layout} ${width} hub overflow`);
       const visible = await run("['.hub-tiles', '.hero-links', '.hub-friends', '.hub-rooms', '.hub-news'].map((s) => getComputedStyle(document.querySelector(s)).display !== 'none')");
-      assert.deepEqual(visible, layout === 'classic' ? [true, false, true, true, true] : [false, true, false, true, true], `${layout} panels`);
+      assert.deepEqual(visible, layout === 'classic' ? [true, false, true, true, true] : [false, true, true, true, true], `${layout} panels`);
       if (layout === 'classic') {
         const [tiles, news, rooms, friends] = await run("['.hub-tiles', '.hub-news', '.hub-rooms', '.hub-friends'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.top, r.bottom])");
-        assert.ok(rooms[1] <= tiles[1] + 1 && Math.abs(friends[1] - rooms[1]) <= 1, 'smaller lower panels stay aligned within the left column height');
-        assert.ok(news[0] < rooms[0] && rooms[0] > news[1], 'news sits separately above the lower pair');
+        assert.ok(news[1] <= tiles[1] + 1 && Math.abs(friends[1] - news[1]) <= 1, 'smaller lower panels stay aligned within the left column height');
+        assert.ok(rooms[0] < news[0] && news[0] > rooms[1], 'chat rooms sit separately above Friends and News');
       } else {
         const [hero, news, rooms] = await run("['.hero', '.hub-news', '.hub-rooms'].map((s) => document.querySelector(s).getBoundingClientRect()).map((r) => [r.left, r.right, r.width])");
         // Centered inside the hub's content area, which excludes any vertical scrollbar.
         const hubCenter = await run("(() => { const h = document.getElementById('hub'); return h.getBoundingClientRect().left + h.clientWidth / 2; })()");
         assert.ok(Math.abs((hero[0] + hero[1]) / 2 - hubCenter) <= 2, 'battle panel centered');
-        assert.ok(Math.abs(news[2] / (news[2] + rooms[2]) - 0.7) < 0.03, 'news and chat rooms split 70/30');
+        assert.ok(rooms[2] > news[2] * 1.9, 'chat rooms span the row above Friends and News');
         assert.equal(await run("[...document.querySelectorAll('.hero-team-grid > *')].every((n) => Math.abs(n.getBoundingClientRect().width - n.getBoundingClientRect().height) < 1)"), true, 'square team slots');
       }
       for (const theme of ['light', 'dark']) {

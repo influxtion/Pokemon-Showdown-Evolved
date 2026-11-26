@@ -242,9 +242,8 @@ function renderHero() {
   els.format.disabled = searching || !state.formats.length || !sessionReady || !sessionConnected;
   els.team.disabled = searching || !format || format.presetTeam || !state.teams.length || !sessionReady || !sessionConnected;
   $('edit-team').setAttribute('aria-disabled', String(!sessionReady || !sessionConnected));
-  if (searching) els.challengeForm.hidden = true;
-  els.challengeToggle.hidden = searching || !els.challengeForm.hidden;
-  els.challengeToggle.disabled = !format || !sessionReady || !sessionConnected;
+  els.challengeToggle.hidden = !els.challengeForm.hidden;
+  els.challengeToggle.disabled = !sessionReady || !sessionConnected;
   els.challengeUser.disabled = !sessionReady || !sessionConnected;
   const challengeSubmit = els.challengeForm.querySelector('[type="submit"]');
   if (challengeSubmit) challengeSubmit.disabled = !sessionReady || !sessionConnected;
@@ -505,6 +504,13 @@ function renderFriends() {
           const details = el('div', 'friend-text');
           details.append(el('span', 'friend-name', friend.name), el('span', 'friend-status', label));
           row.append(details);
+          const chat = el('button', 'btn', 'Chat');
+          chat.type = 'button';
+          chat.dataset.friendChat = friend.userid;
+          chat.dataset.friendName = friend.name;
+          chat.dataset.friendOnline = String(friend.online);
+          chat.setAttribute('aria-label', `Chat with ${friend.name}`);
+          row.append(chat);
           if (friend.online) {
             const challenge = el('button', 'btn', 'Challenge');
             challenge.type = 'button';
@@ -525,6 +531,7 @@ function renderFriends() {
   for (const button of els.friends.querySelectorAll('[data-friend-challenge]')) {
     button.disabled = !sessionReady || !sessionConnected || !currentFormat();
   }
+  for (const button of els.friends.querySelectorAll('[data-friend-chat]')) button.disabled = !sessionReady || !sessionConnected;
 }
 
 els.friends.addEventListener('click', (event) => {
@@ -602,13 +609,7 @@ $('challenge-cancel').addEventListener('click', () => {
   els.challengeToggle.hidden = false;
 });
 
-els.challengeForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  if (!sessionReady || !sessionConnected) return;
-  const user = els.challengeUser.value.trim();
-  const format = currentFormat();
-  if (user && format) act('challenge', { user, format: format.id });
-});
+// User search and the Friends conversation panel are handled by home-social.js.
 
 $('edit-team').addEventListener('click', (event) => {
   event.preventDefault();

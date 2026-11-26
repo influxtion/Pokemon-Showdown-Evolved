@@ -391,6 +391,46 @@ test('profile fails safely before client readiness and reuses an existing room',
   assert.equal(await bridge.act('profile', null), false);
 });
 
+test('user search matches replies, bounds output and cleans up on success and timeout', async () => {
+  const listeners = new Set();
+  let expire;
+  let userid;
+  const app = { user: {}, on(event, fn) { listeners.add(fn); }, off(event, fn) { listeners.delete(fn); },
+    send(command) { userid = command.slice('/cmd userdetails '.length); } };
+  const bridge = new ShowdownBridge(() => fakeContents(code => vm.runInNewContext(code, {
+    window: { app }, app, setTimeout(fn) { expire = fn; return 1; }, clearTimeout() {},
+  })));
+  const pending = bridge.act('find-user', { user: 'Test User' });
+  assert.equal(userid, 'testuser');
+  for (const receive of listeners) receive({ userid: 'other', rooms: {} });
+  assert.equal(listeners.size, 1);
+  for (const receive of listeners) receive({ userid, name: '<Test User>', status: 'x'.repeat(300), rooms: {} });
+  const result = await pending;
+  assert.equal(result.ok, true);
+  assert.equal(result.name, '<Test User>');
+  assert.equal(result.online, true);
+  assert.equal(result.status.length, 140);
+  assert.equal(listeners.size, 0);
+  const timeout = bridge.act('find-user', { user: 'Offline' });
+  expire();
+  assert.deepEqual(await timeout, { ok: false });
+  assert.equal(listeners.size, 0);
+  for (const user of ['', '!!!', 'x\n/command', 'x'.repeat(19), {}, null]) {
+    assert.equal(await bridge.act('find-user', { user }), false);
+    assert.equal(await bridge.act('start-chat', { user }), false);
+  }
+  assert.equal(listeners.size, 0);
+});
+
+test('starting a new conversation prompts guests to choose a name without sending a message', async () => {
+  let opened = 0;
+  const app = { rooms: { '': { openPM() { throw new Error('guest chat must not open'); } } },
+    user: { get() { return false; } }, addPopup() { opened++; } };
+  const bridge = new ShowdownBridge(() => fakeContents(code => vm.runInNewContext(code, { window: { app }, app, LoginPopup: {} })));
+  assert.equal(await bridge.act('start-chat', { user: 'Tester' }), 'needs-client');
+  assert.equal(opened, 1);
+});
+
 test('a close focuses its validated successor within the same client execution', async () => {
   const calls = [];
   const chain = { length: 1, removeClass() { return this; }, addClass() { return this; }, show() { return this; },

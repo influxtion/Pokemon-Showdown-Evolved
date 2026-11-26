@@ -5,7 +5,8 @@ const path = require('node:path');
 const env = { ...process.env };
 env.SHOWDOWN_DESKTOP_BACKGROUND = '1';
 delete env.ELECTRON_RUN_AS_NODE;
-const liveFile = process.argv.includes('--profile-live') ? 'profile-live.cjs'
+const liveFile = process.argv.includes('--home-social-live') ? 'home-social-live.cjs'
+  : process.argv.includes('--profile-live') ? 'profile-live.cjs'
   : process.argv.includes('--teambuilder-live') ? 'teambuilder-live.cjs'
   : process.argv.includes('--startup-live') ? 'startup-live.cjs'
   : process.argv.includes('--appearance-live') ? 'app-appearance-live.cjs'
