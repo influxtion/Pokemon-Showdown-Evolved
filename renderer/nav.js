@@ -331,7 +331,7 @@
             const session = await desktop.getSession();
             if (session?.ready && Array.isArray(session.rooms)) sessionStorage.setItem(lastSessionKey, JSON.stringify(session));
           } catch {}
-          go('play.html');
+          if (!onPlay) go('play.html');
         } else await next.open();
       }
       return result;

@@ -93,9 +93,19 @@ app.whenReady().then(async () => {
     await pause(150);
   };
   const close = async id => {
-    await js(`document.querySelector('.pm-window-${id} > h3 .closebutton').click();0`);
     await page('window.showdownNav.pollNow()');
-    await until(() => page(`window.desktop.getSession().then(s=>!s.messages.some(m=>m.userid===${JSON.stringify(id)}))`), 'native close');
+    const count = await js("[...document.querySelectorAll('.pm-window[data-userid]')].filter(el=>el.style.display!=='none').length");
+    const before = await page('performance.timeOrigin');
+    const clientBefore = await js('performance.timeOrigin');
+    const width = view.getBounds().width;
+    const point = await js(`(() => {const r=document.querySelector('.pm-window-${id} > h3 .closebutton').getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};})()`);
+    const started = Date.now();
+    client.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});
+    client.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});
+    await until(() => count === 1 ? !view.getVisible() : view.getBounds().width === Math.min(width, (count-1)*320), 'close resizes or hides dock without polling', 500);
+    assert.equal(await page('performance.timeOrigin'), before, 'native X keeps launcher document');
+    assert.equal(await js('performance.timeOrigin'), clientBefore, 'native X keeps client document');
+    console.log(`Native close ${id}: ${Date.now()-started}ms`);
     await pause(100);
   };
   await search('HomeTestFriend');
@@ -134,11 +144,25 @@ app.whenReady().then(async () => {
   await until(() => !view.getVisible(), 'profile overlays chats');
   await page('document.getElementById("user-profile-close").click();0');
   await until(() => view.getVisible(), 'dismissal restores chats');
+  await open('TabFriend');
+  const homeDocument = await page('performance.timeOrigin');
+  const nativeDocument = await js('performance.timeOrigin');
+  await page('[...document.querySelectorAll(".nav-close")].find(b=>b.getAttribute("aria-label")==="Close TabFriend").click();0');
+  await until(() => page('![...document.querySelectorAll(".nav-close")].some(b=>b.getAttribute("aria-label")==="Close TabFriend")'), 'Home message tab closes');
+  assert.equal(await page('performance.timeOrigin'), homeDocument, 'Home tab X does not reload Home');
+  assert.equal(await js('performance.timeOrigin'), nativeDocument, 'Home tab X does not reload client');
   // Full-view navigation restores the original single-conversation presentation.
   await page('window.desktop.showdown("open-pm",{user:"hometestfriend"})');
   await until(() => renderer.getURL().endsWith('/play.html') && !renderer.isLoading(), 'full chat handoff');
   assert.equal(await js('document.documentElement.classList.contains("sd-home-chat")'), false);
   assert.equal(await js(`document.querySelector(${JSON.stringify(input('hometestfriend'))}).value`), 'First draft');
+  const playDocument = await page('performance.timeOrigin');
+  await page('[...document.querySelectorAll(".nav-close")].find(b=>b.getAttribute("aria-label")==="Close HomeTestFriend").click();0');
+  await until(() => page('document.getElementById("room-title").textContent === "SecondFriend"'), 'full-size tab selects next conversation');
+  assert.equal(await page('performance.timeOrigin'), playDocument, 'switching after close reuses Play document');
+  assert.equal(await js('performance.timeOrigin'), nativeDocument, 'switching after close reuses client document');
+  await page('window.desktop.showdown("start-chat",{user:"HomeTestFriend"})');
+  await page('window.showdownNav.pollNow()');
   for (const layout of ['classic', 'modern']) {
     await page(`window.desktop.setSetting('homeLayout',${JSON.stringify(layout)})`);
     await win.loadFile(path.join(__dirname, '../renderer/index.html'));

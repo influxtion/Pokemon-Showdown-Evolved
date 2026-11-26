@@ -223,7 +223,11 @@ function ensureClient() {
   });
   contents.on('render-process-gone', () => logger.write('client-process-gone'));
   contents.on('console-message', (event) => {
-    if (event.frame === contents.mainFrame && isShowdownUrl(event.frame.url)) saveBattleWidth(event.message, 'client');
+    if (event.frame !== contents.mainFrame || !isShowdownUrl(event.frame.url)) return;
+    saveBattleWidth(event.message, 'client');
+    if (event.message === '__SD_CHAT_DOCK_CHANGED__' && win && !win.isDestroyed()) {
+      win.webContents.send('client:changed');
+    }
   });
   // Re-applied on every load; the stylesheet follows prefers-color-scheme, which tracks nativeTheme.
   contents.on('dom-ready', () => {

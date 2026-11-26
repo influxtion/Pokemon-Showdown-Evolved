@@ -140,7 +140,8 @@ function readSession() {
     const has = (name) => Boolean(root && root.classList && root.classList.contains(name));
     // A conversation view whose window the client has since closed falls back to Battle.
     let pmOpen = has('sd-menu-pm') ? (messages.find((m) => m.active) || (has('sd-home-chat') && messages[0]) || {}).userid || '' : '';
-    if (has('sd-menu-pm') && !pmOpen) root.classList.toggle('sd-menu-pm', false);
+    // An empty Home dock stays blank until its view is hidden, never painting the native menu.
+    if (has('sd-menu-pm') && !pmOpen && !has('sd-home-chat')) root.classList.toggle('sd-menu-pm', false);
     const state = {
       me,
       avatar: typeof Dex !== 'undefined' && typeof Dex.resolveAvatar === 'function' && app.user.get('avatar')
@@ -314,6 +315,10 @@ function setChatDock(enabled, userid) {
       window.__sdChatDockEvents = true;
       // Native controls still own sending, closing and challenging.
       document.addEventListener('click', event => {
+        if (root.classList.contains('sd-home-chat') && event.target.closest('.pm-window[data-userid] > h3 .closebutton')) {
+          // Notify after the native handler has closed the window; no message data crosses here.
+          setTimeout(() => console.debug('__SD_CHAT_DOCK_CHANGED__'), 0);
+        }
         if (root.classList.contains('sd-home-chat') && event.target.closest('.pm-challenge, .pm-userOptions')) {
           root.classList.toggle('sd-home-chat', false);
           const el = event.target.closest('.pm-window');
