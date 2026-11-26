@@ -864,17 +864,22 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .hero-info { position: absolute; top: 12px; right: 12px; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--hero-muted); border-radius: 50%; color: var(--hero-text); font: bold 16px Georgia, serif; }
 .hero-info:hover, .hero-info:focus-visible { color: var(--hero-text); background: var(--hero-team-bg); text-decoration: none; }
 .hero-top { padding-right: 22px; }
-.home-contact { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 10px; gap: 8px; }
-.home-contact[hidden], .home-chat-view[hidden] { display: none; }
-.home-contact-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.home-contact-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-contact p { margin: 0; }
-.home-contact-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.home-contact-actions .btn { height: 28px; padding: 0 8px; }
-.home-chat-view { min-height: 210px; flex: 1; background: var(--bg-panel); }
-.hub--classic .hub-side:has(.home-contact:not([hidden])) { contain: none; }
-.hub--classic .hub-side:has(.home-contact:not([hidden])) .hub-lower { flex-basis: 390px; }
-.hub--modern .hub-friends:has(.home-contact:not([hidden])) { height: 420px; }
+.user-profile-popup { box-sizing: border-box; width: 360px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel); color: var(--text); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); }
+.user-profile-popup::backdrop { background: rgb(15 27 51 / 35%); }
+.user-profile-close { position: absolute; top: 6px; right: 6px; }
+.user-profile-details { display: flex; align-items: center; gap: 16px; margin: 8px 0 20px; }
+.user-profile-details img { flex: none; object-fit: contain; image-rendering: pixelated; }
+.user-profile-details > div { min-width: 0; overflow-wrap: anywhere; }
+.user-profile-details h2 { margin: 0 0 6px; font-size: 18px; }
+.user-profile-details p { margin: 0; }
+.user-profile-actions { display: flex; gap: 8px; }
+.user-profile-actions .btn { flex: 1; }
+/* A fixed overlay: conversations never participate in Home's layout. */
+.home-chat-dock { position: fixed; bottom: 0; right: 16px; z-index: 30; width: min(var(--chat-width, 320px), calc(100vw - var(--rail-w) - 32px)); height: min(400px, calc(100vh - 140px)); border-radius: 8px 8px 0 0; overflow: hidden; box-shadow: 0 -4px 24px rgb(0 0 0 / 20%); background: var(--bg-panel); }
+.home-chat-dock[hidden] { display: none; }
+.home-chat-view { width: 100%; height: 100%; }
+.home-chat-status { margin: 0; padding: 16px; color: var(--text-2); }
+
 .home-conversations { padding: 8px 12px; max-height: 110px; overflow: auto; border-bottom: 1px solid var(--border); }
 .home-conversations > strong { display: block; font-size: var(--fs-xs); color: var(--text-2); }
 .home-conversation { display: block; width: 100%; padding: 5px 0; border: 0; color: var(--text); background: transparent; text-align: left; cursor: pointer; }

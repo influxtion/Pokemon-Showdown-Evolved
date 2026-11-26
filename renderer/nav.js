@@ -170,6 +170,7 @@
   const onMainMenu = (session) => Boolean(session && session.ready && session.current === '' && session.menuTab === 'battle');
 
   async function openConversation(user) {
+    if (!onPlay && window.homeChat) { await window.homeChat.open({ userid: user, name: user }); return; }
     await act('open-pm', { user });
     if (onPlay) pollNow();
     else go('play.html');

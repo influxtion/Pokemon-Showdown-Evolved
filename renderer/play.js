@@ -2,8 +2,10 @@
 
 // Keeps the native client view aligned with .client-view as the window or banner changes.
 const area = document.querySelector('.client-view');
+const clientModeReady = window.desktop.showdown('chat-dock', { enabled: false });
 
-function syncClient() {
+async function syncClient() {
+  await clientModeReady;
   const r = area.getBoundingClientRect();
   window.desktop.showClient({ x: r.left, y: r.top, width: r.width, height: r.height });
 }

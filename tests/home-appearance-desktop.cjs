@@ -132,7 +132,7 @@ app.whenReady().then(async () => {
       const stops=hero.backgroundImage.match(/color\\(srgb[^)]*\\)/g);if(stops?.length!==2)throw Error('Gradient stops');
       for(const stop of stops)check(label+' hero',getComputedStyle(document.getElementById('hero-sub')).color,stop);
       for(const selector of ['.hero .select','.window-head'])if(rgba(getComputedStyle(document.querySelector(selector)).backgroundColor)[3]!==255)throw Error('Control/header transparency');
-      for(const button of document.querySelectorAll('.btn-primary'))if(getComputedStyle(button).opacity!=='1')throw Error('Faded button');
+      for(const button of document.querySelectorAll('.btn-primary'))if(button.getClientRects().length && getComputedStyle(button).opacity!=='1')throw Error('Faded button');
     }
 
 return { minimum, worst }; })()`);

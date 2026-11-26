@@ -399,16 +399,18 @@ test('user search matches replies, bounds output and cleans up on success and ti
     send(command) { userid = command.slice('/cmd userdetails '.length); } };
   const bridge = new ShowdownBridge(() => fakeContents(code => vm.runInNewContext(code, {
     window: { app }, app, setTimeout(fn) { expire = fn; return 1; }, clearTimeout() {},
+    Dex: { resolveAvatar(avatar) { assert.equal(avatar, '167'); return '//play.pokemonshowdown.com/sprites/trainers/misty.png'; } },
   })));
   const pending = bridge.act('find-user', { user: 'Test User' });
   assert.equal(userid, 'testuser');
   for (const receive of listeners) receive({ userid: 'other', rooms: {} });
   assert.equal(listeners.size, 1);
-  for (const receive of listeners) receive({ userid, name: '<Test User>', status: 'x'.repeat(300), rooms: {} });
+  for (const receive of listeners) receive({ userid, name: '<Test User>', avatar: 167, status: 'x'.repeat(300), rooms: {} });
   const result = await pending;
   assert.equal(result.ok, true);
   assert.equal(result.name, '<Test User>');
   assert.equal(result.online, true);
+  assert.equal(result.avatar, 'https://play.pokemonshowdown.com/sprites/trainers/misty.png');
   assert.equal(result.status.length, 140);
   assert.equal(listeners.size, 0);
   const timeout = bridge.act('find-user', { user: 'Offline' });
@@ -422,6 +424,14 @@ test('user search matches replies, bounds output and cleans up on success and ti
   assert.equal(listeners.size, 0);
 });
 
+test('user search rejects avatar URLs outside official trainer assets', async () => {
+  for (const avatar of ['https://example.com/avatar.png', 'javascript:alert(1)',
+    'https://play.pokemonshowdown.com/action.php', 'https://play.pokemonshowdown.com/sprites/trainers/misty.png?track=1']) {
+    const bridge = new ShowdownBridge(() => fakeContents(() => ({ ok: true, userid: 'misty', name: 'Misty', online: true, avatar })));
+    assert.equal((await bridge.act('find-user', { user: 'Misty' })).avatar, '');
+  }
+});
+
 test('starting a new conversation prompts guests to choose a name without sending a message', async () => {
   let opened = 0;
   const app = { rooms: { '': { openPM() { throw new Error('guest chat must not open'); } } },
@@ -429,6 +439,31 @@ test('starting a new conversation prompts guests to choose a name without sendin
   const bridge = new ShowdownBridge(() => fakeContents(code => vm.runInNewContext(code, { window: { app }, app, LoginPopup: {} })));
   assert.equal(await bridge.act('start-chat', { user: 'Tester' }), 'needs-client');
   assert.equal(opened, 1);
+});
+
+test('chat dock toggles native presentation and rejects malformed mode arguments', async () => {
+  const document = fakeDocument();
+  const close = { tabIndex: -1 };
+  document.querySelectorAll = () => [close];
+  const listeners = [];
+  document.addEventListener = type => listeners.push(type);
+  const focused = [];
+  const app = { rooms: { '': {} }, focusRoom: id => focused.push(id) };
+  const window = { app };
+  const contents = fakeContents(code => vm.runInNewContext(code, { window, app, document }));
+  const bridge = new ShowdownBridge(() => contents);
+  assert.equal(await bridge.act('chat-dock', { enabled: true }), true);
+  assert.equal(document.documentElement.classList.contains('sd-home-chat'), true);
+  assert.equal(close.tabIndex, 0);
+  assert.deepEqual(focused, ['']);
+  assert.equal(await bridge.act('chat-dock', { enabled: true }), true);
+  assert.deepEqual(listeners, ['click', 'dblclick'], 'repeated opens do not duplicate listeners');
+  assert.equal(await bridge.act('chat-dock', { enabled: false }), true);
+  assert.equal(document.documentElement.classList.contains('sd-home-chat'), false);
+  const before = contents.codes.length;
+  for (const enabled of [undefined, null, 1, 'true', {}]) assert.equal(await bridge.act('chat-dock', { enabled }), false);
+  assert.equal(await bridge.act('start-chat', { user: 'Misty', dock: 'true' }), false);
+  assert.equal(contents.codes.length, before);
 });
 
 test('a close focuses its validated successor within the same client execution', async () => {

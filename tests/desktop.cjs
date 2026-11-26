@@ -109,12 +109,12 @@ app.whenReady().then(async () => {
   });
   await run("document.getElementById('edit-team').click(); 0");
   await until(() => renderer.getURL().endsWith('/play.html'), 'random-format team list shortcut');
-  assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: null } });
+  assert.deepEqual(actions.findLast(a => a.action === 'edit-team'), { action: 'edit-team', args: { team: null } });
   await load('index.html');
   await until(() => run("!document.getElementById('format').disabled"), 'formats ready for team shortcut');
   await run("document.getElementById('format').value = 'gen9ou'; document.getElementById('format').dispatchEvent(new Event('change')); document.getElementById('edit-team').click(); 0");
   await until(() => renderer.getURL().endsWith('/play.html'), 'selected team shortcut');
-  assert.deepEqual(actions.pop(), { action: 'edit-team', args: { team: 1, name: 'Selected team', format: 'gen9ou' } });
+  assert.deepEqual(actions.findLast(a => a.action === 'edit-team'), { action: 'edit-team', args: { team: 1, name: 'Selected team', format: 'gen9ou' } });
 
   // News: a post opens in place to its full text; its links, its page on the website and
   // All news open in the system browser, and Home stays put.
@@ -182,7 +182,7 @@ app.whenReady().then(async () => {
   assert.deepEqual(await run("[...document.querySelectorAll('#rooms [data-room]')].map((a) => a.dataset.room)"), ['overused', 'help', 'tournaments']);
   await run("document.querySelector('#rooms [data-room=tournaments]').click(); 0");
   await until(() => actions.some((a) => a.action === 'join'), 'pinned room opens');
-  assert.deepEqual(actions.pop(), { action: 'join', args: { room: 'tournaments' } });
+  assert.deepEqual(actions.findLast(a => a.action === 'join'), { action: 'join', args: { room: 'tournaments' } });
 
   await load('index.html');
   current = { ...current, connected: false };
@@ -393,11 +393,11 @@ app.whenReady().then(async () => {
   actions.length = 0;
   press(client.webContents, true);
   await until(() => actions.some((a) => a.action === 'focus-room'), 'Ctrl+Shift+Tab inside the client focuses the battle');
-  assert.deepEqual(actions.pop(), { action: 'focus-room', args: { room: 'battle-test-2' } });
+  assert.deepEqual(actions.findLast(a => a.action === 'focus-room'), { action: 'focus-room', args: { room: 'battle-test-2' } });
   await until(() => run("document.querySelector('.nav-room[aria-current=page] .nav-room-title')?.textContent === 'vs. Opponent'"), 'battle open');
   press(client.webContents, true);
   await until(() => actions.some((a) => a.action === 'show-menu'), 'then Community');
-  assert.deepEqual(actions.pop(), { action: 'show-menu', args: { tab: 'community' } });
+  assert.deepEqual(actions.findLast(a => a.action === 'show-menu'), { action: 'show-menu', args: { tab: 'community' } });
   await until(() => run("document.querySelector('.nav-page[aria-current=page] .nav-room-title')?.textContent === 'Community'"), 'Community open');
   press(client.webContents, true);
   await until(() => /settings\.html$/.test(renderer.getURL()), 'Ctrl+Shift+Tab inside the client view');

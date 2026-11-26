@@ -187,19 +187,6 @@
                   </div>
                   <div id="home-conversations" class="home-conversations" hidden></div>
                   <div class="friends-body window-body" id="friends"></div>
-                  <section class="home-contact" id="home-contact" aria-label="User and conversation" hidden>
-                    <div class="home-contact-head">
-                      <button class="btn btn-icon" id="contact-back" type="button" aria-label="Back to friends" title="Back to friends">&#8592;</button>
-                      <strong id="contact-name"></strong>
-                    </div>
-                    <p id="contact-status" class="setting-desc" role="status" aria-live="polite"></p>
-                    <div class="home-contact-actions">
-                      <button class="btn btn-primary" id="contact-chat" type="button" hidden>Chat</button>
-                      <button class="btn" id="contact-challenge" type="button" hidden>Challenge</button>
-                      <button class="btn btn-quiet" id="contact-full" type="button" hidden>Open full chat</button>
-                    </div>
-                    <div id="home-chat-view" class="home-chat-view" aria-label="Showdown conversation" hidden></div>
-                  </section>
                 </section>
 
                 <section class="window hub-news" aria-labelledby="news-title">
@@ -219,6 +206,26 @@
 
   </div>
 </div>
+
+<aside id="home-chat-dock" class="home-chat-dock" aria-label="Messages" hidden>
+  <p id="home-chat-status" class="home-chat-status" role="status" hidden></p>
+  <div id="home-chat-view" class="home-chat-view" aria-label="Showdown conversations"></div>
+</aside>
+
+<dialog class="user-profile-popup" id="user-profile" aria-labelledby="user-profile-name" aria-describedby="user-profile-status">
+  <button class="btn btn-icon user-profile-close" id="user-profile-close" type="button" aria-label="Close user profile" autofocus>&times;</button>
+  <div class="user-profile-details">
+    <img id="user-profile-avatar" width="80" height="80" alt="Trainer avatar" hidden>
+    <div>
+      <h2 id="user-profile-name"></h2>
+      <p id="user-profile-status" class="setting-desc" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="user-profile-actions">
+    <button class="btn btn-primary" id="user-profile-message" type="button" disabled>Message</button>
+    <button class="btn" id="user-profile-challenge" type="button" disabled>Challenge</button>
+  </div>
+</dialog>
 
 <!-- First launch only: shown while no Home layout has been chosen. -->
 <dialog class="welcome" id="welcome" closedby="none" aria-labelledby="welcome-title" aria-describedby="welcome-desc">

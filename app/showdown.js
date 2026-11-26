@@ -139,7 +139,7 @@ function readSession() {
     const messages = readMessages(menu);
     const has = (name) => Boolean(root && root.classList && root.classList.contains(name));
     // A conversation view whose window the client has since closed falls back to Battle.
-    let pmOpen = has('sd-menu-pm') ? (messages.find((m) => m.active) || {}).userid || '' : '';
+    let pmOpen = has('sd-menu-pm') ? (messages.find((m) => m.active) || (has('sd-home-chat') && messages[0]) || {}).userid || '' : '';
     if (has('sd-menu-pm') && !pmOpen) root.classList.toggle('sd-menu-pm', false);
     const state = {
       me,
@@ -149,6 +149,7 @@ function readSession() {
       menuUnread: Boolean(menu && menu.notifications),
       menuTab: pmOpen ? 'pm' : has('sd-menu-community') ? 'community' : 'battle',
       pmOpen,
+      chatDock: has('sd-home-chat'),
       messages,
       rooms,
       current: app.curRoom ? app.curRoom.id : '',
@@ -271,6 +272,8 @@ function findUser(name) {
     const receive = data => {
       if (!data || data.userid !== userid) return;
       finish({ ok: true, userid, name: data.name || name, online: data.rooms !== false,
+        avatar: typeof Dex !== 'undefined' && typeof Dex.resolveAvatar === 'function'
+          ? Dex.resolveAvatar(String(data.avatar || 1)) : '',
         status: typeof data.status === 'string' ? data.status.replace(/^!/, '') : '' });
     };
     app.on('response:userdetails', receive);
@@ -279,7 +282,7 @@ function findUser(name) {
   });
 }
 
-function startChat(name) {
+function startChat(name, dock) {
   const menu = window.app && app.rooms && app.rooms[''];
   if (!menu || typeof menu.openPM !== 'function' || app.isDisconnected) return false;
   if (!app.user.get('named')) {
@@ -287,7 +290,45 @@ function startChat(name) {
     return 'needs-client';
   }
   menu.openPM(name, true);
-  return openPM(name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const opened = openPM(name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  if (dock && opened) setChatDock(true, name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  return opened;
+}
+
+function setChatDock(enabled, userid) {
+  if (!window.app || !app.rooms || !app.rooms['']) return false;
+  const root = document.documentElement;
+  root.classList.toggle('sd-home-chat', enabled);
+  if (enabled) {
+    root.classList.toggle('sd-menu-community', false);
+    root.classList.toggle('sd-menu-pm', true);
+    app.focusRoom('');
+    for (const button of document.querySelectorAll('.pm-window[data-userid] > h3 .closebutton')) button.tabIndex = 0;
+    if (userid) requestAnimationFrame(() => {
+      if (!root.classList.contains('sd-home-chat')) return;
+      const el = document.querySelector('.pm-window-' + userid);
+      el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      el?.querySelector('textarea[name=message]')?.focus({ preventScroll: true });
+    });
+    if (!window.__sdChatDockEvents) {
+      window.__sdChatDockEvents = true;
+      // Native controls still own sending, closing and challenging.
+      document.addEventListener('click', event => {
+        if (root.classList.contains('sd-home-chat') && event.target.closest('.pm-challenge, .pm-userOptions')) {
+          root.classList.toggle('sd-home-chat', false);
+          const el = event.target.closest('.pm-window');
+          if (el) openPM(el.getAttribute('data-userid'));
+        }
+      }, true);
+      document.addEventListener('dblclick', event => {
+        if (root.classList.contains('sd-home-chat') && event.target.closest('.pm-window > h3')) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+    }
+  }
+  return true;
 }
 
 // Shows one conversation full size in the main menu (see client-messages.css).
@@ -296,6 +337,7 @@ function openPM(userid) {
   const $w = pmWindow(userid);
   if (!$w) return false;
   const root = document.documentElement;
+  root.classList.toggle('sd-home-chat', false);
   root.classList.toggle('sd-menu-community', false);
   root.classList.toggle('sd-menu-pm', true);
   menu.$pmBox.find('.pm-window.sd-pm-active').removeClass('sd-pm-active');
@@ -1678,16 +1720,20 @@ function sanitizeMessages(raw) {
   return out;
 }
 
+function sanitizeAvatar(value) {
+  try {
+    const url = new URL(typeof value === 'string' && value.length <= 300 ? value : '', SHOWDOWN);
+    if (url.origin === new URL(SHOWDOWN).origin && !url.username && !url.password && !url.search && !url.hash &&
+        /^\/sprites\/trainers(?:-custom)?\/[a-z0-9_-]+\.png$/i.test(url.pathname)) return url.href;
+  } catch {}
+  return '';
+}
+
 function sanitizeSession(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.rooms)) return { ready: false, rooms: [] };
   const messages = sanitizeMessages(raw.messages);
   const pmOpen = typeof raw.pmOpen === 'string' && messages.some((m) => m.userid === raw.pmOpen) ? raw.pmOpen : '';
-  let avatar = '';
-  try {
-    const url = new URL(typeof raw.avatar === 'string' && raw.avatar.length <= 300 ? raw.avatar : '', SHOWDOWN);
-    if (url.origin === new URL(SHOWDOWN).origin && !url.username && !url.password && !url.search && !url.hash &&
-        /^\/sprites\/trainers(?:-custom)?\/[a-z0-9_-]+\.png$/i.test(url.pathname)) avatar = url.href;
-  } catch {}
+  const avatar = sanitizeAvatar(raw.avatar);
   return {
     ready: true,
     me: str(raw.me, 40),
@@ -1697,6 +1743,7 @@ function sanitizeSession(raw) {
     menuTab: raw.menuTab === 'pm' && pmOpen ? 'pm' : raw.menuTab === 'community' ? 'community' : 'battle',
     pmOpen,
     messages,
+    ...(raw.chatDock === true ? { chatDock: true } : {}),
     shell: Boolean(raw.shell),
     connected: Boolean(raw.connected),
     current: typeof raw.current === 'string' && ROOM_ID.test(raw.current) ? raw.current : '',
@@ -1941,10 +1988,15 @@ class ShowdownBridge {
       case 'start-chat': {
         if (typeof args.user !== 'string' || args.user.length > 18 || /[\u0000-\u001f]/.test(args.user) ||
             !args.user.toLowerCase().replace(/[^a-z0-9]/g, '')) return false;
+        if (action === 'start-chat' && args.dock !== undefined && typeof args.dock !== 'boolean') return false;
         code = action === 'find-user' ? call(findUser, args.user.trim())
-          : callWith([pmWindow, openPM], startChat, args.user.trim());
+          : callWith([pmWindow, openPM, setChatDock], startChat, args.user.trim(), args.dock === true);
         break;
       }
+      case 'chat-dock':
+        if (typeof args.enabled !== 'boolean') return false;
+        code = callWith([pmWindow, openPM], setChatDock, args.enabled);
+        break;
       case 'search': {
         const team = args.team === null ? null : args.team;
         if (!isId(args.format) || (team !== null && (!Number.isSafeInteger(team) || team < 0 || team > 9999))) return false;
@@ -2018,7 +2070,7 @@ class ShowdownBridge {
       if (action === 'find-user') {
         if (!result || result.ok !== true || result.userid !== args.user.toLowerCase().replace(/[^a-z0-9]/g, '')) return { ok: false };
         return { ok: true, userid: result.userid, name: str(result.name, 40), online: result.online === true,
-          status: str(result.status, 140) };
+          avatar: sanitizeAvatar(result.avatar), status: str(result.status, 140) };
       }
       // true: done in the background. 'needs-client': show the client so the user can respond.
       return result === true || result === 'needs-client' || result === 'needs-forfeit' ? result : false;
