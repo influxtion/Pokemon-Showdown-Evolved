@@ -1,5 +1,45 @@
 'use strict';
 
+// Local format activity survives page changes; Showdown's profile has no battle dates.
+window.StatsActivity = (() => {
+  const id = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18);
+  function read(user) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(`stats.activity.${id(user)}`));
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      return Object.fromEntries(Object.entries(raw).filter(([format, value]) =>
+        /^[a-z0-9]{1,60}$/.test(format) && value &&
+        Number.isSafeInteger(value.battle) && value.battle > 0 &&
+        Number.isSafeInteger(value.at) && value.at > 0 && value.at <= Date.now())
+        .sort((a, b) => b[1].battle - a[1].battle).slice(0, 200));
+    } catch { return {}; }
+  }
+  function observe(session) {
+    if (!session.ready || !session.connected || !id(session.me)) return;
+    const mine = session.rooms.filter((room) => room.battle && !room.ended &&
+      room.players.some((player) => id(player) === id(session.me)));
+    if (!mine.length) return;
+    const activity = read(session.me);
+    let changed = false;
+    for (const room of mine) {
+      const match = /^battle-([a-z0-9]{1,60})-(\d+)(?:-[a-z0-9]+)?$/.exec(room.id);
+      if (!match) continue;
+      const battle = Number(match[2]);
+      // Room numbers increase on the official server. Reopening an older room is not new play.
+      if (!Number.isSafeInteger(battle) || battle <= (activity[match[1]]?.battle || 0)) continue;
+      activity[match[1]] = { battle, at: Date.now() };
+      changed = true;
+    }
+    if (changed) {
+      try {
+        localStorage.setItem(`stats.activity.${id(session.me)}`, JSON.stringify(Object.fromEntries(
+          Object.entries(activity).sort((a, b) => b[1].battle - a[1].battle).slice(0, 200))));
+      } catch {}
+    }
+  }
+  return { read, observe };
+})();
+
 // Tab strip: small tabs for launcher pages, then one per room open in the Showdown client, so
 // the launcher owns navigation. Other pages can listen for "showdown-session" instead of polling.
 (() => {
@@ -753,6 +793,7 @@
     }
     if (!session || !Array.isArray(session.rooms)) session = { ready: false, rooms: [] };
     if (closingTab || navigating || version !== navigationVersion) return session;
+    window.StatsActivity.observe(session);
     render(session);
     pruneBattleTab();
     if (session.ready) {

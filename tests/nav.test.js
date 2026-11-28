@@ -141,6 +141,49 @@ function harness(states, { onPlay = false, saved = new Map(), act = async () => 
   };
 }
 
+test('format activity tracks own live battles across navigation without advancing old rooms', async () => {
+  const saved = new Map();
+  const h = harness([session([room('battle-gen9ou-123', ['PLAYER', 'Other'])])], { saved, onPlay: true });
+  await h.settle();
+  const first = saved.get('stats.activity.player');
+  assert.equal(JSON.parse(first).gen9ou.battle, 123);
+  await h.poll();
+  assert.equal(saved.get('stats.activity.player'), first, 'polling does not change recency');
+  const next = harness([session([
+    room('battle-gen9ou-122', ['Player', 'Other']),
+    room('battle-gen9uu-125', ['Spectator', 'Other']),
+    room('battle-gen9ru-126', ['Player', 'Other'], { ended: true }),
+    room('battle-gen9nu-9007199254740999', ['Player', 'Other']),
+  ])], { saved, onPlay: true });
+  await next.settle();
+  assert.equal(saved.get('stats.activity.player'), first, 'old, spectated, finished and invalid rooms ignored');
+  const later = harness([session([room('battle-gen9ou-130', ['Player', 'Other'])])], { saved, onPlay: true });
+  await later.settle();
+  assert.equal(JSON.parse(saved.get('stats.activity.player')).gen9ou.battle, 130);
+  const other = harness([session([room('battle-gen9uu-135-secretpw', ['Alt', 'Other'])], { me: 'Alt' })], { saved, onPlay: true });
+  await other.settle();
+  assert.equal(JSON.parse(saved.get('stats.activity.alt')).gen9uu.battle, 135);
+  assert.ok(!saved.get('stats.activity.alt').includes('secretpw'), 'private room tokens are not stored');
+  assert.equal(JSON.parse(saved.get('stats.activity.player')).gen9ou.battle, 130, 'accounts stay separate');
+});
+
+test('format activity recovers from corrupt storage and bounds retained formats', async () => {
+  const saved = new Map([['stats.activity.player', '{bad json']]);
+  const h = harness([session([room('battle-gen9ou-200', ['Player', 'Other'])])], { saved, onPlay: true });
+  await h.settle();
+  assert.equal(JSON.parse(saved.get('stats.activity.player')).gen9ou.battle, 200);
+  const entries = Object.fromEntries(Array.from({ length: 250 }, (_, i) => [`format${i}`, { battle: i + 1, at: 1 }]));
+  entries.bad = { battle: 1000, at: Date.now() + 86400000 };
+  saved.set('stats.activity.player', JSON.stringify(entries));
+  const bounded = harness([session([room('battle-gen9ou-300', ['Player', 'Other'])])], { saved, onPlay: true });
+  await bounded.settle();
+  const activity = JSON.parse(saved.get('stats.activity.player'));
+  assert.equal(Object.keys(activity).length, 200);
+  assert.equal(activity.gen9ou.battle, 300);
+  assert.equal(activity.format0, undefined);
+  assert.equal(activity.bad, undefined);
+});
+
 test('clicking the current launcher page prevents a reload', async () => {
   const h = harness([session([])]);
   await h.settle();
