@@ -656,6 +656,7 @@ window.StatsActivity = (() => {
     if (box) {
       box.hidden = !session.ready || !me;
       $('me').textContent = me;
+      $('profile')?.setAttribute('aria-label', `${me}: Profile & preferences`);
       box.title = me;
       const avatar = $('avatar');
       if (avatar) {

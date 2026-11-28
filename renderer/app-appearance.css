@@ -81,6 +81,10 @@ html[data-home-theme] .daily-full .daily-body p { margin: 0; }
 html[data-home-theme] .daily-full .daily-rules { padding: 0 14px 8px; }
 html[data-home-theme] .daily-full .daily-streak { color: var(--text); }
 html[data-home-theme] .daily-full .daily-streak svg { color: var(--text-2); }
+
+/* Small labels need full text contrast on tinted panel headers and footers. */
+html[data-home-theme] .window-head > a,
+html[data-home-theme] .bot-card-cloud-text { color: var(--text); }
 html[data-home-theme] .daily-full .daily-streak.is-lit svg { color: var(--daily-flame); }
 html[data-home-theme] .stats-head { border-radius: var(--home-radius); }
 /* Stats stays readable over artwork, with solid surfaces and clear table boundaries. */
