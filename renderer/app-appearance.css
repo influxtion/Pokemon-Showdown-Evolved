@@ -83,6 +83,22 @@ html[data-home-theme] .daily-full .daily-streak { color: var(--text); }
 html[data-home-theme] .daily-full .daily-streak svg { color: var(--text-2); }
 html[data-home-theme] .daily-full .daily-streak.is-lit svg { color: var(--daily-flame); }
 html[data-home-theme] .stats-head { border-radius: var(--home-radius); }
+/* Stats stays readable over artwork, with solid surfaces and clear table boundaries. */
+html .stats-page {
+  --stats-border: color-mix(in srgb, var(--text) 30%, var(--border-strong));
+}
+html .stats-page :is(.stats-head, .window) {
+  background: var(--bg-panel);
+  border: 2px solid var(--stats-border);
+  box-shadow: none;
+}
+html .stats-page :is(.window-head, .stats-note, .ladder th, .ladder td) {
+  border-bottom-color: var(--stats-border);
+}
+html .stats-page .ladder th { border-bottom-width: 2px; }
+html .stats-page .stats-figure { border-left-color: var(--stats-border); }
+html .stats-page :is(.input, .select, .btn) { border-color: var(--stats-border); }
+html .stats-page :is(.input, .select, .btn):hover { border-color: var(--accent); }
 html[data-home-theme] :is(.res-section, .res-intro) { padding: 18px 20px; }
 html[data-home-theme] .res-toc { padding: 16px; }
 html[data-home-theme] .res-section > h2 { border-color: var(--home-coral); }
