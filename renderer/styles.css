@@ -1695,30 +1695,35 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
   display: flex;
   align-items: center;
   gap: var(--space-5);
-  padding: var(--space-5);
-  background: var(--hero-bg);
-  border: 1px solid var(--hero-border);
+  padding: var(--space-4);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--hero-text);
+  color: var(--text);
 }
-.stats-title { min-width: 180px; }
-.stats-title h2 { font-size: 26px; font-weight: 600; line-height: 1.2; margin: 2px 0 0; }
-.stats-figures { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.stats-title { min-width: 140px; max-width: 220px; overflow-wrap: anywhere; }
+.stats-title h2 { font-size: var(--fs-xl); font-weight: 600; line-height: 1.2; margin: 2px 0 0; }
+.stats-figures { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
 .stats-figure {
   display: flex;
   flex-direction: column;
-  padding: var(--space-3) var(--space-4);
-  background: var(--hero-team-bg);
-  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-4);
+  border-left: 1px solid var(--border);
   min-width: 0;
 }
-.stats-figure-label { font-size: var(--fs-sm); color: var(--hero-muted); }
-.stats-figure strong { font-size: 26px; font-weight: 600; line-height: 1.25; }
-.stats-figure-note { font-size: var(--fs-sm); color: var(--hero-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-figure-label { font-size: var(--fs-sm); color: var(--text-2); }
+.stats-figure strong { font-size: 22px; font-weight: 600; line-height: 1.35; }
+.stats-figure-note { font-size: var(--fs-sm); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-toolbar { flex-wrap: wrap; }
+.stats-toolbar h2 { margin-right: auto; }
+.stats-sort-label { font-size: var(--fs-sm); color: var(--text-2); }
+.stats-toolbar .select { width: 175px; }
+.stats-toolbar > .input { margin-left: 0; }
+.stats-note { margin: 0; padding: var(--space-3) var(--space-4); color: var(--text-2); font-size: var(--fs-sm); border-bottom: 1px solid var(--border); }
+#stats-body { overflow-x: auto; }
 
-.ladder { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ladder { width: 100%; min-width: 790px; border-collapse: collapse; table-layout: fixed; }
 .ladder th { padding: 0; border-bottom: 1px solid var(--border); background: var(--bg-subtle); text-align: left; font-weight: 400; }
-.ladder th.col-rank { padding: 0 var(--space-3); color: var(--text-3); font-size: var(--fs-sm); }
 .ladder-sort {
   width: 100%;
   height: 32px;
@@ -1747,21 +1752,13 @@ a.list-row:hover { background: var(--bg-hover); text-decoration: none; }
 .ladder tbody tr:last-child td { border-bottom: 0; }
 .ladder tbody tr:nth-child(even) { background: var(--bg-subtle); }
 .ladder tbody tr:hover { background: var(--bg-hover); }
-.ladder .col-rank { width: 48px; text-align: right; color: var(--text-3); }
-.ladder .col-num { width: 96px; text-align: right; }
-.ladder .col-rate { width: 26%; }
-.ladder .col-play { width: 76px; text-align: right; }
+.ladder .col-num { width: 80px; text-align: right; }
+.ladder .col-recent { width: 145px; color: var(--text-2); }
+.ladder .col-play { width: 80px; text-align: right; }
 .ladder-format { font-weight: 600; }
-.ladder-elo { font-size: var(--fs-lg); font-weight: 700; }
-.ladder .btn { height: 24px; padding: 0 var(--space-3); font-size: var(--fs-sm); visibility: hidden; }
-.ladder tr:hover .btn, .ladder .btn:focus-visible { visibility: visible; }
+.ladder-elo { font-weight: 600; }
+.ladder .btn { height: 24px; padding: 0 var(--space-3); font-size: var(--fs-sm); }
 .unrated { color: var(--text-3); }
-
-/* Wins in green against losses in red. */
-.record { display: flex; align-items: center; gap: var(--space-3); }
-.record-bar { flex: 1; height: 8px; border-radius: 2px; background: var(--err); overflow: hidden; }
-.record-won { display: block; height: 100%; background: var(--ok); border-right: 2px solid var(--bg-panel); }
-.record-text { width: 38px; text-align: right; font-weight: 600; }
 
 /* ---------- Icon bar and room tabs ----------
    The rail holds the launcher's pages (icon over name); Showdown rooms are tabs across the top of

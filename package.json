@@ -19,6 +19,7 @@
     "test:practice:api": "node tests/practice-api-live.cjs --runtime api/runtime",
     "test": "node --test tests/*.test.js api/test/*.test.js",
     "test:desktop": "node scripts/test-desktop.js",
+    "test:stats": "node scripts/test-desktop.js --stats",
     "test:appearance:live": "node scripts/test-desktop.js --appearance-live",
     "test:teambuilder:live": "node scripts/test-desktop.js --teambuilder-live",
     "test:profile:live": "node scripts/test-desktop.js --profile-live",
