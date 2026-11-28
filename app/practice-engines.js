@@ -162,11 +162,13 @@ class LocalEngine extends EventEmitter {
 
   async target() {
     if (this.installing || this.removing) throw new Error(`${this.name} is being updated on this computer.`);
+    if (!this.supported) throw new Error(`${this.name} is not supported on this system.`);
     const runtime = this.inspect();
     if (!runtime.installed) throw new Error(`${this.name} is not on this computer. Download it on the Bots page, or play on the cloud server.`);
+    if (!runtime.current) throw new Error(`Update ${this.name} on the Bots Downloads page before playing locally.`);
     if (!this.server) {
       const key = crypto.randomBytes(32).toString('hex');
-      const runtime = () => { const value = this.inspect(); return value.installed ? value : null; };
+      const runtime = () => { const value = this.inspect(); return value.installed && value.current ? value : null; };
       const api = this.createServer({ ...(this.bot === 'metamon' ? { metamonRuntime: runtime } : { runtime }),
         apiKey: key, maxSessions: 2, maxSessionsPerClient: 2, sessionBurst: 100, sessionsPerHour: 3600,
         maxThreads: this.threads, lowPriority: true });
@@ -214,6 +216,7 @@ class MetamonEngine extends LocalEngine {
 
   status() {
     return { ...super.status(), model: 'Kakuna',
+      unsupportedReason: this.model?.status().unsupportedReason || '',
       progress: this.installing ? { label: this.model?.progress || 'Preparing Metamon', fraction: null } : null };
   }
 }

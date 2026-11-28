@@ -30,6 +30,8 @@ npm start         # http://127.0.0.1:8787
 
 Setup also downloads everything Foul Play would otherwise fetch during a battle, because the worker has no network access: the Random Battle sets and, for OU, Smogon's monthly usage stats (`gen9ou-0`), Showdown's sample sets and Foul Play's own set and move data. Each file is pinned by SHA-256 in `lock.json` (`ouData`).
 
+The 1.0.0 installer also checks artifact hashes for the pinned Python dependencies and Maturin build backend, downloads the hash-pinned poke-engine source archive and builds it with Cargo `--locked` and no unpinned pip build environment. Downloads have a streamed size limit (the declared model size, otherwise 1 GiB) and a 15-minute timeout. Existing local downloads must be updated when their recorded pins differ from the app's current pins. These checks do not make native output byte-identical across different system compilers.
+
 ### Refreshing the OU data
 
 The OU usage stats and set data are refreshed by hand, when needed (for example once Smogon publishes a new month, or after a tier shift):

@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { installAgData, installOuData, refreshOuData, promoteRuntime, paths, OU_FILES } = require('../install');
+const { installAgData, installOuData, refreshOuData, promoteRuntime, paths, OU_FILES, download } = require('../install');
 const lock = require('../lock.json');
 
 const sha = text => crypto.createHash('sha256').update(text).digest('hex');
@@ -92,6 +92,31 @@ test('a failed runtime replacement restores the previous working install', async
   await promoteRuntime(where);
   assert.equal(fs.readFileSync(path.join(where.current, 'runtime'), 'utf8'), 'new');
   assert.deepEqual(fs.readdirSync(path.dirname(where.current)), ['current']);
+});
+
+test('downloads bound declared and streamed size and remove an oversized partial file', async t => {
+  const dir = temp(t);
+  const pin = { url: 'https://example.test/runtime', sha256: sha('small') };
+  for (const declared of [true, false]) {
+    const target = path.join(dir, String(declared));
+    await assert.rejects(download(pin, target, { maxBytes: 8,
+      fetcher: async () => new Response('too much data', { headers: declared ? { 'content-length': '13' } : {} }),
+    }), /size limit/);
+    assert.equal(fs.existsSync(target), false);
+    assert.equal(fs.existsSync(`${target}.partial`), false);
+  }
+});
+
+test('a stalled download times out and removes its partial file without user intervention', { timeout: 5000 }, async t => {
+  const target = path.join(temp(t), 'stalled');
+  let cancelled = false;
+  await assert.rejects(download({ url: 'https://example.test/runtime', sha256: sha('x') }, target, {
+    timeoutMs: 30, fetcher: async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(Buffer.from('x')); }, cancel() { cancelled = true; },
+    })),
+  }), /abort|timeout/i);
+  assert.equal(cancelled, true);
+  assert.equal(fs.existsSync(`${target}.partial`), false);
 });
 
 test('refresh moves the usage stats to the newest published month and re-pins the sets', async t => {

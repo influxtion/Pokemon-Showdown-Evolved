@@ -6,7 +6,9 @@
 
 Pokemon Showdown Evolved is a free, open-source desktop app for [Pokémon Showdown](https://play.pokemonshowdown.com/). It includes a modernized look with a convenient system and additional features, like playable bots, replay notes, and team building tools.
 
-[Download Pokemon Showdown Evolved v0.2.0](https://github.com/influxtion/Pokemon-Showdown-Launcher-App/releases/tag/v0.2.0). Choose the Windows installer, Mac DMG (Apple Silicon or Intel), or Linux AppImage under **Assets**. A Linux tar.gz is also available. No Git or Node.js is needed to install it.
+[Download the latest published release](https://github.com/influxtion/Pokemon-Showdown-Evolved/releases/latest). Choose only the platforms listed in that release's assets. No Git or Node.js is needed to install the desktop app.
+
+This branch prepares **1.0.0**, which has not been published. The planned direct-download Mac build uses Developer ID signing and notarization and requires macOS 13 or later. Native verification is still required before advertising Mac support. Local Foul Play may require Apple's Command Line Tools; local Metamon requires Apple Silicon and macOS 14 or later and is unavailable on Intel Macs. Cloud bots support both Mac architectures when the service is available. [Mac release preparation](docs/mac-release.md).
 
 ## Home preview
 
@@ -26,6 +28,8 @@ The classic Home layout in light mode, with the Evolved sidebar, Sunrise Ocean b
 Online play requires an internet connection. Bot practice is separate from your Showdown account and the public ladder; the app never searches, challenges, or chooses moves on your online account automatically.
 
 Choose a Home layout on first launch, then install Showdex or skip it. Sign in through Showdown for online play, or open **Bots** for practice. Foul Play runs in the cloud by default; its local download is optional.
+
+Read [Privacy and data use](PRIVACY.md) for local storage, embedded advertising, cloud bot traffic and deletion controls. The same summary is available in Settings.
 
 ## Mascot and credits
 

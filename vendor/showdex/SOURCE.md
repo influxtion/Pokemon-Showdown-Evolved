@@ -8,7 +8,8 @@ its license is preserved in `LICENSE` beside this file.
 Run `node scripts/build-showdex.js` with Node.js 24 and Corepack available.
 The script checks out the pinned commit into ignored `out/showdex-source`,
 applies the desktop readiness patch recorded in `patches/desktop-ready.patch`,
-installs the pinned pnpm 10 dependencies from upstream's lockfile, and builds
+applies `patches/dependency-security.patch` (reviewed dependency/lockfile fixes),
+installs the resulting pinned pnpm 10 dependencies, and builds
 the standalone target. It writes the runtime assets and a source archive to
 ignored `vendor/showdex/dist/`. The archive contains the patched source,
 build inputs, and upstream license. `manifest.json` records the expected SHA-256
@@ -26,6 +27,10 @@ Showdex chrome only. Selectors use upstream data attributes and the module/local
 prefixes retained by this pinned build, without depending on generated hashes.
 Recheck these selectors and both calculator themes when updating Showdex. This
 stylesheet does not change the generated bundle or the asset manifest.
+
+The November 27, 2026 dependency patch pins lodash/lodash-es 4.18.1, uuid 13.0.1,
+qs 6.16.1, ua-parser-js 2.0.10 and i18next 26.3.4. Both patches and the modified
+package.json/pnpm-lock.yaml are included in the corresponding source archive.
 
 The pinned build inputs are `BUILD_DATE=1A000000000`,
 `UUID_STANDALONE_NAMESPACE=4f7f1e80-1008-4f00-a7c1-113311331133`,

@@ -34,3 +34,14 @@ test('unsupported Metamon platforms cannot install; removal is scoped and blocke
   assert.deepEqual(await r.remove(), { ok: true });
   assert.deepEqual(fs.readdirSync(r.dir), ['keep']);
 });
+
+test('local Metamon requires macOS 14 on Apple Silicon and has no Intel Mac wheel', t => {
+  const r = runtime(t, 'darwin-arm64');
+  r.systemRelease = '22.6.0';
+  assert.equal(r.status().supported, false);
+  assert.match(r.status().unsupportedReason, /macOS 14/);
+  r.systemRelease = '23.0.0';
+  assert.equal(r.status().supported, true);
+  r.platform = 'darwin-x64';
+  assert.equal(r.status().supported, false);
+});

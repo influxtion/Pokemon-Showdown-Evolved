@@ -347,7 +347,7 @@
       const el = item.elements;
       const sameBot = item.id === 'metamon' ? value.opponent === 'metamon' : value.opponent?.startsWith('foulplay');
       const localBattle = active && sameBot && value.engine === 'local';
-      el.note.textContent = item.error || state.error || (state.removing ? 'Removing download...' : state.installing ? 'Downloading. You can keep using the app.' : !state.supported ? 'Local download is not available for this system yet.' : state.installed ? state.current ? 'Downloaded. Choose where this bot plays below.' : 'An update is available for this download.' : 'Not downloaded. Cloud play remains available.');
+      el.note.textContent = item.error || state.error || (state.removing ? 'Removing download...' : state.installing ? 'Downloading. You can keep using the app.' : !state.supported ? state.unsupportedReason || 'Local download is not available for this system yet.' : state.installed ? state.current ? 'Downloaded. Choose where this bot plays below.' : 'Update required before playing locally.' : 'Not downloaded. Cloud play remains available.');
       el.note.className = `bots-local-note${item.error || state.error ? ' bots-local-note--err' : ''}`;
       el.progress.hidden = !state.installing;
       const bar = el.progress.querySelector('[role=progressbar]');
@@ -405,8 +405,8 @@
   function engineState(value, bot) {
     if (bot?.id === 'metamon') {
       if (value.metamonEngineChoice === 'local' && value.metamon?.installed) return {
-        ready: !value.metamon.installing && !value.metamon.removing, icon: 'computer',
-        text: value.metamon.installing || value.metamon.removing ? 'Updating on this computer...' : 'This computer - Kakuna' };
+        ready: Boolean(value.metamon.current) && !value.metamon.installing && !value.metamon.removing, icon: 'computer',
+        text: value.metamon.installing || value.metamon.removing ? 'Updating on this computer...' : !value.metamon.current ? 'Update Metamon in Downloads' : 'This computer - Kakuna' };
       const remote = value.cloud?.bots?.find(item => item.id === 'metamon');
       return { ...cloudState(value.cloud), icon: 'cloud', ready: Boolean(remote?.available && remote.formats?.includes(format)),
         text: remote?.available ? 'Cloud server - Kakuna' : 'Needs Metamon installed on the cloud server', tone: remote?.available ? '' : 'warn' };
@@ -414,6 +414,7 @@
     const supported = runsLocally(value) ? value.local?.formats : value.cloud?.bots?.find(item => item.id === bot?.id)?.formats;
     if (supported && !supported.includes(format)) return { ready: false, text: runsLocally(value) ? "Update Foul Play for this format" : "This level/format needs a cloud server update; local play is available", tone: "warn", icon: runsLocally(value) ? "computer" : "cloud" };
     if (!runsLocally(value)) return { ...cloudState(value.cloud), icon: 'cloud' };
+    if (!value.local.current) return { ready: false, text: 'Update Foul Play in Downloads', tone: 'warn', icon: 'computer' };
     if (value.local.installing || value.local.removing) return { ready: false, text: 'Updating on this computer…', tone: 'warn', icon: 'computer' };
     return { ready: true, text: 'This computer', icon: 'computer' };
   }

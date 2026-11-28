@@ -48,6 +48,15 @@ test('nothing is downloaded until the player asks, and target() refuses until th
   await assert.rejects(local.target(), /not on this computer/);
 });
 
+test('an old runtime cannot start or be passed to a local worker after an app update', async () => {
+  const fake = fakeInstaller();
+  Object.assign(fake.disk, { installed: true, current: false });
+  let created = false;
+  const local = engine(fake, { createServer: () => { created = true; } });
+  await assert.rejects(local.target(), /Update Foul Play/);
+  assert.equal(created, false);
+});
+
 test('install reports progress, then the engine is installed', async () => {
   const fake = fakeInstaller();
   const local = engine(fake);

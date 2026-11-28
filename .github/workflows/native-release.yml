@@ -2,60 +2,83 @@ name: Release candidate builds
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/automatic-updates]
+    inputs:
+      platforms:
+        description: Platforms to prepare for private review
+        required: true
+        type: choice
+        default: windows-linux
+        options: [windows-linux, macos, all]
+      version:
+        description: Must match the approved main package version
+        required: true
+        type: string
+        default: '1.0.0'
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-candidate-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-candidate-main
+  cancel-in-progress: false
 
 jobs:
-  showdex:
+  source:
     runs-on: windows-2025
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+      matrix: ${{ steps.pin.outputs.matrix }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
+      - name: Pin one main commit for every payload and platform
+        id: pin
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PLATFORMS: ${{ inputs.platforms }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: node scripts/release-source.js
       - run: npm ci
       - run: npm run build:showdex
+      - name: Confirm Showdex build did not change source
+        shell: pwsh
+        run: |
+          if (git status --porcelain --untracked-files=no) { throw 'Tracked source changed.' }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pinned-showdex
           path: vendor/showdex/dist/
           retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: main-source-provenance
+          path: out/main-source-provenance.json
+          retention-days: 14
   package:
-    needs: showdex
+    needs: source
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2025
-            platform: win
-            arch: x64
-            id: Windows-x64
-          - runner: macos-15
-            platform: mac
-            arch: arm64
-            id: macOS-arm64
-          - runner: macos-15-intel
-            platform: mac
-            arch: x64
-            id: macOS-x64
-          - runner: ubuntu-24.04
-            platform: linux
-            arch: x64
-            id: Linux-x64
+      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      MAIN_SOURCE_SHA: ${{ needs.source.outputs.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - name: Verify exact main source
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne $env:MAIN_SOURCE_SHA) { throw 'Wrong application source.' }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
@@ -65,17 +88,57 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64
+          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 libfuse2t64 xvfb
       - run: npm run check
-      - run: npm test
       - run: npm run build:practice
+      - run: node --test --test-concurrency=1 tests/*.test.js api/test/*.test.js
+        env:
+          PRACTICE_TEST_SERVER_ROOT: ${{ github.workspace }}/vendor/practice/dist/server
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: pinned-showdex
           path: vendor/showdex/dist/
-      - name: Build native packages
-        run: npm run pack:${{ matrix.platform }} -- --${{ matrix.arch }}
-      - name: Save packages for review
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:CSC_LINK) {
+            Remove-Item Env:CSC_LINK -ErrorAction SilentlyContinue
+            Remove-Item Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
+            Write-Output 'No Windows certificate configured; this private review candidate will be unsigned.'
+          }
+          npm run pack:win
+      - name: Build Linux AppImage
+        if: runner.os == 'Linux'
+        run: npx --no-install electron-builder --linux AppImage --x64 --publish never --config.directories.output=out/linux
+      - name: Build signed and notarized Mac candidate
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run pack:mac -- --${{ matrix.arch }}
+      - name: Confirm source and record final artifact hashes
+        shell: pwsh
+        run: |
+          if (git status --porcelain --untracked-files=no) { throw 'Tracked source changed during packaging.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:MAIN_SOURCE_SHA) { throw 'Source commit changed.' }
+          node scripts/release-receipt.js
+      - name: Smoke test packaged Windows app
+        if: runner.os == 'Windows'
+        run: npm run smoke:packaged -- --practice --simple-practice
+      - name: Smoke test packaged Linux app
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root out/linux/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 out/linux/linux-unpacked/chrome-sandbox
+          xvfb-run -a npm run smoke:packaged -- --practice --simple-practice
+      - name: Save candidates for review only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: packages-${{ matrix.id }}
@@ -85,8 +148,9 @@ jobs:
             out/windows/latest.yml
             out/macos/*.dmg
             out/macos/*.zip
+            out/macos/*-signature.txt
             out/linux/*.AppImage
-            out/linux/*.tar.gz
             out/linux/latest-linux.yml
+            out/release-receipt.json
           compression-level: 0
           retention-days: 14

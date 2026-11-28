@@ -1,0 +1,364 @@
+diff --git a/package.json b/package.json
+index 53eb1b0..8c560fc 100644
+--- a/package.json
++++ b/package.json
+@@ -99,14 +99,14 @@
+     "date-fns": "^4.1.0",
+     "file-saver": "^2.0.5",
+     "final-form": "^5.0.0",
+-    "i18next": "^26.0.3",
++    "i18next": "26.3.4",
+     "i18next-browser-languagedetector": "^8.2.1",
+     "i18next-intervalplural-postprocessor": "^3.0.0",
+     "lexical": "^0.42.0",
+     "lz-string": "^1.5.0",
+     "pino": "^10.3.1",
+     "prismjs": "^1.30.0",
+-    "qs": "^6.11.2",
++    "qs": "6.16.1",
+     "react": "^19.2.4",
+     "react-contexify": "^6.0.0",
+     "react-dom": "^19.2.4",
+@@ -120,9 +120,9 @@
+     "romans": "^3.1.0",
+     "simplebar": "^6.2.5",
+     "slugify": "^1.6.6",
+-    "ua-parser-js": "^2.0.9",
++    "ua-parser-js": "2.0.10",
+     "use-debouncy": "^5.1.7",
+-    "uuid": "^13.0.0"
++    "uuid": "13.0.1"
+   },
+   "devDependencies": {
+     "@eslint/js": "^10.0.1",
+@@ -184,7 +184,9 @@
+     ],
+     "overrides": {
+       "webpack-visualizer-plugin2>react": "$react",
+-      "webpack-visualizer-plugin2>react-dom": "$react-dom"
++      "webpack-visualizer-plugin2>react-dom": "$react-dom",
++      "lodash": "4.18.1",
++      "lodash-es": "4.18.1"
+     },
+     "patchedDependencies": {
+       "@smogon/calc@0.11.0": "patches/@smogon__calc@0.11.0.patch",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index b7d5440..0df2d50 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -7,6 +7,8 @@ settings:
+ overrides:
+   webpack-visualizer-plugin2>react: ^19.2.4
+   webpack-visualizer-plugin2>react-dom: ^19.2.4
++  lodash: 4.18.1
++  lodash-es: 4.18.1
+ 
+ patchedDependencies:
+   '@smogon/calc@0.11.0':
+@@ -93,8 +95,8 @@ importers:
+         specifier: ^5.0.0
+         version: 5.0.0
+       i18next:
+-        specifier: ^26.0.3
+-        version: 26.0.3(typescript@6.0.2)
++        specifier: 26.3.4
++        version: 26.3.4(typescript@6.0.2)
+       i18next-browser-languagedetector:
+         specifier: ^8.2.1
+         version: 8.2.1
+@@ -114,8 +116,8 @@ importers:
+         specifier: ^1.30.0
+         version: 1.30.0
+       qs:
+-        specifier: ^6.11.2
+-        version: 6.15.0
++        specifier: 6.16.1
++        version: 6.16.1
+       react:
+         specifier: ^19.2.4
+         version: 19.2.4
+@@ -133,7 +135,7 @@ importers:
+         version: 5.2.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+       react-i18next:
+         specifier: ^17.0.2
+-        version: 17.0.2(i18next@26.0.3(typescript@6.0.2))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.2)
++        version: 17.0.2(i18next@26.3.4(typescript@6.0.2))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.2)
+       react-inlinesvg:
+         specifier: ^4.3.0
+         version: 4.3.0(react@19.2.4)
+@@ -156,14 +158,14 @@ importers:
+         specifier: ^1.6.6
+         version: 1.6.8
+       ua-parser-js:
+-        specifier: ^2.0.9
+-        version: 2.0.9
++        specifier: 2.0.10
++        version: 2.0.10
+       use-debouncy:
+         specifier: ^5.1.7
+         version: 5.1.7(react@19.2.4)
+       uuid:
+-        specifier: ^13.0.0
+-        version: 13.0.0
++        specifier: 13.0.1
++        version: 13.0.1
+     devDependencies:
+       '@eslint/js':
+         specifier: ^10.0.1
+@@ -2631,8 +2633,8 @@ packages:
+   i18next-intervalplural-postprocessor@3.0.0:
+     resolution: {integrity: sha512-ZJWg2Gcb0kQqVI7kygLj9wVwQHK3mzRAg94uLsdoHqss0M9n0HSPr1pThd2AttkBsJFWR26G18hnKCqcTB8shQ==}
+ 
+-  i18next@26.0.3:
+-    resolution: {integrity: sha512-1571kXINxHKY7LksWp8wP+zP0YqHSSpl/OW0Y0owFEf2H3s8gCAffWaZivcz14rMkOvn3R/psiQxVsR9t2Nafg==}
++  i18next@26.3.4:
++    resolution: {integrity: sha512-pa7m0d7pBDqGHZxljT+WPFeyFgQ7P7SciPPo1tTqYuO0z4sqADYhwnBESmmGp/wEof1inwdls/k8ZgTg8rxFHA==}
+     peerDependencies:
+       typescript: ^5 || ^6
+     peerDependenciesMeta:
+@@ -2664,6 +2666,7 @@ packages:
+   image-size@0.5.5:
+     resolution: {integrity: sha512-6TDAlDPZxUFCv+fuOkIoXT/V/f3Qbq8e37p+YOiYrUv3v9cc3/6x78VdfPgFVaB9dZYeLUfKgHRebpkm/oP2VQ==}
+     engines: {node: '>=0.10.0'}
++    deprecated: Please migrate to image-size@2.x
+     hasBin: true
+ 
+   immer@11.1.4:
+@@ -3030,8 +3033,8 @@ packages:
+     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
+     engines: {node: '>=10'}
+ 
+-  lodash-es@4.17.23:
+-    resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
++  lodash-es@4.18.1:
++    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
+ 
+   lodash._baseclone@4.5.7:
+     resolution: {integrity: sha512-nOtLg6tdIdD+TehqBv0WI7jbkLaohHhKSwLmS/UXSFWMWWUxdJc9EVtAfD4L0mV15vV+lZVfF4LEo363VdrMBw==}
+@@ -3047,8 +3050,8 @@ packages:
+     resolution: {integrity: sha512-GhrVeweiTD6uTmmn5hV/lzgCQhccwReIVRLHp7LT4SopOjqEZ5BbX8b5WWEtAKasjmy8hR7ZPwsYlxRCku5odg==}
+     deprecated: This package is deprecated. Use structuredClone instead.
+ 
+-  lodash@4.17.23:
+-    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
++  lodash@4.18.1:
++    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+ 
+   loose-envify@1.4.0:
+     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
+@@ -3514,8 +3517,8 @@ packages:
+     resolution: {integrity: sha512-V/yCWTTF7VJ9hIh18Ugr2zhJMP01MY7c5kh4J870L7imm6/DIzBsNLTXzMwUA3yZ5b/KBqLx8Kp3uRvd7xSe3Q==}
+     engines: {node: '>=0.6'}
+ 
+-  qs@6.15.0:
+-    resolution: {integrity: sha512-mAZTtNCeetKMH+pSjrb76NAM8V9a05I9aBZOHztWy/UqcJdQYNsf59vrRKWnojAT9Y+GbIvoTBC++CPHqpDBhQ==}
++  qs@6.16.1:
++    resolution: {integrity: sha512-5Px6J7rfHBAGUhNQ3es4YzcOdBBw0SDcVtThJml4RdnKw4tKs2epA0kPZ+K8X+WiHktT93RHVcQ/3ym5aTCgtg==}
+     engines: {node: '>=0.6'}
+ 
+   quick-format-unescaped@4.0.4:
+@@ -3867,6 +3870,10 @@ packages:
+     resolution: {integrity: sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA==}
+     engines: {node: '>= 0.4'}
+ 
++  side-channel-list@1.0.1:
++    resolution: {integrity: sha512-mjn/0bi/oUURjc5Xl7IaWi/OJJJumuoJFQJfDDyO46+hBWsfaVM65TBHq2eoZBhzl9EchxOijpkbRC8SVBQU0w==}
++    engines: {node: '>= 0.4'}
++
+   side-channel-map@1.0.1:
+     resolution: {integrity: sha512-VCjCNfgMsby3tTdo02nbjtM/ewra6jPHmpThenkTYh8pG9ucZ/1P8So4u4FGBek/BjpOVsDCMoLA/iuBKIFXRA==}
+     engines: {node: '>= 0.4'}
+@@ -3879,6 +3886,10 @@ packages:
+     resolution: {integrity: sha512-ZX99e6tRweoUXqR+VBrslhda51Nh5MTQwou5tnUDgbtyM0dBgmhEDtWGP/xbKn6hqfPRHujUNwz5fy/wbbhnpw==}
+     engines: {node: '>= 0.4'}
+ 
++  side-channel@1.1.1:
++    resolution: {integrity: sha512-6x6dK6zJdpTzF4sQeNYxwtvBzf6Eg4GtlesS94HOvTudUeyK2WXAaIfmDgsyslYrRBeFIlsi54AYsFGUuhmvrQ==}
++    engines: {node: '>= 0.4'}
++
+   siginfo@2.0.0:
+     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
+ 
+@@ -4200,8 +4211,8 @@ packages:
+   ua-is-frozen@0.1.2:
+     resolution: {integrity: sha512-RwKDW2p3iyWn4UbaxpP2+VxwqXh0jpvdxsYpZ5j/MLLiQOfbsV5shpgQiw93+KMYQPcteeMQ289MaAFzs3G9pw==}
+ 
+-  ua-parser-js@2.0.9:
+-    resolution: {integrity: sha512-OsqGhxyo/wGdLSXMSJxuMGN6H4gDnKz6Fb3IBm4bxZFMnyy0sdf6MN96Ie8tC6z/btdO+Bsy8guxlvLdwT076w==}
++  ua-parser-js@2.0.10:
++    resolution: {integrity: sha512-t+3Ktbq0Ies2vaSezfOaWiolH4OigQIO1dk+1xDpOydB1COVPocVYOrEV5rqZ0kFY9XYG1v9LutCyMgYBpABcw==}
+     hasBin: true
+ 
+   unbox-primitive@1.1.0:
+@@ -4264,12 +4275,13 @@ packages:
+     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
+     engines: {node: '>= 0.4.0'}
+ 
+-  uuid@13.0.0:
+-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
++  uuid@13.0.1:
++    resolution: {integrity: sha512-9ezox2roIft6ExBVTVqibSd5dc5/47Sw/uY6b4SjQUT2TzQ0tltNquWA46y4xPQmdZYqvnio22SgWd41M86+jw==}
+     hasBin: true
+ 
+   uuid@8.3.2:
+     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
++    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+     hasBin: true
+ 
+   vary@1.1.2:
+@@ -6350,7 +6362,7 @@ snapshots:
+       editor: 1.0.0
+       find-config: 1.0.0
+       inquirer: 6.5.2
+-      lodash: 4.17.23
++      lodash: 4.18.1
+       temp: 0.9.4
+       word-wrap: 1.2.5
+ 
+@@ -7128,7 +7140,7 @@ snapshots:
+     dependencies:
+       '@types/html-minifier-terser': 6.1.0
+       html-minifier-terser: 6.1.0
+-      lodash: 4.17.23
++      lodash: 4.18.1
+       pretty-error: 4.0.0
+       tapable: 2.3.2
+     optionalDependencies:
+@@ -7189,9 +7201,7 @@ snapshots:
+ 
+   i18next-intervalplural-postprocessor@3.0.0: {}
+ 
+-  i18next@26.0.3(typescript@6.0.2):
+-    dependencies:
+-      '@babel/runtime': 7.29.2
++  i18next@26.3.4(typescript@6.0.2):
+     optionalDependencies:
+       typescript: 6.0.2
+ 
+@@ -7240,7 +7250,7 @@ snapshots:
+       cli-width: 2.2.1
+       external-editor: 3.1.0
+       figures: 2.0.0
+-      lodash: 4.17.23
++      lodash: 4.18.1
+       mute-stream: 0.0.7
+       run-async: 2.4.1
+       rxjs: 6.6.7
+@@ -7552,7 +7562,7 @@ snapshots:
+     dependencies:
+       p-locate: 5.0.0
+ 
+-  lodash-es@4.17.23: {}
++  lodash-es@4.18.1: {}
+ 
+   lodash._baseclone@4.5.7: {}
+ 
+@@ -7564,7 +7574,7 @@ snapshots:
+ 
+   lodash.clone@4.5.0: {}
+ 
+-  lodash@4.17.23: {}
++  lodash@4.18.1: {}
+ 
+   loose-envify@1.4.0:
+     dependencies:
+@@ -7979,7 +7989,7 @@ snapshots:
+ 
+   pretty-error@4.0.0:
+     dependencies:
+-      lodash: 4.17.23
++      lodash: 4.18.1
+       renderkid: 3.0.0
+ 
+   prismjs@1.30.0: {}
+@@ -8014,9 +8024,10 @@ snapshots:
+     dependencies:
+       side-channel: 1.1.0
+ 
+-  qs@6.15.0:
++  qs@6.16.1:
+     dependencies:
+-      side-channel: 1.1.0
++      es-define-property: 1.0.1
++      side-channel: 1.1.1
+ 
+   quick-format-unescaped@4.0.4: {}
+ 
+@@ -8059,11 +8070,11 @@ snapshots:
+       react: 19.2.4
+       react-dom: 19.2.4(react@19.2.4)
+ 
+-  react-i18next@17.0.2(i18next@26.0.3(typescript@6.0.2))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.2):
++  react-i18next@17.0.2(i18next@26.3.4(typescript@6.0.2))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.2):
+     dependencies:
+       '@babel/runtime': 7.29.2
+       html-parse-stringify: 3.0.1
+-      i18next: 26.0.3(typescript@6.0.2)
++      i18next: 26.3.4(typescript@6.0.2)
+       react: 19.2.4
+       use-sync-external-store: 1.6.0(react@19.2.4)
+     optionalDependencies:
+@@ -8184,7 +8195,7 @@ snapshots:
+       css-select: 4.3.0
+       dom-converter: 0.2.0
+       htmlparser2: 6.1.0
+-      lodash: 4.17.23
++      lodash: 4.18.1
+       strip-ansi: 6.0.1
+ 
+   require-from-string@2.0.2: {}
+@@ -8414,6 +8425,11 @@ snapshots:
+       es-errors: 1.3.0
+       object-inspect: 1.13.4
+ 
++  side-channel-list@1.0.1:
++    dependencies:
++      es-errors: 1.3.0
++      object-inspect: 1.13.4
++
+   side-channel-map@1.0.1:
+     dependencies:
+       call-bound: 1.0.4
+@@ -8437,14 +8453,22 @@ snapshots:
+       side-channel-map: 1.0.1
+       side-channel-weakmap: 1.0.2
+ 
++  side-channel@1.1.1:
++    dependencies:
++      es-errors: 1.3.0
++      object-inspect: 1.13.4
++      side-channel-list: 1.0.1
++      side-channel-map: 1.0.1
++      side-channel-weakmap: 1.0.2
++
+   siginfo@2.0.0: {}
+ 
+   signal-exit@3.0.7: {}
+ 
+   simplebar-core@1.3.2:
+     dependencies:
+-      lodash: 4.17.23
+-      lodash-es: 4.17.23
++      lodash: 4.18.1
++      lodash-es: 4.18.1
+ 
+   simplebar@6.3.3:
+     dependencies:
+@@ -8814,7 +8838,7 @@ snapshots:
+ 
+   ua-is-frozen@0.1.2: {}
+ 
+-  ua-parser-js@2.0.9:
++  ua-parser-js@2.0.10:
+     dependencies:
+       detect-europe-js: 0.1.2
+       is-standalone-pwa: 0.1.1
+@@ -8869,7 +8893,7 @@ snapshots:
+ 
+   utils-merge@1.0.1: {}
+ 
+-  uuid@13.0.0: {}
++  uuid@13.0.1: {}
+ 
+   uuid@8.3.2: {}
+ 

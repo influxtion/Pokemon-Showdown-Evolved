@@ -27,6 +27,7 @@ const { MessageAlerts } = require('./message-alerts');
 const { launcherUrl, launcherFrame, httpsHost, denyPermissions } = require('./security');
 const { ShowdexIntegration, registerShowdexScheme } = require('./showdex-integration');
 const { tabShortcut } = require('./shortcuts');
+const { applicationMenu } = require('./application-menu');
 const { Updates, restartBlocker, RELEASES_URL } = require('./updates');
 let updates = null;
 let updateInstalling = false;
@@ -162,15 +163,18 @@ app.on('web-contents-created', (_event, contents) => {
     const shortcut = tabShortcut(input);
     if (!shortcut || !inMainWindow(contents)) return;
     event.preventDefault();
-    // The keyboard follows the tab: the client takes it when shown, the launcher otherwise.
-    cycleFocus = true;
-    clearTimeout(cycleFocusTimer);
-    cycleFocusTimer = setTimeout(() => { cycleFocus = false; }, 2000);
-    // Ctrl+W can open the forfeit popup in the launcher, so its keys (Escape) must reach it.
-    if (shortcut.type === 'close' && contents !== win.webContents) win.webContents.focus();
-    win.webContents.send('nav:shortcut', shortcut);
+    sendTabShortcut(shortcut);
   });
 });
+
+function sendTabShortcut(shortcut) {
+  if (!win || win.isDestroyed()) return;
+  cycleFocus = true;
+  clearTimeout(cycleFocusTimer);
+  cycleFocusTimer = setTimeout(() => { cycleFocus = false; }, 2000);
+  if (shortcut.type === 'close') win.webContents.focus();
+  win.webContents.send('nav:shortcut', shortcut);
+}
 
 function isLauncherFrame(event) {
   return launcherFrame(event, win?.webContents, RENDERER_DIR);
@@ -427,6 +431,10 @@ function createWindow() {
   });
   win.on('closed', () => {
     clearTimeout(windowSaveTimer);
+    // macOS keeps the process alive after the last window closes. Stop downloads and
+    // private workers here too, after all close confirmations have been accepted.
+    void localEngine?.dispose().catch(() => {});
+    void metamonEngine?.dispose().catch(() => {});
     if (client && !client.webContents.isDestroyed()) client.webContents.close();
     replayReview?.close();
     replayReview = null;
@@ -1060,7 +1068,16 @@ app.whenReady().then(async () => {
     logger.write('showdex-assets-failed');
   }
   nativeTheme.themeSource = settings.get('theme');
-  Menu.setApplicationMenu(null);
+  const menu = applicationMenu(process.platform, { name: app.name,
+    shortcut: shortcut => {
+      // Sign-in popups retain normal native Command-W window closing.
+      const focused = BrowserWindow.getFocusedWindow();
+      if (focused && focused !== win) { if (shortcut.type === 'close') focused.close(); return; }
+      sendTabShortcut(shortcut);
+    },
+    closeWindow: () => BrowserWindow.getFocusedWindow()?.close(),
+  });
+  Menu.setApplicationMenu(menu ? Menu.buildFromTemplate(menu) : null);
   createWindow();
   setupUpdates();
   app.on('activate', () => {

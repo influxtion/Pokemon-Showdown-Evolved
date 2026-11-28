@@ -1,5 +1,7 @@
 # Final release audit: November 27, 2026
 
+**Follow-up:** The owner authorized corrections on the audit branch and selected version 1.0.0. See [the current remediation/readiness report](release-readiness-1.0.0.md) and [exact Apple credentials/Mac checklist](mac-release.md). The findings and results below are the original audit baseline, retained for traceability; they are not the current unresolved list. The owner confirmed that the cloud service is intentionally down and excluded that outage from this repair task.
+
 **Decision: do not distribute the current Mac candidate as a verified Developer ID release.** The Windows development app passes broad functional checks, but the repository is not configured to produce the requested signed, hardened, notarized Mac release. No Mac release artifact was produced or certified during this audit.
 
 The owner clarified that the target is **direct Mac downloads with Developer ID signing and notarization**, not the Mac App Store. App Store sandboxing, store-only updates, store metadata, and App Review acceptance are therefore not requirements for this release. Apple's notarization is an automated security/signature assessment, not App Review or approval of functionality or intellectual-property rights. [Apple notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).

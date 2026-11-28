@@ -54,7 +54,6 @@
         </button>
         <a href="play.html" data-nav="sign-in" title="Sign in" hidden>Sign in</a>
       </div>
-      <span class="rail-version">v0.2.0-dev</span>
     </div>
   </nav>
 
@@ -232,6 +231,18 @@
           <p class="field-error" id="update-error" role="alert" hidden></p>
         </section>
 
+        <section class="settings-section" aria-labelledby="privacy-title">
+          <h2 id="privacy-title">Privacy &amp; data</h2>
+          <div class="panel">
+            <div class="setting-row"><div class="setting-text">
+              <p>The official Showdown client loads at startup and can contact advertising providers, including while you are on Home. Those services may receive your IP address, device information, cookies and other identifiers.</p>
+              <p>Cloud bot practice sends team setup and battle information to the bot service. Local bots perform inference on this computer after downloading their runtime. Showdex, replays, artwork, downloads and update checks also contact external services.</p>
+              <p>Settings, notes, Daily progress, recent format activity and website data are saved locally. Sign out and Reset below remove different parts of that data; neither removes the entire app profile. Remove downloaded bots from Bots &gt; Downloads. Exported notes can include private replay links.</p>
+              <p><a href="https://github.com/influxtion/Pokemon-Showdown-Evolved/blob/main/PRIVACY.md">Read the full privacy and deletion notice</a> · <a href="https://pokemonshowdown.com/privacy">Showdown privacy policy</a></p>
+            </div></div>
+          </div>
+        </section>
+
         <section class="settings-section">
           <h2>Troubleshooting</h2>
           <div class="panel">
@@ -259,7 +270,7 @@
             <div class="setting-row">
               <div class="setting-text">
                 <div>Reset launcher data</div>
-                <div class="setting-desc">Deletes launcher settings, preferences and replay notes. Your Showdown sign-in and teams are kept. This cannot be undone.</div>
+                <div class="setting-desc">Deletes launcher settings, preferences and replay notes. Showdown sign-in, teams, Daily progress, recent format activity and downloaded bots are kept. This cannot be undone.</div>
               </div>
               <div class="setting-control"><button class="btn btn-danger" id="reset-launcher" type="button">Reset…</button></div>
             </div>

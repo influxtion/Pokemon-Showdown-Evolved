@@ -46,10 +46,13 @@ function removeInside(base, target) {
 }
 
 function patchSource() {
-  run('git', ['restore', '--', 'src/main.ts', '.env'], SOURCE);
+  run('git', ['restore', '--', 'src/main.ts', '.env', 'package.json', 'pnpm-lock.yaml'], SOURCE);
   const patch = path.join(VENDOR, 'patches', 'desktop-ready.patch');
   run('git', ['apply', '--check', patch], SOURCE);
   run('git', ['apply', patch], SOURCE);
+  const dependencies = path.join(VENDOR, 'patches', 'dependency-security.patch');
+  run('git', ['apply', '--check', dependencies], SOURCE);
+  run('git', ['apply', dependencies], SOURCE);
 
   const envFile = path.join(SOURCE, '.env');
   for (const [key, value] of Object.entries({
@@ -81,6 +84,7 @@ function archiveSource() {
   // .env is intentionally absent from git ls-files in some upstream checkouts.
   fs.copyFileSync(path.join(SOURCE, '.env'), path.join(STAGING, '.env'));
   fs.copyFileSync(path.join(VENDOR, 'patches', 'desktop-ready.patch'), path.join(STAGING, 'DESKTOP-PATCH.patch'));
+  fs.copyFileSync(path.join(VENDOR, 'patches', 'dependency-security.patch'), path.join(STAGING, 'DEPENDENCY-SECURITY.patch'));
   fs.writeFileSync(path.join(STAGING, 'DESKTOP-BUILD.json'), JSON.stringify({
     upstream: UPSTREAM, commit: COMMIT, version: VERSION, buildDate: BUILD_DATE,
     standaloneResourceProtocol: 'showdex', standaloneResourcePrefix: 'assets',

@@ -2,7 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { tabShortcut } = require('../app/shortcuts');
+const { tabShortcut: parseShortcut } = require('../app/shortcuts');
+const tabShortcut = (input, platform = 'win32') => parseShortcut(input, platform);
 
 const key = (extra = {}) => ({ type: 'keyDown', key: 'Tab', code: 'Tab', control: true, shift: false, alt: false, meta: false, ...extra });
 
@@ -40,4 +41,13 @@ test('other key presses are left alone', () => {
   assert.equal(tabShortcut(key({ type: 'keyUp' })), null);
   assert.equal(tabShortcut(key({ key: 'T', code: 'KeyT' })), null);
   assert.equal(tabShortcut(null), null);
+});
+
+test('Mac uses Command for tab close/jump and leaves Command-Tab to the OS', () => {
+  assert.deepEqual(tabShortcut(key({ key: 'w', control: false, meta: true }), 'darwin'), { type: 'close' });
+  assert.deepEqual(tabShortcut(key({ key: '9', code: 'Digit9', control: false, meta: true }), 'darwin'), { type: 'jump', index: 9 });
+  assert.equal(tabShortcut(key({ key: 'w' }), 'darwin'), null);
+  assert.equal(tabShortcut(key({ control: false, meta: true }), 'darwin'), null);
+  assert.equal(tabShortcut(key({ key: 'w', control: false, meta: true, isAutoRepeat: true }), 'darwin'), null);
+  assert.deepEqual(tabShortcut(key(), 'darwin'), { type: 'cycle', direction: 1 });
 });

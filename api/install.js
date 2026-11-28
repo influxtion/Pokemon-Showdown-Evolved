@@ -88,11 +88,18 @@ function sha256File(file) {
   });
 }
 
-async function download(entry, target, { signal, onFraction = () => {}, fetcher = fetch } = {}) {
+async function download(entry, target, { signal, onFraction = () => {}, fetcher = fetch,
+  maxBytes = entry.size || 1024 * 1024 * 1024, timeoutMs = 15 * 60 * 1000 } = {}) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new Error('Invalid download size limit.');
+  signal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeoutMs)]);
   if (fs.existsSync(target) && await sha256File(target) === entry.sha256) return target;
   const response = await fetcher(entry.url, { signal, redirect: 'follow' });
   if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}): ${new URL(entry.url).hostname}`);
   const total = Number(response.headers.get('content-length')) || 0;
+  if (total > maxBytes) {
+    await response.body.cancel();
+    throw new Error('Download exceeds its size limit.');
+  }
   const hash = crypto.createHash('sha256');
   const partial = `${target}.partial`;
   await fsp.mkdir(path.dirname(target), { recursive: true });
@@ -103,6 +110,7 @@ async function download(entry, target, { signal, onFraction = () => {}, fetcher 
       try {
         hash.update(chunk);
         received += chunk.length;
+        if (received > maxBytes) throw new Error('Download exceeds its size limit.');
         if (total) onFraction(Math.min(1, received / total));
         done(null, chunk);
       } catch (error) { done(error); }
@@ -244,6 +252,8 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   const rust = await toolchain(where, key, { signal, onFraction: fraction => report(fraction), onLog: log });
   const env = { ...rust.env, PYTHONNOUSERSITE: '1', PYTHONDONTWRITEBYTECODE: '1', PIP_NO_INPUT: '1',
     PIP_DISABLE_PIP_VERSION_CHECK: '1',
+    // With build isolation disabled, the pinned maturin executable must be discoverable.
+    PATH: [path.join(where.staging, 'python', process.platform === 'win32' ? 'Scripts' : 'bin'), rust.env.PATH].filter(Boolean).join(path.delimiter),
     // Cargo's default of one optimizing rustc per CPU thread can exhaust memory and crash the build.
     CARGO_BUILD_JOBS: process.env.CARGO_BUILD_JOBS || String(Math.min(4, os.availableParallelism())) };
 
@@ -254,17 +264,25 @@ async function install({ dir, onProgress = () => {}, onLog = () => {}, signal, k
   await fsp.rename(path.join(where.staging, `foul-play-${lock.foulPlay.revision}`), path.join(where.staging, 'foul-play'));
 
   next('packages');
+  const requirements = path.join(where.staging, 'requirements.txt');
+  const packages = [...lock.packages, ...lock.buildPackages];
+  await fsp.writeFile(requirements, packages.map(pin => {
+    const hashes = lock.packageHashes[pin];
+    if (!hashes?.length || hashes.some(hash => !/^[a-f0-9]{64}$/.test(hash))) throw new Error(`Missing package hashes: ${pin}`);
+    return `${pin} ${hashes.map(hash => `--hash=sha256:${hash}`).join(' ')}`;
+  }).join('\n') + '\n');
   let collected = 0;
-  await run(python, ['-I', '-m', 'pip', 'install', '--no-warn-script-location', ...lock.packages], { env, signal, onLine: line => {
+  await run(python, ['-I', '-m', 'pip', 'install', '--no-warn-script-location', '--no-deps', '--require-hashes', '-r', requirements], { env, signal, onLine: line => {
     log(line);
-    if (/^Collecting /.test(line)) report(Math.min(0.9, ++collected / lock.packages.length), line.slice(11));
+    if (/^Collecting /.test(line)) report(Math.min(0.9, ++collected / packages.length), line.slice(11));
   } });
 
   next('engine');
+  const engineSource = await download(lock.engine.source, path.join(downloads, 'poke-engine.tar.gz'), { signal });
   let crates = 0;
   await run(python, ['-I', '-m', 'pip', 'install', '-v', '--no-warn-script-location', '--no-cache-dir',
-    `--no-binary=${lock.engine.package}`, `${lock.engine.package}==${lock.engine.version}`,
-    `--config-settings=build-args=--features ${lock.engine.features} --no-default-features`], { env, signal, onLine: line => {
+    '--no-deps', '--no-build-isolation', engineSource,
+    `--config-settings=build-args=--locked --features ${lock.engine.features} --no-default-features`], { env, signal, onLine: line => {
     log(line);
     const crate = /^\s*Compiling (\S+)/.exec(line);
     if (crate) report(Math.min(0.95, ++crates / ENGINE_CRATES), crate[1]);

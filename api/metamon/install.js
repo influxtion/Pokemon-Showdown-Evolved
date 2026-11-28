@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
 const { EventEmitter } = require('node:events');
 const { download, extract, run, pythonExecutable, promoteRuntime } = require('../install');
 const pythonLock = require('../lock.json').python;
@@ -17,10 +18,11 @@ for (const name of ['requirements.txt', 'bootstrap.txt', ...NOTICE_FILES]) ident
 const IDENTITY = identity.digest('hex');
 
 class MetamonRuntime extends EventEmitter {
-  constructor({ dir, platform = `${process.platform}-${process.arch}`, worker = WORKER } = {}) {
+  constructor({ dir, platform = `${process.platform}-${process.arch}`, systemRelease = os.release(), worker = WORKER } = {}) {
     super();
     this.dir = path.resolve(dir);
     this.platform = platform;
+    this.systemRelease = systemRelease;
     this.worker = worker;
     this.current = path.join(this.dir, 'current');
     this.installing = null;
@@ -39,7 +41,10 @@ class MetamonRuntime extends EventEmitter {
 
   status() {
     const value = this.inspect();
-    return { installed: value.installed, current: value.current, supported: Boolean(lock.torch[this.platform] && pythonLock.builds[this.platform]),
+    const supported = Boolean(lock.torch[this.platform] && pythonLock.builds[this.platform]) &&
+      (this.platform !== 'darwin-arm64' || Number.parseInt(this.systemRelease, 10) >= 23);
+    return { installed: value.installed, current: value.current, supported,
+      unsupportedReason: !supported && this.platform.startsWith('darwin') ? 'Local Metamon requires Apple Silicon and macOS 14 or later. Cloud Metamon supports both Mac architectures.' : '',
       installing: Boolean(this.installing), progress: this.progress, error: this.error, model: lock.model.name };
   }
 
@@ -96,6 +101,7 @@ class MetamonRuntime extends EventEmitter {
     for (const name of NOTICE_FILES) await fsp.copyFile(path.join(ASSETS, name), path.join(staging, name));
     await fsp.writeFile(path.join(staging, 'SOURCE.json'), JSON.stringify(lock, null, 2) + '\n');
     report('Checking Metamon on CPU');
+    await run(python, ['-I', '-m', 'pip', 'check'], { env, signal });
     await run(python, ['-I', '-B', this.worker, '--runtime', staging, '--check'], { env, signal });
     signal.throwIfAborted();
     await fsp.writeFile(path.join(staging, 'install.json'), JSON.stringify({ version: 1, identity: IDENTITY, model: 'Kakuna', installedAt: new Date().toISOString() }));
