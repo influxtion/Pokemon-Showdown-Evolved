@@ -74,10 +74,28 @@
         <section class="stats-head" id="stats-head" aria-label="Summary" hidden></section>
 
         <section class="window" aria-labelledby="formats-title">
-          <div class="window-head">
+          <div class="window-head stats-toolbar">
             <h2 id="formats-title">Formats</h2>
+            <label class="stats-sort-label" for="stats-sort">Sort by</label>
+            <select class="select" id="stats-sort" aria-describedby="stats-recency-note" disabled>
+              <option value="recent:-1">Recent in this app</option>
+              <option value="recent:1">Oldest in this app</option>
+              <option value="games:-1">Most games</option>
+              <option value="games:1">Least games</option>
+              <option value="wins:-1">Most wins</option>
+              <option value="wins:1">Least wins</option>
+              <option value="losses:-1">Most losses</option>
+              <option value="losses:1">Least losses</option>
+              <option value="elo:-1">Highest rating</option>
+              <option value="elo:1">Lowest rating</option>
+              <option value="gxe:-1">Highest GXE</option>
+              <option value="gxe:1">Lowest GXE</option>
+              <option value="name:1">Format A–Z</option>
+              <option value="name:-1">Format Z–A</option>
+            </select>
             <input class="input" id="stats-filter" type="search" placeholder="Filter formats" aria-label="Filter formats" autocomplete="off" disabled>
           </div>
+          <p class="stats-note" id="stats-recency-note">Recent activity is tracked on this device from now on, including unrated play. Formats without activity are listed last, by games played.</p>
           <div id="stats-body"><div class="empty">Connecting to Showdown…</div></div>
         </section>
       </div>
